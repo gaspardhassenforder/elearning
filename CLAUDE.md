@@ -4,9 +4,25 @@ This file provides architectural guidance for contributors working on Open Noteb
 
 ## Project Overview
 
-**Open Notebook** is an open-source, privacy-focused alternative to Google's Notebook LM. It's an AI-powered research assistant enabling users to upload multi-modal content (PDFs, audio, video, web pages), generate intelligent notes, search semantically, chat with AI models, and produce professional podcasts—all with complete control over data and choice of AI providers.
+**Open Notebook** is evolving from a personal research assistant into a **B2B interactive learning platform**. Organizations can deliver curated educational content through AI-guided notebooks that combine reading materials, interactive AI chat, quizzes, and podcasts—all while maintaining privacy-first, self-hosted architecture.
 
-**Key Values**: Privacy-first, multi-provider AI support, fully self-hosted option, open-source transparency.
+### Product Vision
+Enable organizations to provide structured, interactive learning experiences where:
+- **Admins** curate educational notebooks with multi-modal content (PDFs, videos, documents)
+- **Learners** engage with content through reading, AI-guided chat, self-generated quizzes, and custom podcasts
+- **AI acts as a guide**, not an answer key—encouraging critical thinking and active learning
+
+### Key Values
+- **Privacy-first**: Self-hosted, complete data control
+- **Multi-provider AI**: Support for 16+ AI providers (OpenAI, Anthropic, Ollama, etc.)
+- **Interactive learning**: AI-guided exploration, not passive consumption
+- **B2B focused**: Single-instance multi-tenancy with organization-level content
+- **Open-source**: Transparent, customizable, community-driven
+
+### Target Users
+- **B2B Clients**: Companies, educational institutions, training organizations
+- **Learners**: Employees/students consuming educational content
+- **Admins**: Content creators managing notebooks and user access
 
 ---
 
@@ -14,21 +30,29 @@ This file provides architectural guidance for contributors working on Open Noteb
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│              Frontend (React/Next.js)                    │
+│         Frontend (React/Next.js) - Learning UI          │
 │              frontend/ @ port 3000                       │
 ├─────────────────────────────────────────────────────────┤
-│ - Notebooks, sources, notes, chat, podcasts, search UI  │
+│ - 3-Column Learning Interface:                          │
+│   • Document Reader (sources viewer)                    │
+│   • AI Chat Guide (interactive tutor)                   │
+│   • Artifacts Panel (quizzes, podcasts, notes)          │
+│ - User authentication & notebook assignment             │
 │ - Zustand state management, TanStack Query (React Query)│
 │ - Shadcn/ui component library with Tailwind CSS         │
 └────────────────────────┬────────────────────────────────┘
-                         │ HTTP REST
+                         │ HTTP REST + JWT Auth
 ┌────────────────────────▼────────────────────────────────┐
 │              API (FastAPI)                              │
 │              api/ @ port 5055                           │
 ├─────────────────────────────────────────────────────────┤
-│ - REST endpoints for notebooks, sources, notes, chat    │
-│ - LangGraph workflow orchestration                      │
-│ - Job queue for async operations (podcasts)             │
+│ - User authentication & role-based access control       │
+│ - Notebook assignment & access management               │
+│ - Quiz generation workflow (LangGraph)                  │
+│ - Custom podcast generation (topic + length + speakers) │
+│ - AI chat guide mode (hints, not answers)               │
+│ - Artifacts management (unified view)                   │
+│ - Job queue for async operations (surreal-commands)     │
 │ - Multi-provider AI provisioning via Esperanto          │
 └────────────────────────┬────────────────────────────────┘
                          │ SurrealQL
@@ -36,8 +60,10 @@ This file provides architectural guidance for contributors working on Open Noteb
 │         Database (SurrealDB)                            │
 │         Graph database @ port 8000                      │
 ├─────────────────────────────────────────────────────────┤
-│ - Records: Notebook, Source, Note, ChatSession, etc.    │
-│ - Relationships: source-to-notebook, note-to-source     │
+│ - Core: User, Notebook, Source, Note, ChatSession       │
+│ - Learning: Quiz, QuizQuestion, Podcast, Artifact       │
+│ - Access: UserNotebookAssignment                        │
+│ - Relationships: user-to-notebook, source-to-notebook   │
 │ - Vector embeddings for semantic search                 │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -83,62 +109,90 @@ User documentation is at @docs/
 
 ## Architecture Highlights
 
-### 1. Async-First Design
+### 1. Learning Platform Architecture
+- **3-Column Interface**: Document reader, AI chat guide, artifacts panel
+- **User Management**: Authentication, role-based access (Admin/Learner)
+- **Notebook Assignment**: Users see only assigned notebooks
+- **Artifacts System**: Unified view of quizzes, podcasts, notes, transformations
+- **AI Guide Mode**: Prompt-engineered to provide hints, not direct answers
+
+### 2. Async-First Design
 - All database queries, graph invocations, and API calls are async (await)
 - SurrealDB async driver with connection pooling
 - FastAPI handles concurrent requests efficiently
+- Async job processing for quiz/podcast generation
 
-### 2. LangGraph Workflows
+### 3. LangGraph Workflows
 - **source.py**: Content ingestion (extract → embed → save)
-- **chat.py**: Conversational agent with message history
+- **chat.py**: AI guide mode - conversational tutor with hints
 - **ask.py**: Search + synthesis (retrieve relevant sources → LLM)
+- **quiz_generation.py**: Generate MCQ quizzes from sources (NEW)
+- **podcast.py**: Custom podcast generation with topic/length/speaker options (ENHANCED)
 - **transformation.py**: Custom transformations on sources
 - All use `provision_langchain_model()` for smart model selection
 
-### 3. Multi-Provider AI
-- **Esperanto library**: Unified interface to 8+ AI providers
+### 4. Multi-Provider AI
+- **Esperanto library**: Unified interface to 16+ AI providers
 - **ModelManager**: Factory pattern with fallback logic
 - **Smart selection**: Detects large contexts, prefers long-context models
 - **Override support**: Per-request model configuration
+- **Cost optimization**: Cheaper models for quizzes, premium for podcasts
 
-### 4. Database Schema
+### 5. Database Schema
 - **Automatic migrations**: AsyncMigrationManager runs on API startup
 - **SurrealDB graph model**: Records with relationships and embeddings
+- **Learning models**: User, Quiz, Podcast, Artifact, UserNotebookAssignment
 - **Vector search**: Built-in semantic search across all content
 - **Transactions**: Repo functions handle ACID operations
 
-### 5. Authentication
-- **Current**: Simple password middleware (insecure, dev-only)
-- **Production**: Replace with OAuth/JWT (see CONFIGURATION.md)
+### 6. Authentication & Authorization
+- **User Model**: Username/password authentication (JWT-based)
+- **Roles**: Admin (content creator) vs. Learner (consumer)
+- **Access Control**: Notebook assignment per user
+- **Future**: Organization-based multi-tenancy, SSO/OAuth
 
 ---
 
 ## Important Quirks & Gotchas
 
+### Learning Platform Specifics
+- **User roles**: Admin can create/edit notebooks; Learners are read-only
+- **Notebook assignment**: Currently all users see all notebooks (MVP)
+- **AI guide mode**: Prompt-engineered to give hints, not direct answers
+- **Quiz generation**: Async job, may take 30-60 seconds
+- **Custom podcasts**: User specifies topic, length, and speaker format
+- **Artifacts**: All generated content (quizzes, podcasts, notes) stored per notebook
+
 ### API Startup
 - **Migrations run automatically** on startup; check logs for errors
 - **Must start API before UI**: UI depends on API for all data
 - **SurrealDB must be running**: API fails without database connection
+- **User seeding**: May need to create initial admin user manually
 
 ### Frontend-Backend Communication
 - **Base API URL**: Configured in `.env.local` (default: http://localhost:5055)
 - **CORS enabled**: Configured in `api/main.py` (allow all origins in dev)
+- **Authentication**: JWT tokens stored in localStorage/cookies
 - **Rate limiting**: Not built-in; add at proxy layer for production
 
 ### LangGraph Workflows
-- **Blocking operations**: Chat/podcast workflows may take minutes; no timeout
+- **Blocking operations**: Chat/podcast/quiz workflows may take minutes
 - **State persistence**: Uses SQLite checkpoint storage in `/data/sqlite-db/`
 - **Model fallback**: If primary model fails, falls back to cheaper/smaller model
+- **Quiz quality**: Depends on source content quality and LLM model
 
 ### Podcast Generation
 - **Async job queue**: `podcast_service.py` submits jobs but doesn't wait
 - **Track status**: Use `/commands/{command_id}` endpoint to poll status
 - **TTS failures**: Fall back to silent audio if speech synthesis fails
+- **Speaker format**: Single or multi-speaker (user choice)
+- **Overview podcasts**: Pre-generated by admin when creating notebook
 
 ### Content Processing
 - **File extraction**: Uses content-core library; supports 50+ file types
 - **URL handling**: Extracts text + metadata from web pages
 - **Large files**: Content processing is sync; may block API briefly
+- **Embeddings**: Required for semantic search and AI chat context
 
 ---
 
@@ -159,6 +213,7 @@ See dedicated CLAUDE.md files for detailed guidance:
 ## Documentation Map
 
 - **[README.md](README.md)**: Project overview, features, quick start
+- **[PRD.md](PRD.md)**: Product Requirements Document for B2B learning platform transformation
 - **[docs/index.md](docs/index.md)**: Complete user & deployment documentation
 - **[CONFIGURATION.md](CONFIGURATION.md)**: Environment variables, model configuration
 - **[CONTRIBUTING.md](CONTRIBUTING.md)**: Contribution guidelines
@@ -173,6 +228,84 @@ See dedicated CLAUDE.md files for detailed guidance:
 - **Utils tests**: `tests/test_utils.py`
 - **Run all**: `uv run pytest tests/`
 - **Coverage**: Check with `pytest --cov`
+
+---
+
+## Learning Platform Development
+
+### Key Features to Implement
+
+**User Authentication & Management**
+- User model with roles (Admin/Learner)
+- JWT-based authentication
+- Notebook assignment logic
+- Access control middleware
+
+**3-Column Learning Interface**
+- Document reader component (left column)
+- AI chat guide component (middle column)
+- Artifacts panel component (right column)
+- Responsive layout for mobile/tablet
+
+**Quiz System**
+- Quiz generation workflow (LangGraph)
+- MCQ question model and storage
+- Quiz UI components (generator, viewer, results)
+- Admin quiz pre-loading
+
+**Enhanced Podcast System**
+- Custom podcast generation with user options
+- Single vs. multi-speaker selection
+- Topic/length specification
+- Overview podcast pre-generation
+
+**Artifacts Management**
+- Unified artifact model
+- Artifacts list view
+- Artifact type filtering
+- Per-notebook artifact storage
+
+**AI Guide Mode**
+- Prompt engineering for hints vs. answers
+- Socratic questioning patterns
+- Document section references
+- Context-aware guidance
+
+### Development Priorities (MVP)
+
+1. **Phase 1: Foundation** (Weeks 1-2)
+   - User authentication system
+   - Database schema updates (User, Quiz, Podcast, Artifact models)
+   - Notebook assignment logic
+   - API endpoints for auth and user management
+
+2. **Phase 2: Learning Interface** (Weeks 3-4)
+   - 3-column layout implementation
+   - Document reader component
+   - AI chat guide component
+   - Artifacts panel component
+
+3. **Phase 3: Interactive Features** (Weeks 5-6)
+   - Quiz generation workflow
+   - Custom podcast generation
+   - AI guide mode prompt engineering
+   - Artifact management
+
+4. **Phase 4: Polish & Testing** (Week 7+)
+   - Responsive design
+   - UX refinement
+   - Performance optimization
+   - User testing
+
+### Future Enhancements (Post-MVP)
+
+- Admin dashboard for user/notebook management
+- Organization-based access control
+- Progress tracking and analytics
+- Advanced quiz types (short answer, essay)
+- Additional artifact types (slide decks, study guides)
+- SSO/OAuth integration
+- Onboarding questionnaire for user type detection
 
 ---
 
