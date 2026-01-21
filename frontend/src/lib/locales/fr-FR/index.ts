@@ -1,4 +1,4 @@
-export const enUS = {
+export const frFR = {
   common: {
     search: "Search...",
     create: "New",
@@ -21,7 +21,7 @@ export const enUS = {
     newPodcast: "New Podcast",
     language: "Language",
     english: "English",
-    french: "Français",
+    chinese: "简体中文",
     source: "Source",
     notebook: "Notebook",
     podcast: "Podcast",
@@ -127,6 +127,8 @@ export const enUS = {
     editTransformation: "Edit Transformation",
     comingSoon: "Coming soon",
     retry: "Try Again",
+    traditionalChinese: "繁體中文",
+    portuguese: "Português",
     completed: "completed",
     saveSuccess: "Saved successfully",
     contextModes: {

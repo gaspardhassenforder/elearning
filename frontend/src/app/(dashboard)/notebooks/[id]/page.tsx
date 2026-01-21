@@ -1,12 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import { AppShell } from '@/components/layout/AppShell'
+import { LearningLayout } from '@/components/layout/LearningLayout'
 import { NotebookHeader } from '../components/NotebookHeader'
-import { SourcesColumn } from '../components/SourcesColumn'
+import { DocumentsColumn } from '../components/DocumentsColumn'
 import { NotesColumn } from '../components/NotesColumn'
 import { ChatColumn } from '../components/ChatColumn'
+import { ArtifactsPanel } from '@/components/layout/ArtifactsPanel'
 import { useNotebook } from '@/lib/hooks/use-notebooks'
 import { useNotebookSources } from '@/lib/hooks/use-sources'
 import { useNotes } from '@/lib/hooks/use-notes'
@@ -16,7 +18,7 @@ import { useIsDesktop } from '@/lib/hooks/use-media-query'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { cn } from '@/lib/utils'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { FileText, StickyNote, MessageSquare } from 'lucide-react'
+import { FileText, StickyNote, MessageSquare, BookOpen, GraduationCap, GripVertical } from 'lucide-react'
 
 export type ContextMode = 'off' | 'insights' | 'full'
 
@@ -44,13 +46,96 @@ export default function NotebookPage() {
   const { data: notes, isLoading: notesLoading } = useNotes(notebookId)
 
   // Get collapse states for dynamic layout
-  const { sourcesCollapsed, notesCollapsed } = useNotebookColumnsStore()
+  const { sourcesCollapsed, notesCollapsed, artifactsCollapsed, chatCollapsed } = useNotebookColumnsStore()
 
   // Detect desktop to avoid double-mounting ChatColumn
   const isDesktop = useIsDesktop()
 
-  // Mobile tab state (Sources, Notes, or Chat)
-  const [mobileActiveTab, setMobileActiveTab] = useState<'sources' | 'notes' | 'chat'>('chat')
+  // Resizable column widths
+  const [documentsWidth, setDocumentsWidth] = useState(33.33) // percentage
+  const [notesArtifactsWidth, setNotesArtifactsWidth] = useState(33.33) // percentage
+  const [notesHeight, setNotesHeight] = useState(66.67) // percentage of Notes+Artifacts column
+  const [isResizing, setIsResizing] = useState<'documents' | 'notes-artifacts' | 'notes-vertical' | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const resizeStartRef = useRef({ x: 0, y: 0, documentsWidth: 0, notesArtifactsWidth: 0, notesHeight: 0 })
+
+  const handleResizeStart = useCallback((type: 'documents' | 'notes-artifacts' | 'notes-vertical', e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsResizing(type)
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect()
+      resizeStartRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        documentsWidth,
+        notesArtifactsWidth,
+        notesHeight,
+      }
+    }
+  }, [documentsWidth, notesArtifactsWidth, notesHeight])
+
+  useEffect(() => {
+    if (!isResizing || !containerRef.current) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      requestAnimationFrame(() => {
+        if (!containerRef.current) return
+        const rect = containerRef.current.getBoundingClientRect()
+        
+        if (isResizing === 'documents' || isResizing === 'notes-artifacts') {
+          const deltaX = e.clientX - resizeStartRef.current.x
+          const deltaPercent = (deltaX / rect.width) * 100
+
+          if (isResizing === 'documents') {
+            const newDocWidth = resizeStartRef.current.documentsWidth + deltaPercent
+            const minDocWidth = 10
+            const maxDocWidth = 60
+            
+            // Ensure there's enough space for middle and chat columns (min 15% each)
+            const maxAllowedDocWidth = 100 - 30 // Reserve 30% for middle + chat
+            
+            const constrainedDocWidth = Math.max(minDocWidth, Math.min(maxDocWidth, Math.min(maxAllowedDocWidth, newDocWidth)))
+            setDocumentsWidth(constrainedDocWidth)
+            
+          } else if (isResizing === 'notes-artifacts') {
+            const newMiddleWidth = resizeStartRef.current.notesArtifactsWidth + deltaPercent
+            const minMiddleWidth = 15
+            const maxMiddleWidth = 60
+            
+            // Ensure there's enough space for chat column (min 10%)
+            const maxAllowedMiddle = 100 - documentsWidth - 10
+            
+            const constrainedMiddleWidth = Math.max(minMiddleWidth, Math.min(maxMiddleWidth, Math.min(maxAllowedMiddle, newMiddleWidth)))
+            setNotesArtifactsWidth(constrainedMiddleWidth)
+          }
+        } else if (isResizing === 'notes-vertical') {
+          const notesArtifactsContainer = containerRef.current.querySelector('[data-notes-artifacts-container]') as HTMLElement
+          if (notesArtifactsContainer) {
+            const containerRect = notesArtifactsContainer.getBoundingClientRect()
+            const deltaY = e.clientY - resizeStartRef.current.y
+            const deltaPercent = (deltaY / containerRect.height) * 100
+            const newHeight = Math.max(20, Math.min(80, resizeStartRef.current.notesHeight + deltaPercent))
+            setNotesHeight(newHeight)
+          }
+        }
+      })
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(null)
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isResizing])
+
+  // Mobile tab state (Documents, Notes, Chat, or Artifacts)
+  const [mobileActiveTab, setMobileActiveTab] = useState<'documents' | 'notes' | 'chat' | 'artifacts'>('documents')
 
   // Context selection state
   const [contextSelections, setContextSelections] = useState<ContextSelections>({
@@ -133,15 +218,19 @@ export default function NotebookPage() {
           {!isDesktop && (
             <>
               <div className="lg:hidden mb-4">
-                <Tabs value={mobileActiveTab} onValueChange={(value) => setMobileActiveTab(value as 'sources' | 'notes' | 'chat')}>
-                  <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="sources" className="gap-2">
+                <Tabs value={mobileActiveTab} onValueChange={(value) => setMobileActiveTab(value as 'documents' | 'notes' | 'chat' | 'artifacts')}>
+                  <TabsList className="grid w-full grid-cols-4">
+                    <TabsTrigger value="documents" className="gap-2">
                       <FileText className="h-4 w-4" />
-                      {t.navigation.sources}
+                      {t.navigation.documents}
                     </TabsTrigger>
                     <TabsTrigger value="notes" className="gap-2">
                       <StickyNote className="h-4 w-4" />
                       {t.common.notes}
+                    </TabsTrigger>
+                    <TabsTrigger value="artifacts" className="gap-2">
+                      <GraduationCap className="h-4 w-4" />
+                      Artifacts
                     </TabsTrigger>
                     <TabsTrigger value="chat" className="gap-2">
                       <MessageSquare className="h-4 w-4" />
@@ -153,8 +242,8 @@ export default function NotebookPage() {
 
               {/* Mobile: Show only active tab */}
               <div className="flex-1 overflow-hidden lg:hidden">
-                {mobileActiveTab === 'sources' && (
-                  <SourcesColumn
+                {mobileActiveTab === 'documents' && (
+                  <DocumentsColumn
                     sources={sources}
                     isLoading={sourcesLoading}
                     notebookId={notebookId}
@@ -176,6 +265,11 @@ export default function NotebookPage() {
                     onContextModeChange={(noteId, mode) => handleContextModeChange(noteId, mode, 'note')}
                   />
                 )}
+                {mobileActiveTab === 'artifacts' && (
+                  <ArtifactsPanel
+                    notebookId={notebookId}
+                  />
+                )}
                 {mobileActiveTab === 'chat' && (
                   <ChatColumn
                     notebookId={notebookId}
@@ -186,17 +280,28 @@ export default function NotebookPage() {
             </>
           )}
 
-          {/* Desktop: Collapsible columns layout */}
-          <div className={cn(
-            'hidden lg:flex h-full min-h-0 gap-6 transition-all duration-150',
-            'flex-row'
-          )}>
-            {/* Sources Column */}
-            <div className={cn(
-              'transition-all duration-150',
-              sourcesCollapsed ? 'w-12 flex-shrink-0' : 'flex-none basis-1/3'
-            )}>
-              <SourcesColumn
+          {/* Desktop: 3-column learning layout */}
+          <div 
+            ref={containerRef}
+            className={cn(
+              'hidden lg:flex h-full min-h-0',
+              'flex-row relative',
+              isResizing && 'select-none cursor-col-resize'
+            )}
+            style={{ gap: '6px' }}
+          >
+            {/* Column 1: Documents (merged Sources + Reader) */}
+            <div 
+              className={cn(
+                'relative h-full',
+                sourcesCollapsed ? 'w-12 flex-shrink-0' : ''
+              )}
+              style={!sourcesCollapsed ? { 
+                width: `${documentsWidth}%`,
+                transition: isResizing ? 'none' : 'width 150ms'
+              } : undefined}
+            >
+              <DocumentsColumn
                 sources={sources}
                 isLoading={sourcesLoading}
                 notebookId={notebookId}
@@ -208,24 +313,108 @@ export default function NotebookPage() {
                 isFetchingNextPage={isFetchingNextPage}
                 fetchNextPage={fetchNextPage}
               />
+              {!sourcesCollapsed && !(notesCollapsed && artifactsCollapsed) && (
+                <div
+                  onMouseDown={(e) => handleResizeStart('documents', e)}
+                  className={cn(
+                    'absolute right-0 top-0 h-full cursor-col-resize z-20 group',
+                    'flex items-center justify-center'
+                  )}
+                  style={{ right: '-3px', width: '6px' }}
+                >
+                  <div className="w-px h-full bg-transparent group-hover:bg-primary/50 transition-colors" />
+                  <GripVertical className="absolute opacity-0 group-hover:opacity-100 transition-opacity text-primary" size={14} />
+                </div>
+              )}
             </div>
 
-            {/* Notes Column */}
-            <div className={cn(
-              'transition-all duration-150',
-              notesCollapsed ? 'w-12 flex-shrink-0' : 'flex-none basis-1/3'
-            )}>
-              <NotesColumn
-                notes={notes}
-                isLoading={notesLoading}
-                notebookId={notebookId}
-                contextSelections={contextSelections.notes}
-                onContextModeChange={(noteId, mode) => handleContextModeChange(noteId, mode, 'note')}
-              />
+            {/* Column 2: Notes + Artifacts (stacked vertically) */}
+            <div 
+              className={cn(
+                'relative h-full',
+                (notesCollapsed && artifactsCollapsed) ? 'w-12 flex-shrink-0' : ''
+              )}
+              style={!(notesCollapsed && artifactsCollapsed) ? { 
+                width: `${notesArtifactsWidth}%`,
+                transition: isResizing ? 'none' : 'width 150ms'
+              } : undefined}
+              data-notes-artifacts-container
+            >
+              <div className="flex flex-col h-full gap-1.5">
+                {/* Notes - resizable height when both expanded, else takes available space */}
+                <div 
+                  className={cn(
+                    'relative',
+                    notesCollapsed ? 'w-12 flex-shrink-0' : 'w-full min-h-0'
+                  )}
+                  style={!notesCollapsed && !artifactsCollapsed ? { 
+                    height: `${notesHeight}%`,
+                    transition: isResizing === 'notes-vertical' ? 'none' : 'height 150ms'
+                  } : !notesCollapsed ? { flex: 1 } : undefined}
+                >
+                  <NotesColumn
+                    notes={notes}
+                    isLoading={notesLoading}
+                    notebookId={notebookId}
+                    contextSelections={contextSelections.notes}
+                    onContextModeChange={(noteId, mode) => handleContextModeChange(noteId, mode, 'note')}
+                  />
+                </div>
+                
+                {/* Horizontal resize handle between Notes and Artifacts */}
+                {!notesCollapsed && !artifactsCollapsed && (
+                  <div
+                    onMouseDown={(e) => handleResizeStart('notes-vertical', e)}
+                    className={cn(
+                      'cursor-row-resize z-20 group flex items-center justify-center',
+                      'h-[6px] -my-[3px]'
+                    )}
+                  >
+                    <div className="w-full h-px bg-transparent group-hover:bg-primary/50 transition-colors" />
+                    <GripVertical className="absolute opacity-0 group-hover:opacity-100 transition-opacity text-primary rotate-90" size={14} />
+                  </div>
+                )}
+                
+                {/* Artifacts - takes remaining space */}
+                <div 
+                  className={cn(
+                    'relative',
+                    artifactsCollapsed ? 'w-12 flex-shrink-0' : 'w-full flex-1 min-h-0'
+                  )}
+                  style={{
+                    transition: isResizing === 'notes-vertical' ? 'none' : 'flex 150ms, height 150ms'
+                  }}
+                >
+                  <ArtifactsPanel
+                    notebookId={notebookId}
+                  />
+                </div>
+              </div>
+              {!(notesCollapsed && artifactsCollapsed) && !chatCollapsed && (
+                <div
+                  onMouseDown={(e) => handleResizeStart('notes-artifacts', e)}
+                  className={cn(
+                    'absolute right-0 top-0 h-full cursor-col-resize z-20 group',
+                    'flex items-center justify-center'
+                  )}
+                  style={{ right: '-3px', width: '6px' }}
+                >
+                  <div className="w-px h-full bg-transparent group-hover:bg-primary/50 transition-colors" />
+                  <GripVertical className="absolute opacity-0 group-hover:opacity-100 transition-opacity text-primary" size={14} />
+                </div>
+              )}
             </div>
 
-            {/* Chat Column - always expanded, takes remaining space */}
-            <div className="transition-all duration-150 flex-1 lg:pr-6 lg:-mr-6">
+            {/* Column 3: Chat - takes remaining space */}
+            <div 
+              className={cn(
+                'h-full',
+                chatCollapsed ? 'w-12 flex-shrink-0' : 'flex-1 min-w-0'
+              )}
+              style={{
+                transition: isResizing ? 'none' : 'width 150ms, flex 150ms'
+              }}
+            >
               <ChatColumn
                 notebookId={notebookId}
                 contextSelections={contextSelections}

@@ -1,0 +1,37 @@
+You are an expert educator creating quiz questions. Generate multiple choice questions based on the provided educational content.
+
+**Content to quiz:**
+{{ sources_content }}
+
+**Instructions:**
+{% if topic %}
+Focus specifically on: {{ topic }}
+{% else %}
+Cover the main concepts and key points from the content.
+{% endif %}
+
+Generate exactly {{ num_questions }} multiple choice questions with:
+1. A clear, well-written question
+2. Four answer options (A, B, C, D)
+3. The correct answer indicated by its index (0-3)
+4. A brief explanation of why that's the correct answer
+
+**Guidelines:**
+- Questions should test understanding, not just memorization
+- Make distractors (wrong answers) plausible but clearly incorrect
+- Vary difficulty: include easy, medium, and challenging questions
+- Reference specific content from the sources when appropriate
+- Keep questions focused and unambiguous
+
+**Output Format:**
+Return ONLY a valid JSON array with no additional text:
+```json
+[
+  {
+    "question": "What is the main concept described in the document?",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "correct_answer": 0,
+    "explanation": "Option A is correct because..."
+  }
+]
+```

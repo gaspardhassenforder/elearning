@@ -1,0 +1,12 @@
+-- Migration 11 Down: Remove Learning Platform Tables
+
+-- Remove indexes first
+REMOVE INDEX artifact_type_idx ON TABLE artifact;
+REMOVE INDEX artifact_notebook_idx ON TABLE artifact;
+REMOVE INDEX podcast_notebook_idx ON TABLE podcast;
+REMOVE INDEX quiz_notebook_idx ON TABLE quiz;
+
+-- Remove tables
+REMOVE TABLE artifact;
+REMOVE TABLE podcast;
+REMOVE TABLE quiz;

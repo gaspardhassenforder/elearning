@@ -79,6 +79,7 @@ export function NotesColumn({
         onToggle={toggleNotes}
         collapsedIcon={StickyNote}
         collapsedLabel={t.common.notes}
+        direction="vertical-in-stack"
       >
         <Card className="h-full flex flex-col flex-1 overflow-hidden">
           <CardHeader className="pb-3 flex-shrink-0">

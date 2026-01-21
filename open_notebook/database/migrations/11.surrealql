@@ -1,0 +1,48 @@
+-- Migration 11: Learning Platform Features
+-- Creates quiz, podcast, and artifact tables for the learning platform
+
+-- Create Quiz table
+DEFINE TABLE quiz SCHEMAFULL;
+DEFINE FIELD notebook_id ON quiz TYPE record<notebook>;
+DEFINE FIELD title ON quiz TYPE string;
+DEFINE FIELD description ON quiz TYPE option<string>;
+DEFINE FIELD questions ON quiz TYPE array;
+DEFINE FIELD created_by ON quiz TYPE string DEFAULT "user";
+DEFINE FIELD source_ids ON quiz TYPE option<array>;
+DEFINE FIELD created ON quiz TYPE datetime DEFAULT time::now();
+DEFINE FIELD updated ON quiz TYPE datetime DEFAULT time::now();
+
+-- Index for efficient notebook lookups
+DEFINE INDEX quiz_notebook_idx ON quiz FIELDS notebook_id;
+
+-- Create Podcast table for custom podcasts
+DEFINE TABLE podcast SCHEMAFULL;
+DEFINE FIELD notebook_id ON podcast TYPE record<notebook>;
+DEFINE FIELD title ON podcast TYPE string;
+DEFINE FIELD topic ON podcast TYPE option<string>;
+DEFINE FIELD length ON podcast TYPE string DEFAULT "medium";
+DEFINE FIELD speaker_format ON podcast TYPE string DEFAULT "multi";
+DEFINE FIELD audio_file_path ON podcast TYPE option<string>;
+DEFINE FIELD transcript ON podcast TYPE option<string>;
+DEFINE FIELD is_overview ON podcast TYPE bool DEFAULT false;
+DEFINE FIELD created_by ON podcast TYPE string DEFAULT "user";
+DEFINE FIELD status ON podcast TYPE string DEFAULT "pending";
+DEFINE FIELD error_message ON podcast TYPE option<string>;
+DEFINE FIELD created ON podcast TYPE datetime DEFAULT time::now();
+DEFINE FIELD updated ON podcast TYPE datetime DEFAULT time::now();
+
+-- Index for efficient notebook lookups
+DEFINE INDEX podcast_notebook_idx ON podcast FIELDS notebook_id;
+
+-- Create Artifact table for unified artifact tracking
+DEFINE TABLE artifact SCHEMAFULL;
+DEFINE FIELD notebook_id ON artifact TYPE record<notebook>;
+DEFINE FIELD artifact_type ON artifact TYPE string;
+DEFINE FIELD artifact_id ON artifact TYPE string;
+DEFINE FIELD title ON artifact TYPE string;
+DEFINE FIELD created ON artifact TYPE datetime DEFAULT time::now();
+DEFINE FIELD updated ON artifact TYPE datetime DEFAULT time::now();
+
+-- Indexes for artifact lookups
+DEFINE INDEX artifact_notebook_idx ON artifact FIELDS notebook_id;
+DEFINE INDEX artifact_type_idx ON artifact FIELDS artifact_type;

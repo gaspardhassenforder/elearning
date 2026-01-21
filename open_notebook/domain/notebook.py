@@ -87,6 +87,63 @@ class Notebook(ObjectModel):
             logger.exception(e)
             raise DatabaseOperationError(e)
 
+    async def get_artifacts(self) -> List["Artifact"]:
+        """Get all artifacts (quizzes, podcasts, notes) for this notebook."""
+        try:
+            from open_notebook.domain.artifact import Artifact
+
+            result = await repo_query(
+                """
+                SELECT * FROM artifact 
+                WHERE notebook_id = $notebook_id 
+                ORDER BY created DESC
+                """,
+                {"notebook_id": ensure_record_id(self.id)},
+            )
+            return [Artifact(**r) for r in result] if result else []
+        except Exception as e:
+            logger.error(f"Error fetching artifacts for notebook {self.id}: {str(e)}")
+            logger.exception(e)
+            raise DatabaseOperationError(e)
+
+    async def get_quizzes(self) -> List["Quiz"]:
+        """Get all quizzes for this notebook."""
+        try:
+            from open_notebook.domain.quiz import Quiz
+
+            result = await repo_query(
+                """
+                SELECT * FROM quiz 
+                WHERE notebook_id = $notebook_id 
+                ORDER BY created DESC
+                """,
+                {"notebook_id": ensure_record_id(self.id)},
+            )
+            return [Quiz(**r) for r in result] if result else []
+        except Exception as e:
+            logger.error(f"Error fetching quizzes for notebook {self.id}: {str(e)}")
+            logger.exception(e)
+            raise DatabaseOperationError(e)
+
+    async def get_podcasts(self) -> List["Podcast"]:
+        """Get all podcasts for this notebook."""
+        try:
+            from open_notebook.domain.podcast import Podcast
+
+            result = await repo_query(
+                """
+                SELECT * FROM podcast 
+                WHERE notebook_id = $notebook_id 
+                ORDER BY created DESC
+                """,
+                {"notebook_id": ensure_record_id(self.id)},
+            )
+            return [Podcast(**r) for r in result] if result else []
+        except Exception as e:
+            logger.error(f"Error fetching podcasts for notebook {self.id}: {str(e)}")
+            logger.exception(e)
+            raise DatabaseOperationError(e)
+
 
 class Asset(BaseModel):
     file_path: Optional[str] = None

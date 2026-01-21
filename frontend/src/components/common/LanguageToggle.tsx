@@ -41,22 +41,10 @@ export function LanguageToggle({ iconOnly = false }: LanguageToggleProps) {
           <span>{t.common.english}</span>
         </DropdownMenuItem>
         <DropdownMenuItem 
-          onClick={() => setLanguage('zh-CN')}
-          className={currentLang === 'zh-CN' || currentLang.startsWith('zh-Hans') || currentLang === 'zh' ? 'bg-accent' : ''}
+          onClick={() => setLanguage('fr-FR')}
+          className={currentLang === 'fr-FR' || currentLang.startsWith('fr') ? 'bg-accent' : ''}
         >
-          <span>{t.common.chinese}</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => setLanguage('zh-TW')}
-          className={currentLang === 'zh-TW' || currentLang.startsWith('zh-Hant') ? 'bg-accent' : ''}
-        >
-          <span>{t.common.traditionalChinese}</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => setLanguage('pt-BR')}
-          className={currentLang === 'pt-BR' || currentLang.startsWith('pt') ? 'bg-accent' : ''}
-        >
-          <span>{t.common.portuguese}</span>
+          <span>{t.common.french || 'Français'}</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

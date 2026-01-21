@@ -12,6 +12,7 @@ interface CollapsibleColumnProps {
   collapsedIcon: LucideIcon
   collapsedLabel: string
   children: ReactNode
+  direction?: 'horizontal' | 'vertical' | 'vertical-in-stack'
 }
 
 export function CollapsibleColumn({
@@ -20,8 +21,15 @@ export function CollapsibleColumn({
   collapsedIcon: CollapsedIcon,
   collapsedLabel,
   children,
+  direction = 'horizontal',
 }: CollapsibleColumnProps) {
   if (isCollapsed) {
+    // 'vertical-in-stack' = vertical bar (w-12) that's stacked with others vertically
+    // 'vertical' = horizontal bar (h-12, w-full) in a vertical stack
+    // 'horizontal' = vertical bar (w-12, h-full) in a horizontal layout
+    const isVerticalInStack = direction === 'vertical-in-stack'
+    const isVertical = direction === 'vertical'
+    
     return (
       <TooltipProvider>
         <Tooltip>
@@ -29,26 +37,38 @@ export function CollapsibleColumn({
             <button
               onClick={onToggle}
               className={cn(
-                'flex flex-col items-center justify-center gap-3',
-                'w-12 h-full min-h-0',
+                'flex items-center justify-center gap-2',
                 'border rounded-lg',
                 'bg-card hover:bg-accent/50',
                 'transition-all duration-150',
                 'cursor-pointer group',
-                'py-6'
+                isVerticalInStack
+                  ? 'w-12 h-full min-h-0 flex-col py-6'
+                  : isVertical 
+                    ? 'h-12 w-full px-4 flex-row' 
+                    : 'w-12 h-full min-h-0 flex-col py-6'
               )}
               aria-label={`Expand ${collapsedLabel}`}
             >
-              <CollapsedIcon className="h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
-              <div
-                className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors whitespace-nowrap"
-                style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', textOrientation: 'mixed' }}
-              >
-                {collapsedLabel}
-              </div>
+              <CollapsedIcon className={cn(
+                'text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0',
+                (isVertical && !isVerticalInStack) ? 'h-4 w-4' : 'h-5 w-5'
+              )} />
+              {(isVertical && !isVerticalInStack) ? (
+                <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                  {collapsedLabel}
+                </span>
+              ) : (
+                <div
+                  className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors whitespace-nowrap"
+                  style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', textOrientation: 'mixed' }}
+                >
+                  {collapsedLabel}
+                </div>
+              )}
             </button>
           </TooltipTrigger>
-          <TooltipContent side="right">
+          <TooltipContent side={isVerticalInStack || !isVertical ? 'right' : 'bottom'}>
             <p>Expand {collapsedLabel}</p>
           </TooltipContent>
         </Tooltip>
@@ -57,7 +77,11 @@ export function CollapsibleColumn({
   }
 
   return (
-    <div className="h-full min-h-0 transition-all duration-150">
+    <div className={cn(
+      'transition-all duration-150',
+      direction === 'vertical-in-stack' ? 'w-full h-full min-h-0' :
+      direction === 'horizontal' ? 'h-full min-h-0' : 'w-full'
+    )}>
       {children}
     </div>
   )
