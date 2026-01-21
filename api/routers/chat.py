@@ -380,6 +380,14 @@ async def execute_chat(request: ExecuteChatRequest):
         return ExecuteChatResponse(session_id=request.session_id, messages=messages)
     except NotFoundError:
         raise HTTPException(status_code=404, detail="Session not found")
+    except ValueError as e:
+        # Catch configuration errors (like missing default model)
+        error_msg = str(e)
+        if "No default" in error_msg and "model configured" in error_msg:
+            logger.error(f"Configuration error: {error_msg}")
+            raise HTTPException(status_code=400, detail=error_msg)
+        logger.error(f"Value error executing chat: {error_msg}")
+        raise HTTPException(status_code=400, detail=error_msg)
     except Exception as e:
         logger.error(f"Error executing chat: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error executing chat: {str(e)}")

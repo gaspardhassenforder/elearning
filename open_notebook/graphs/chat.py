@@ -68,12 +68,24 @@ def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict
 
     ai_message = model.invoke(payload)
 
+    # Extract text content from potentially structured response
+    content = ai_message.content
+    
+    # Handle structured content (list of dictionaries with 'text' field)
+    if isinstance(content, list):
+        # Extract text from structured content (e.g., [{'type': 'text', 'text': '...'}])
+        text_parts = []
+        for item in content:
+            if isinstance(item, dict):
+                if 'text' in item:
+                    text_parts.append(item['text'])
+                elif 'type' in item and item.get('type') == 'text':
+                    text_parts.append(item.get('text', ''))
+        content = '\n'.join(text_parts) if text_parts else str(content)
+    elif not isinstance(content, str):
+        content = str(content)
+    
     # Clean thinking content from AI response (e.g., <think>...</think> tags)
-    content = (
-        ai_message.content
-        if isinstance(ai_message.content, str)
-        else str(ai_message.content)
-    )
     cleaned_content = clean_thinking_content(content)
     cleaned_message = ai_message.model_copy(update={"content": cleaned_content})
 

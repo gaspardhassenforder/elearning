@@ -169,6 +169,7 @@ export const enUS = {
     answerModelNotFound: "Answer model not found",
     finalAnswerModelNotFound: "Final answer model not found",
     noAnswerGenerated: "No answer could be generated",
+    noDefaultModel: "No default chat model configured. Please go to Settings → Models and configure a default chat model.",
     genericError: "An unexpected error occurred",
   },
   connectionErrors: {

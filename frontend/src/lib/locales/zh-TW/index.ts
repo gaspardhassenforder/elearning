@@ -169,6 +169,7 @@ export const zhTW = {
     answerModelNotFound: "未找到回答模型",
     finalAnswerModelNotFound: "未找到最終回答模型",
     noAnswerGenerated: "未能生成回答",
+    noDefaultModel: "未設定預設聊天模型。請前往 設定 → 模型 設定預設聊天模型。",
     genericError: "發生了意外錯誤",
   },
   connectionErrors: {
