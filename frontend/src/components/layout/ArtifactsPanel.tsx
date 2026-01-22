@@ -107,7 +107,7 @@ export function ArtifactsPanel({ notebookId, className }: ArtifactsPanelProps) {
             <div className="flex items-center justify-between gap-2">
               <CardTitle className="text-lg">{t.artifacts?.title || 'Artifacts'}</CardTitle>
               <div className="flex items-center gap-2">
-                <DropdownMenu>
+                <DropdownMenu modal={false}>
                   <DropdownMenuTrigger asChild>
                     <Button size="sm">
                       <Plus className="h-4 w-4 mr-2" />
@@ -116,15 +116,21 @@ export function ArtifactsPanel({ notebookId, className }: ArtifactsPanelProps) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setShowQuizDialog(true)}>
+                    <DropdownMenuItem
+                      onSelect={() => setTimeout(() => setShowQuizDialog(true), 0)}
+                    >
                       <FileText className="h-4 w-4 mr-2" />
                       {t.artifacts?.generateQuiz || 'Generate Quiz'}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setShowPodcastDialog(true)}>
+                    <DropdownMenuItem
+                      onSelect={() => setTimeout(() => setShowPodcastDialog(true), 0)}
+                    >
                       <Headphones className="h-4 w-4 mr-2" />
                       {t.artifacts?.generatePodcast || 'Generate Podcast'}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setShowTransformationDialog(true)}>
+                    <DropdownMenuItem
+                      onSelect={() => setTimeout(() => setShowTransformationDialog(true), 0)}
+                    >
                       <Sparkles className="h-4 w-4 mr-2" />
                       {t.artifacts?.generateTransformation || 'Generate Transformation'}
                     </DropdownMenuItem>
@@ -196,28 +202,20 @@ export function ArtifactsPanel({ notebookId, className }: ArtifactsPanelProps) {
         </Card>
       </CollapsibleColumn>
 
-      {showQuizDialog && (
-        <GenerateQuizDialog
-          notebookId={notebookId}
-          open={showQuizDialog}
-          onOpenChange={setShowQuizDialog}
-        />
-      )}
-
-      {showPodcastDialog && (
-        <GeneratePodcastDialog
-          open={showPodcastDialog}
-          onOpenChange={setShowPodcastDialog}
-        />
-      )}
-
-      {showTransformationDialog && (
-        <GenerateTransformationDialog
-          notebookId={notebookId}
-          open={showTransformationDialog}
-          onOpenChange={setShowTransformationDialog}
-        />
-      )}
+      <GenerateQuizDialog
+        notebookId={notebookId}
+        open={showQuizDialog}
+        onOpenChange={setShowQuizDialog}
+      />
+      <GeneratePodcastDialog
+        open={showPodcastDialog}
+        onOpenChange={setShowPodcastDialog}
+      />
+      <GenerateTransformationDialog
+        notebookId={notebookId}
+        open={showTransformationDialog}
+        onOpenChange={setShowTransformationDialog}
+      />
     </>
   )
 }
