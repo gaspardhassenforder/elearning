@@ -40,9 +40,9 @@ describe('useTranslation Hook', () => {
     const { result } = renderHook(() => useTranslation())
     
     act(() => {
-      result.current.setLanguage('zh-CN')
+      result.current.setLanguage('fr-FR')
     })
     
-    expect(changeLanguageMock).toHaveBeenCalledWith('zh-CN')
+    expect(changeLanguageMock).toHaveBeenCalledWith('fr-FR')
   })
 })

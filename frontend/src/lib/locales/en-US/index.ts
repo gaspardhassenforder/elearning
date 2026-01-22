@@ -948,7 +948,9 @@ export const enUS = {
     generate: "Generate",
     generateQuiz: "Generate Quiz",
     generatePodcast: "Generate Podcast",
+    generateTransformation: "Generate Transformation",
     generateQuizDesc: "Create a quiz from your notebook sources",
+    generateTransformationDesc: "Apply a transformation to your notebook content and save it as an artifact",
     noArtifacts: "No artifacts yet",
     noArtifactsDescription: "Generate a quiz or podcast to get started",
     quiz: "Quiz",
@@ -974,6 +976,7 @@ export const enUS = {
     incorrect: "Incorrect",
     explanation: "Explanation",
     quizGenerated: "Quiz generated successfully",
+    transformationGenerated: "Transformation generated successfully",
     deleteSuccess: "Artifact deleted successfully",
     noContent: "No content available",
   }

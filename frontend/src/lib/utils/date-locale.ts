@@ -13,7 +13,7 @@ const LOCALE_MAP: Record<string, Locale> = {
  * Get the date-fns locale for a given language code.
  * Falls back to English (en-US) if the language is not found.
  * 
- * @param language - The language code (e.g., 'zh-CN', 'en-US')
+ * @param language - The language code (e.g., 'fr-FR', 'en-US')
  * @returns The corresponding date-fns Locale object
  */
 export function getDateLocale(language: string): Locale {
