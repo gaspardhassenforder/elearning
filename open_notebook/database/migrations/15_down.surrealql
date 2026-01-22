@@ -1,0 +1,64 @@
+-- Migration 15 Down: Revert episode and speaker profiles back to OpenAI
+-- This migration reverts the Google AI migration back to OpenAI
+
+-- Revert episode profiles back to OpenAI
+UPDATE episode_profile SET 
+    outline_provider = "openai",
+    outline_model = "gpt-5-mini",
+    transcript_provider = "openai",
+    transcript_model = "gpt-5-mini"
+WHERE outline_provider = "google" OR transcript_provider = "google";
+
+-- Revert speaker profiles back to OpenAI
+UPDATE speaker_profile SET 
+    tts_provider = "openai",
+    tts_model = "gpt-4o-mini-tts"
+WHERE tts_provider = "google";
+
+-- Revert voice IDs for tech_experts profile
+UPDATE speaker_profile SET speakers = [
+    {
+        name: speakers[0].name,
+        voice_id: "nova",
+        backstory: speakers[0].backstory,
+        personality: speakers[0].personality
+    },
+    {
+        name: speakers[1].name,
+        voice_id: "alloy",
+        backstory: speakers[1].backstory,
+        personality: speakers[1].personality
+    }
+] WHERE name = "tech_experts";
+
+-- Revert voice IDs for solo_expert profile
+UPDATE speaker_profile SET speakers = [
+    {
+        name: speakers[0].name,
+        voice_id: "nova",
+        backstory: speakers[0].backstory,
+        personality: speakers[0].personality
+    }
+] WHERE name = "solo_expert";
+
+-- Revert voice IDs for business_panel profile
+UPDATE speaker_profile SET speakers = [
+    {
+        name: speakers[0].name,
+        voice_id: "echo",
+        backstory: speakers[0].backstory,
+        personality: speakers[0].personality
+    },
+    {
+        name: speakers[1].name,
+        voice_id: "shimmer",
+        backstory: speakers[1].backstory,
+        personality: speakers[1].personality
+    },
+    {
+        name: speakers[2].name,
+        voice_id: "ash",
+        backstory: speakers[2].backstory,
+        personality: speakers[2].personality
+    }
+] WHERE name = "business_panel";

@@ -9,6 +9,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { useToast } from '@/lib/hooks/use-toast'
+import { notesApi } from '@/lib/api/notes'
 
 interface TransformationViewerProps {
   transformationId: string
@@ -27,17 +28,14 @@ export function TransformationViewer({
   const { toast } = useToast()
   const [copied, setCopied] = useState(false)
 
-  // For now, we'll need to fetch transformation results
-  // Since transformations API doesn't have a direct get-by-id endpoint for results,
-  // we'll need to check the artifacts API or create a placeholder
-  // For MVP, we'll show a placeholder that can be enhanced later
-  const { data: transformationResult, isLoading } = useQuery({
-    queryKey: ['transformation', transformationId],
+  // Fetch the note content - transformationId is actually the note_id
+  const { data: transformationResult, isLoading, error } = useQuery({
+    queryKey: ['note', transformationId],
     queryFn: async () => {
-      // TODO: Implement actual API call when backend endpoint is available
-      // For now, return placeholder data
+      const note = await notesApi.get(transformationId)
       return {
-        content: 'Transformation result content will be displayed here once the backend endpoint is implemented.',
+        title: note.title,
+        content: note.content || '',
       }
     },
     enabled: open && !!transformationId,
@@ -67,12 +65,27 @@ export function TransformationViewer({
   if (isLoading) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-3xl max-h-[90vh]">
+        <DialogContent className="w-[90vw] max-w-2xl h-[80vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>{t.artifacts?.transformation || 'Transformation'}</DialogTitle>
           </DialogHeader>
-          <div className="flex items-center justify-center py-12">
+          <div className="flex-1 flex items-center justify-center">
             <LoadingSpinner size="lg" />
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
+  if (error) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="w-[90vw] max-w-2xl h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{t.artifacts?.transformation || 'Transformation'}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 flex items-center justify-center text-muted-foreground">
+            {t.common.errorLoading || 'Failed to load transformation result'}
           </div>
         </DialogContent>
       </Dialog>
@@ -81,13 +94,13 @@ export function TransformationViewer({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+      <DialogContent className="w-[90vw] max-w-2xl h-[80vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>{t.artifacts?.transformation || 'Transformation Result'}</DialogTitle>
+          <DialogTitle className="pr-8">{transformationResult?.title || t.artifacts?.transformation || 'Transformation Result'}</DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden flex flex-col">
-          <div className="flex justify-end mb-2">
+        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+          <div className="flex justify-end mb-2 flex-shrink-0">
             <Button variant="outline" size="sm" onClick={handleCopy}>
               {copied ? (
                 <>
@@ -103,11 +116,11 @@ export function TransformationViewer({
             </Button>
           </div>
 
-          <ScrollArea className="flex-1">
-            <div className="prose max-w-none dark:prose-invert p-4">
-              <pre className="whitespace-pre-wrap text-sm bg-muted p-4 rounded">
+          <ScrollArea className="flex-1 min-h-0">
+            <div className="prose prose-sm max-w-none dark:prose-invert px-1">
+              <div className="whitespace-pre-wrap text-sm leading-relaxed">
                 {transformationResult?.content || t.artifacts?.noContent || 'No content available'}
-              </pre>
+              </div>
             </div>
           </ScrollArea>
         </div>

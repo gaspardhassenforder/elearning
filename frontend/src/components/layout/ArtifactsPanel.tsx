@@ -22,6 +22,7 @@ import { PodcastCard } from '@/components/artifacts/PodcastCard'
 import { TransformationCard } from '@/components/artifacts/TransformationCard'
 import { GenerateQuizDialog } from '@/components/artifacts/GenerateQuizDialog'
 import { GeneratePodcastDialog } from '@/components/podcasts/GeneratePodcastDialog'
+import { GenerateTransformationDialog } from '@/components/artifacts/GenerateTransformationDialog'
 
 interface ArtifactsPanelProps {
   notebookId: string
@@ -33,6 +34,7 @@ export function ArtifactsPanel({ notebookId, className }: ArtifactsPanelProps) {
   const [activeTab, setActiveTab] = useState<'all' | 'quiz' | 'podcast' | 'transformation'>('all')
   const [showQuizDialog, setShowQuizDialog] = useState(false)
   const [showPodcastDialog, setShowPodcastDialog] = useState(false)
+  const [showTransformationDialog, setShowTransformationDialog] = useState(false)
 
   const { data: artifacts, isLoading, error } = useArtifacts(notebookId)
   const deleteArtifact = useDeleteArtifact()
@@ -122,6 +124,10 @@ export function ArtifactsPanel({ notebookId, className }: ArtifactsPanelProps) {
                       <Headphones className="h-4 w-4 mr-2" />
                       {t.artifacts?.generatePodcast || 'Generate Podcast'}
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setShowTransformationDialog(true)}>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      {t.artifacts?.generateTransformation || 'Generate Transformation'}
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
                 {collapseButton}
@@ -202,6 +208,14 @@ export function ArtifactsPanel({ notebookId, className }: ArtifactsPanelProps) {
         <GeneratePodcastDialog
           open={showPodcastDialog}
           onOpenChange={setShowPodcastDialog}
+        />
+      )}
+
+      {showTransformationDialog && (
+        <GenerateTransformationDialog
+          notebookId={notebookId}
+          open={showTransformationDialog}
+          onOpenChange={setShowTransformationDialog}
         />
       )}
     </>

@@ -76,6 +76,7 @@ venv.bak/
 
 # VS Code
 .vscode/
+.cursor/
 
 # Spyder project settings
 .spyderproject

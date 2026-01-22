@@ -3,6 +3,9 @@ import apiClient from './client'
 export interface QuizQuestion {
   question: string
   options: string[]
+  correct_answer: number
+  explanation?: string
+  source_reference?: string
 }
 
 export interface Quiz {
@@ -13,6 +16,10 @@ export interface Quiz {
   num_questions: number
   created: string
   created_by: string
+  // Persistence fields
+  completed: boolean
+  user_answers?: number[]
+  last_score?: number
 }
 
 export interface QuizGenerateRequest {
@@ -27,10 +34,13 @@ export interface QuizCheckRequest {
 
 export interface QuizCheckResult {
   score: number
+  total: number
   percentage: number
   results: Array<{
     question_index: number
-    correct: boolean
+    user_answer: number
+    correct_answer: number
+    is_correct: boolean
     explanation?: string
   }>
 }
@@ -66,5 +76,12 @@ export const quizzesApi = {
   
   delete: async (quizId: string) => {
     await apiClient.delete(`/quizzes/${quizId}`)
+  },
+  
+  reset: async (quizId: string) => {
+    const response = await apiClient.post<{ status: string; quiz_id: string }>(
+      `/quizzes/${quizId}/reset`
+    )
+    return response.data
   }
 }

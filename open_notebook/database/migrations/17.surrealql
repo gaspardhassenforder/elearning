@@ -1,0 +1,4 @@
+-- Add quiz persistence fields for storing user attempts
+DEFINE FIELD user_answers ON quiz TYPE option<array<int>>;
+DEFINE FIELD last_score ON quiz TYPE option<int>;
+DEFINE FIELD completed ON quiz TYPE bool DEFAULT false;

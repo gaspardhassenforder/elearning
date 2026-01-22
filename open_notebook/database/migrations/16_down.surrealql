@@ -1,0 +1,2 @@
+-- Rollback: remove questions_json field
+REMOVE FIELD questions_json ON quiz;

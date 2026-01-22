@@ -1,12 +1,16 @@
 from typing import List, Optional
+from pydantic import BaseModel, Field
 
 from fastapi import APIRouter, HTTPException, Query
 from loguru import logger
 
 from api.models import NotebookCreate, NotebookResponse, NotebookUpdate
 from open_notebook.database.repository import ensure_record_id, repo_query
-from open_notebook.domain.notebook import Notebook, Source
+from open_notebook.domain.notebook import Notebook, Source, Note
+from open_notebook.domain.transformation import Transformation
+from open_notebook.domain.artifact import Artifact
 from open_notebook.exceptions import InvalidInputError
+from open_notebook.graphs.transformation import graph as transformation_graph
 
 router = APIRouter()
 
@@ -253,6 +257,130 @@ async def remove_source_from_notebook(notebook_id: str, source_id: str):
         raise HTTPException(
             status_code=500, detail=f"Error removing source from notebook: {str(e)}"
         )
+
+
+class NotebookTransformationRequest(BaseModel):
+    """Request body for notebook transformation generation."""
+    transformation_id: str = Field(..., description="ID of the transformation to apply")
+    model_id: Optional[str] = Field(None, description="Optional model ID to use")
+
+
+@router.post("/notebooks/{notebook_id}/transformations/generate")
+async def generate_transformation(notebook_id: str, request: NotebookTransformationRequest):
+    """
+    Generate a transformation artifact for a notebook.
+    
+    This endpoint:
+    1. Gathers all sources from the notebook (with full text)
+    2. Combines their text content
+    3. Executes the transformation
+    4. Creates a Note artifact with the result
+    """
+    try:
+        # Validate notebook exists
+        notebook = await Notebook.get(notebook_id)
+        if not notebook:
+            raise HTTPException(status_code=404, detail="Notebook not found")
+
+        # Validate transformation exists
+        transformation = await Transformation.get(request.transformation_id)
+        if not transformation:
+            raise HTTPException(status_code=404, detail="Transformation not found")
+
+        # Fetch sources WITH full_text (notebook.get_sources() omits it)
+        srcs = await repo_query(
+            """
+            select in as source from reference where out=$id
+            fetch source
+            """,
+            {"id": ensure_record_id(notebook_id)},
+        )
+        sources = [Source(**src["source"]) for src in srcs] if srcs else []
+
+        if not sources:
+            raise HTTPException(
+                status_code=400,
+                detail="No sources found in notebook. Please add sources before generating a transformation."
+            )
+
+        # Combine source content
+        content_parts = []
+        for source in sources:
+            if source.full_text:
+                text = source.full_text[:10000] if len(source.full_text) > 10000 else source.full_text
+                title = source.title or "Untitled Source"
+                content_parts.append(f"## {title}\n\n{text}")
+
+        if not content_parts:
+            raise HTTPException(
+                status_code=400,
+                detail="No text content found in sources."
+            )
+
+        combined_content = "\n\n---\n\n".join(content_parts)
+        
+        # Limit total content
+        max_content_length = 50000
+        if len(combined_content) > max_content_length:
+            combined_content = combined_content[:max_content_length] + "\n\n[Content truncated...]"
+
+        logger.info(f"Executing transformation {request.transformation_id} on notebook {notebook_id}")
+
+        # Get default transformation model if not specified
+        model_id = request.model_id
+        if not model_id:
+            from open_notebook.ai.models import DefaultModels
+            defaults = await DefaultModels.get_instance()
+            if defaults and defaults.default_transformation_model:
+                model_id = defaults.default_transformation_model
+            elif defaults and defaults.default_chat_model:
+                model_id = defaults.default_chat_model
+
+        # Execute transformation
+        result = await transformation_graph.ainvoke(
+            dict(
+                input_text=combined_content,
+                transformation=transformation,
+            ),
+            config=dict(configurable={"model_id": model_id}),
+        )
+
+        transformed_content = result.get("output", "")
+        if not transformed_content:
+            raise HTTPException(status_code=500, detail="Transformation returned empty result")
+
+        # Create note with transformation result
+        note_title = f"{transformation.title or transformation.name} - {notebook.name}"
+        note = Note(
+            title=note_title,
+            content=transformed_content,
+            note_type="ai",
+        )
+        await note.save()
+
+        # Create artifact tracker
+        await Artifact.create_for_artifact(
+            notebook_id=notebook_id,
+            artifact_type="transformation",
+            artifact_id=note.id,
+            title=note_title,
+        )
+
+        logger.info(f"Transformation artifact created: note {note.id}")
+
+        return {
+            "note_id": note.id,
+            "artifact_id": note.id,
+            "title": note_title,
+            "content": transformed_content,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating transformation: {e}")
+        logger.exception(e)
+        raise HTTPException(status_code=500, detail=f"Failed to generate transformation: {str(e)}")
 
 
 @router.delete("/notebooks/{notebook_id}")

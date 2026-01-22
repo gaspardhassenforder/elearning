@@ -1,0 +1,4 @@
+-- Add questions_json field to store questions as JSON string
+-- This works around SurrealDB SCHEMAFULL nested object limitations
+
+DEFINE FIELD questions_json ON quiz TYPE option<string>;

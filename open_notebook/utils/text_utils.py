@@ -5,7 +5,7 @@ Extracted from main utils to avoid circular imports.
 
 import re
 import unicodedata
-from typing import Tuple
+from typing import Tuple, Union, List, Any
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -16,6 +16,42 @@ from .token_utils import token_count
 THINK_PATTERN = re.compile(r"<think>(.*?)</think>", re.DOTALL)
 # Pattern for malformed output: content</think> (missing opening tag)
 THINK_PATTERN_NO_OPEN = re.compile(r"^(.*?)</think>", re.DOTALL)
+
+
+def extract_text_from_response(content: Any) -> str:
+    """
+    Extract text content from various LLM response formats.
+    
+    Handles:
+    - Plain strings
+    - Lists of content blocks (e.g., [{'type': 'text', 'text': '...'}])
+    - Other types (converted via str())
+    
+    Args:
+        content: The response content from an LLM (string, list, or other)
+        
+    Returns:
+        str: The extracted text content
+        
+    Example:
+        >>> extract_text_from_response("Hello world")
+        "Hello world"
+        >>> extract_text_from_response([{'type': 'text', 'text': 'Hello'}])
+        "Hello"
+    """
+    if isinstance(content, str):
+        return content
+    elif isinstance(content, list):
+        # Extract text from content blocks (e.g., [{'type': 'text', 'text': '...'}])
+        text_parts = []
+        for block in content:
+            if isinstance(block, dict) and block.get('type') == 'text':
+                text_parts.append(block.get('text', ''))
+            elif isinstance(block, str):
+                text_parts.append(block)
+        return '\n'.join(text_parts)
+    else:
+        return str(content)
 
 
 def split_text(txt: str, chunk_size=500):

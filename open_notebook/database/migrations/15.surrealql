@@ -1,0 +1,64 @@
+-- Migration 15: Update episode and speaker profiles to use Google Gemini models
+-- Migrates from OpenAI to Google AI for podcast generation
+
+-- Update episode profiles: Change provider from "openai" to "google" and models to "gemini-3-flash-preview"
+UPDATE episode_profile SET 
+    outline_provider = "google",
+    outline_model = "gemini-3-flash-preview",
+    transcript_provider = "google",
+    transcript_model = "gemini-3-flash-preview"
+WHERE outline_provider = "openai" OR transcript_provider = "openai";
+
+-- Update speaker profiles: Change TTS provider from "openai" to "google" and model to "gemini-2.5-flash-preview-tts"
+UPDATE speaker_profile SET 
+    tts_provider = "google",
+    tts_model = "gemini-2.5-flash-preview-tts"
+WHERE tts_provider = "openai";
+
+-- Update voice IDs to use Google voices for tech_experts profile
+UPDATE speaker_profile SET speakers = [
+    {
+        name: speakers[0].name,
+        voice_id: "Kore",
+        backstory: speakers[0].backstory,
+        personality: speakers[0].personality
+    },
+    {
+        name: speakers[1].name,
+        voice_id: "Puck",
+        backstory: speakers[1].backstory,
+        personality: speakers[1].personality
+    }
+] WHERE name = "tech_experts";
+
+-- Update voice IDs for solo_expert profile
+UPDATE speaker_profile SET speakers = [
+    {
+        name: speakers[0].name,
+        voice_id: "Kore",
+        backstory: speakers[0].backstory,
+        personality: speakers[0].personality
+    }
+] WHERE name = "solo_expert";
+
+-- Update voice IDs for business_panel profile
+UPDATE speaker_profile SET speakers = [
+    {
+        name: speakers[0].name,
+        voice_id: "Charon",
+        backstory: speakers[0].backstory,
+        personality: speakers[0].personality
+    },
+    {
+        name: speakers[1].name,
+        voice_id: "Aoede",
+        backstory: speakers[1].backstory,
+        personality: speakers[1].personality
+    },
+    {
+        name: speakers[2].name,
+        voice_id: "Kore",
+        backstory: speakers[2].backstory,
+        personality: speakers[2].personality
+    }
+] WHERE name = "business_panel";

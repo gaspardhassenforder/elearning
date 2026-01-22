@@ -86,6 +86,9 @@ class ObjectModel(BaseModel):
 
             result = await repo_query("SELECT * FROM $id", {"id": ensure_record_id(id)})
             if result:
+                logger.debug(f"ObjectModel.get({id}): DB returned keys = {list(result[0].keys())}")
+                if 'questions' in result[0]:
+                    logger.debug(f"ObjectModel.get({id}): questions = {result[0]['questions']}")
                 return target_class(**result[0])
             else:
                 raise NotFoundError(f"{table_name} with id {id} not found")
@@ -167,8 +170,17 @@ class ObjectModel(BaseModel):
             
             for key, value in result_list[0].items():
                 if hasattr(self, key):
-                    if isinstance(getattr(self, key), BaseModel):
-                        setattr(self, key, type(getattr(self, key))(**value))
+                    current_value = getattr(self, key)
+                    if isinstance(current_value, BaseModel):
+                        setattr(self, key, type(current_value)(**value))
+                    elif isinstance(current_value, list) and current_value and value is None:
+                        # Don't overwrite a populated list with None from DB result
+                        logger.debug(f"Skipping overwrite of {key}: keeping {len(current_value)} items instead of None")
+                        pass
+                    elif isinstance(current_value, list) and current_value and isinstance(value, list) and not value:
+                        # Don't overwrite a populated list with empty list from DB result
+                        logger.debug(f"Skipping overwrite of {key}: keeping {len(current_value)} items instead of empty list")
+                        pass
                     else:
                         setattr(self, key, value)
 

@@ -40,10 +40,25 @@ async def generate_quiz(
 
 async def get_quiz(quiz_id: str) -> Optional[Quiz]:
     """Get a quiz by ID."""
+    from open_notebook.database.repository import repo_query, ensure_record_id
+    
     try:
-        return await Quiz.get(quiz_id)
+        # First, check raw database data
+        raw_result = await repo_query("SELECT * FROM $id", {"id": ensure_record_id(quiz_id)})
+        if raw_result:
+            raw_data = raw_result[0]
+            logger.info(f"Raw DB data for {quiz_id}: keys = {list(raw_data.keys())}")
+            logger.info(f"Raw DB: questions = {raw_data.get('questions')}")
+            logger.info(f"Raw DB: questions_json = {raw_data.get('questions_json', 'NOT FOUND')[:200] if raw_data.get('questions_json') else 'None/Empty'}")
+        
+        quiz = await Quiz.get(quiz_id)
+        logger.info(f"Loaded quiz {quiz_id}: title={quiz.title}, questions_count={len(quiz.questions)}, questions_json={bool(quiz.questions_json)}")
+        if quiz.questions:
+            logger.info(f"First question: {quiz.questions[0].question[:50]}...")
+        return quiz
     except Exception as e:
         logger.error(f"Error getting quiz {quiz_id}: {e}")
+        logger.exception(e)
         return None
 
 
@@ -92,7 +107,7 @@ async def delete_quiz(quiz_id: str) -> bool:
 
 async def check_quiz_answers(quiz_id: str, answers: List[int]) -> dict:
     """
-    Check user answers against a quiz.
+    Check user answers against a quiz and persist the results.
     
     Args:
         quiz_id: ID of the quiz
@@ -105,4 +120,37 @@ async def check_quiz_answers(quiz_id: str, answers: List[int]) -> dict:
     if not quiz:
         raise ValueError(f"Quiz {quiz_id} not found")
     
-    return quiz.get_score(answers)
+    result = quiz.get_score(answers)
+    
+    # Persist the user's answers and score
+    quiz.user_answers = answers
+    quiz.last_score = result["score"]
+    quiz.completed = True
+    await quiz.save()
+    
+    logger.info(f"Quiz {quiz_id} completed with score {result['score']}/{result['total']}")
+    
+    return result
+
+
+async def reset_quiz(quiz_id: str) -> bool:
+    """
+    Reset a quiz to allow retaking it.
+    
+    Args:
+        quiz_id: ID of the quiz to reset
+        
+    Returns:
+        True if successful
+    """
+    quiz = await Quiz.get(quiz_id)
+    if not quiz:
+        raise ValueError(f"Quiz {quiz_id} not found")
+    
+    quiz.user_answers = None
+    quiz.last_score = None
+    quiz.completed = False
+    await quiz.save()
+    
+    logger.info(f"Quiz {quiz_id} reset for retake")
+    return True

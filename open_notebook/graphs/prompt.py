@@ -7,6 +7,7 @@ from langgraph.graph import END, START, StateGraph
 from typing_extensions import TypedDict
 
 from open_notebook.ai.provision import provision_langchain_model
+from open_notebook.utils import extract_text_from_response
 
 
 class PatternChainState(TypedDict):
@@ -31,7 +32,10 @@ async def call_model(state: dict, config: RunnableConfig) -> dict:
 
     response = await chain.ainvoke(payload)
 
-    return {"output": response.content}
+    # Extract text from response (handles string, list of content blocks, etc.)
+    output_content = extract_text_from_response(response.content)
+
+    return {"output": output_content}
 
 
 agent_state = StateGraph(PatternChainState)

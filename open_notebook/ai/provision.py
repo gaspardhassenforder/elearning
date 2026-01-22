@@ -19,7 +19,7 @@ async def provision_langchain_model(
     # This bypasses the database model configuration entirely
     from esperanto import AIFactory
     
-    logger.debug("Using hardcoded Gemini Flash 1.5 model")
+    logger.debug("Using hardcoded Gemini Flash 3 model")
     model = AIFactory.create_language(
         model_name="gemini-3-flash-preview",
         provider="google",

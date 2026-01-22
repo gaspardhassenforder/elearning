@@ -33,8 +33,25 @@ async def gather_sources(state: QuizGenerationState) -> dict:
     logger.info(f"Gathering sources for notebook {state['notebook_id']}")
 
     try:
+        from open_notebook.database.repository import repo_query, ensure_record_id
+        from open_notebook.domain.notebook import Source
+        
         notebook = await Notebook.get(state["notebook_id"])
-        sources = await notebook.get_sources()
+        if not notebook:
+            return {
+                "error": "Notebook not found",
+                "status": "failed",
+            }
+        
+        # Fetch sources WITH full_text (notebook.get_sources() omits it for performance)
+        srcs = await repo_query(
+            """
+            select in as source from reference where out=$id
+            fetch source
+            """,
+            {"id": ensure_record_id(state["notebook_id"])},
+        )
+        sources = [Source(**src["source"]) for src in srcs] if srcs else []
 
         if not sources:
             return {
@@ -103,7 +120,7 @@ async def generate_questions(state: QuizGenerationState) -> dict:
         }
 
         # Render prompt using Prompter
-        prompter = Prompter(prompt_template="quiz/generate")
+        prompter = Prompter(prompt_template="quiz/generate.md")
         prompt = prompter.render(data=prompt_data)
 
         # Get model for quiz generation
@@ -116,12 +133,22 @@ async def generate_questions(state: QuizGenerationState) -> dict:
 
         # Generate questions
         response = await model.ainvoke(prompt)
-        response_text = response.content if hasattr(response, "content") else str(response)
+        
+        # Extract text from response (handles string, list of content blocks, etc.)
+        from open_notebook.utils import extract_text_from_response
+        raw_content = response.content if hasattr(response, "content") else response
+        response_text = extract_text_from_response(raw_content)
 
         # Parse JSON response
+        logger.debug(f"Response text to parse (first 500 chars): {response_text[:500]}")
         questions = _parse_quiz_response(response_text)
+        logger.info(f"Parsed {len(questions)} questions from response")
+        
+        if questions:
+            logger.debug(f"First parsed question: {questions[0]}")
 
         if not questions:
+            logger.error(f"Failed to parse questions. Full response: {response_text}")
             return {
                 "error": "Failed to parse quiz questions from LLM response",
                 "status": "failed",
@@ -204,7 +231,20 @@ async def save_quiz(state: QuizGenerationState) -> dict:
             source_ids=state.get("source_ids"),
             created_by="user",
         )
+        
+        # Debug logging
+        logger.debug(f"Quiz before save: questions count = {len(quiz.questions)}")
+        logger.debug(f"Quiz questions type: {type(quiz.questions)}")
+        if quiz.questions:
+            logger.debug(f"First question: {quiz.questions[0]}")
+        
+        # Check what will be saved
+        save_data = quiz._prepare_save_data()
+        logger.debug(f"Save data questions: {save_data.get('questions')}")
+        
         await quiz.save()
+        
+        logger.debug(f"Quiz after save: ID = {quiz.id}, questions count = {len(quiz.questions)}")
 
         # Create artifact tracker
         await Artifact.create_for_artifact(
@@ -271,10 +311,13 @@ async def generate_quiz(
 
     # Step 2: Generate questions
     state.update(await generate_questions(state))
+    logger.info(f"After generate_questions: generated_questions count = {len(state.get('generated_questions', []))}")
     if state.get("error"):
+        logger.error(f"generate_questions failed: {state['error']}")
         return {"error": state["error"], "status": state["status"]}
 
     # Step 3: Save quiz
+    logger.info(f"Proceeding to save_quiz with {len(state['generated_questions'])} questions")
     state.update(await save_quiz(state))
     if state.get("error"):
         return {"error": state["error"], "status": state["status"]}

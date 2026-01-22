@@ -69,11 +69,15 @@ async def get_notebook_quizzes(notebook_id: str):
 @router.get("/quizzes/{quiz_id}")
 async def get_quiz(quiz_id: str):
     """Get a specific quiz with all questions."""
+    from loguru import logger
+    
     quiz = await quiz_service.get_quiz(quiz_id)
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
     
-    return {
+    logger.info(f"Quiz {quiz_id} has {len(quiz.questions)} questions, completed={quiz.completed}")
+    
+    response = {
         "id": quiz.id,
         "title": quiz.title,
         "description": quiz.description,
@@ -81,15 +85,21 @@ async def get_quiz(quiz_id: str):
             {
                 "question": q.question,
                 "options": q.options,
-                # Note: correct_answer is intentionally NOT included
-                # so users can't cheat by inspecting the response
+                # Include correct_answer only if quiz is completed (for showing results)
+                **({"correct_answer": q.correct_answer, "explanation": q.explanation} if quiz.completed else {}),
             }
             for q in quiz.questions
         ],
         "num_questions": len(quiz.questions),
         "created": quiz.created,
         "created_by": quiz.created_by,
+        # Include completion state
+        "completed": quiz.completed,
+        "user_answers": quiz.user_answers,
+        "last_score": quiz.last_score,
     }
+    
+    return response
 
 
 @router.post("/quizzes/{quiz_id}/check")
@@ -102,6 +112,18 @@ async def check_quiz_answers(quiz_id: str, request: QuizAnswersRequest):
     try:
         result = await quiz_service.check_quiz_answers(quiz_id, request.answers)
         return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/quizzes/{quiz_id}/reset")
+async def reset_quiz(quiz_id: str):
+    """Reset a quiz to allow retaking it."""
+    try:
+        await quiz_service.reset_quiz(quiz_id)
+        return {"status": "reset", "quiz_id": quiz_id}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
