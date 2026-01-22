@@ -1,0 +1,6 @@
+-- Migration 14 Down: Remove Gemini as default embedding model
+
+-- Clear the default embedding model
+UPDATE open_notebook:default_models SET default_embedding_model = NONE;
+
+-- Note: We don't delete the model record itself as it may be used elsewhere
