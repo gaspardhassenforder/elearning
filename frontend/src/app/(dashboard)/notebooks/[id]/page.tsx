@@ -54,7 +54,7 @@ export default function NotebookPage() {
   // Resizable column widths
   const [documentsWidth, setDocumentsWidth] = useState(33.33) // percentage
   const [notesArtifactsWidth, setNotesArtifactsWidth] = useState(33.33) // percentage
-  const [notesHeight, setNotesHeight] = useState(66.67) // percentage of Notes+Artifacts column
+  const [notesHeight, setNotesHeight] = useState(50) // percentage of Notes+Artifacts column (notes vs artifacts; 50 = equal)
   const [isResizing, setIsResizing] = useState<'documents' | 'notes-artifacts' | 'notes-vertical' | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const resizeStartRef = useRef({ x: 0, y: 0, documentsWidth: 0, notesArtifactsWidth: 0, notesHeight: 0 })
@@ -63,7 +63,6 @@ export default function NotebookPage() {
     e.preventDefault()
     setIsResizing(type)
     if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect()
       resizeStartRef.current = {
         x: e.clientX,
         y: e.clientY,
@@ -101,10 +100,7 @@ export default function NotebookPage() {
             const newMiddleWidth = resizeStartRef.current.notesArtifactsWidth + deltaPercent
             const minMiddleWidth = 15
             const maxMiddleWidth = 60
-            
-            // Ensure there's enough space for chat column (min 10%)
-            const maxAllowedMiddle = 100 - documentsWidth - 10
-            
+            const maxAllowedMiddle = 100 - resizeStartRef.current.documentsWidth - 10
             const constrainedMiddleWidth = Math.max(minMiddleWidth, Math.min(maxMiddleWidth, Math.min(maxAllowedMiddle, newMiddleWidth)))
             setNotesArtifactsWidth(constrainedMiddleWidth)
           }
@@ -398,6 +394,20 @@ export default function NotebookPage() {
                     'flex items-center justify-center'
                   )}
                   style={{ right: '-3px', width: '6px' }}
+                >
+                  <div className="w-px h-full bg-transparent group-hover:bg-primary/50 transition-colors" />
+                  <GripVertical className="absolute opacity-0 group-hover:opacity-100 transition-opacity text-primary" size={14} />
+                </div>
+              )}
+              {/* Centered resize handle when both notes+artifacts collapsed: larger hit area, visually in middle */}
+              {(notesCollapsed && artifactsCollapsed) && !sourcesCollapsed && !chatCollapsed && (
+                <div
+                  onMouseDown={(e) => handleResizeStart('documents', e)}
+                  className={cn(
+                    'absolute top-0 h-full cursor-col-resize z-20 group',
+                    'flex items-center justify-center'
+                  )}
+                  style={{ left: '50%', transform: 'translateX(-50%)', width: '24px' }}
                 >
                   <div className="w-px h-full bg-transparent group-hover:bg-primary/50 transition-colors" />
                   <GripVertical className="absolute opacity-0 group-hover:opacity-100 transition-opacity text-primary" size={14} />
