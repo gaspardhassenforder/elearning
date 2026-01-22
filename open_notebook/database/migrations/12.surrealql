@@ -1,0 +1,5 @@
+-- Migration 12: Clean up invalid artifact records
+-- Remove any artifact records that don't have the required fields
+-- (These may have been created by the old RELATE-based approach)
+
+DELETE FROM artifact WHERE artifact_id IS NONE OR artifact_type IS NONE OR title IS NONE;

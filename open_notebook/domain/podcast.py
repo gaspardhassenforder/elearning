@@ -2,6 +2,7 @@
 
 from typing import ClassVar, Literal, Optional
 
+from open_notebook.database.repository import ensure_record_id
 from open_notebook.domain.base import ObjectModel
 
 
@@ -21,6 +22,16 @@ class Podcast(ObjectModel):
     created_by: Literal["admin", "user"] = "user"
     status: Literal["pending", "generating", "completed", "failed"] = "pending"
     error_message: Optional[str] = None
+    
+    def _prepare_save_data(self) -> dict:
+        """Override to ensure notebook_id is converted to RecordID for database."""
+        data = super()._prepare_save_data()
+        
+        # Convert notebook_id string to RecordID format for database
+        if "notebook_id" in data and data["notebook_id"] is not None:
+            data["notebook_id"] = ensure_record_id(data["notebook_id"])
+        
+        return data
 
     async def get_notebook(self):
         """Get the parent notebook."""

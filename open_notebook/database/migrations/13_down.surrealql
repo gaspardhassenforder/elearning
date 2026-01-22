@@ -1,0 +1,10 @@
+-- Migration 13 Down: Restore artifact relation table
+-- Note: This will lose any artifact tracking data
+
+-- Remove the regular artifact table
+REMOVE TABLE artifact;
+
+-- Restore old artifact relation table
+DEFINE TABLE artifact
+TYPE RELATION 
+FROM note TO notebook;

@@ -157,6 +157,14 @@ class ObjectModel(BaseModel):
             result_list: List[Dict[str, Any]] = (
                 repo_result if isinstance(repo_result, list) else [repo_result]
             )
+            
+            # Validate that we have a proper dictionary result
+            if not result_list or not isinstance(result_list[0], dict):
+                logger.error(f"Invalid repo result format: {result_list}")
+                raise DatabaseOperationError(
+                    f"Database returned invalid format: expected dict, got {type(result_list[0]) if result_list else 'empty list'}"
+                )
+            
             for key, value in result_list[0].items():
                 if hasattr(self, key):
                     if isinstance(getattr(self, key), BaseModel):

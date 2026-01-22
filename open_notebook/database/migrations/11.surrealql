@@ -34,6 +34,9 @@ DEFINE FIELD updated ON podcast TYPE datetime DEFAULT time::now();
 -- Index for efficient notebook lookups
 DEFINE INDEX podcast_notebook_idx ON podcast FIELDS notebook_id;
 
+-- Remove old artifact relation table (from migration 1)
+REMOVE TABLE IF EXISTS artifact;
+
 -- Create Artifact table for unified artifact tracking
 DEFINE TABLE artifact SCHEMAFULL;
 DEFINE FIELD notebook_id ON artifact TYPE record<notebook>;

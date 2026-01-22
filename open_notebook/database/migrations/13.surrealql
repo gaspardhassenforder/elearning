@@ -1,0 +1,20 @@
+-- Migration 13: Fix artifact table definition
+-- The artifact table was originally defined as a RELATION table in migration 1,
+-- but migration 11 tried to redefine it as a regular table without removing the old definition.
+-- This migration fixes that by removing the old RELATION table and creating the proper table.
+
+-- Remove old artifact relation table
+REMOVE TABLE artifact;
+
+-- Create Artifact table for unified artifact tracking
+DEFINE TABLE artifact SCHEMAFULL;
+DEFINE FIELD notebook_id ON artifact TYPE record<notebook>;
+DEFINE FIELD artifact_type ON artifact TYPE string;
+DEFINE FIELD artifact_id ON artifact TYPE string;
+DEFINE FIELD title ON artifact TYPE string;
+DEFINE FIELD created ON artifact TYPE datetime DEFAULT time::now();
+DEFINE FIELD updated ON artifact TYPE datetime DEFAULT time::now();
+
+-- Indexes for artifact lookups
+DEFINE INDEX artifact_notebook_idx ON artifact FIELDS notebook_id;
+DEFINE INDEX artifact_type_idx ON artifact FIELDS artifact_type;

@@ -90,7 +90,20 @@ async def repo_create(table: str, data: Dict[str, Any]) -> Dict[str, Any]:
     data["updated"] = datetime.now(timezone.utc)
     try:
         async with db_connection() as connection:
-            return parse_record_ids(await connection.insert(table, data))
+            result = await connection.insert(table, data)
+            parsed_result = parse_record_ids(result)
+            
+            # If result is a list, get the first item
+            if isinstance(parsed_result, list) and len(parsed_result) > 0:
+                return parsed_result[0]
+            
+            # If it's already a dict, return it
+            if isinstance(parsed_result, dict):
+                return parsed_result
+                
+            # Otherwise, something went wrong
+            logger.error(f"Unexpected insert result format: {type(parsed_result)}, value: {parsed_result}")
+            raise RuntimeError(f"Unexpected insert result format: {type(parsed_result)}")
     except RuntimeError as e:
         logger.error(str(e))
         raise

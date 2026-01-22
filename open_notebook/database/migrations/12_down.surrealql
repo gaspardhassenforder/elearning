@@ -1,0 +1,3 @@
+-- Migration 12 Down: No-op
+-- We can't restore deleted invalid records
+-- This migration only cleaned up corrupted data

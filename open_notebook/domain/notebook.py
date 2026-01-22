@@ -47,16 +47,32 @@ class Notebook(ObjectModel):
 
     async def get_notes(self) -> List["Note"]:
         try:
-            srcs = await repo_query(
+            # Get notes through the artifact table
+            result = await repo_query(
                 """
-            select * omit note.content, note.embedding from (
-                select in as note from artifact where out=$id
-                fetch note
-            ) order by note.updated desc
-            """,
-                {"id": ensure_record_id(self.id)},
+                SELECT artifact_id, updated FROM artifact 
+                WHERE notebook_id = $notebook_id 
+                AND artifact_type = 'note'
+                ORDER BY updated DESC
+                """,
+                {"notebook_id": ensure_record_id(self.id)},
             )
-            return [Note(**src["note"]) for src in srcs] if srcs else []
+            
+            if not result:
+                return []
+            
+            # Fetch the actual notes
+            notes = []
+            for artifact_record in result:
+                note_id = artifact_record.get("artifact_id")
+                if note_id:
+                    try:
+                        note = await Note.get(note_id)
+                        notes.append(note)
+                    except Exception as e:
+                        logger.warning(f"Failed to fetch note {note_id}: {e}")
+            
+            return notes
         except Exception as e:
             logger.error(f"Error fetching notes for notebook {self.id}: {str(e)}")
             logger.exception(e)
@@ -450,7 +466,18 @@ class Note(ObjectModel):
     async def add_to_notebook(self, notebook_id: str) -> Any:
         if not notebook_id:
             raise InvalidInputError("Notebook ID must be provided")
-        return await self.relate("artifact", notebook_id)
+        if not self.id:
+            raise InvalidInputError("Note must be saved before adding to notebook")
+        
+        # Create an Artifact tracker record
+        from open_notebook.domain.artifact import Artifact
+        
+        return await Artifact.create_for_artifact(
+            notebook_id=notebook_id,
+            artifact_type="note",
+            artifact_id=self.id,
+            title=self.title or "Untitled Note",
+        )
 
     def get_context(
         self, context_size: Literal["short", "long"] = "short"
