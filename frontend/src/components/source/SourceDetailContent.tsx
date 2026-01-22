@@ -66,6 +66,7 @@ import { toast } from 'sonner'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { SourceInsightDialog } from '@/components/source/SourceInsightDialog'
 import { NotebookAssociations } from '@/components/source/NotebookAssociations'
+import { RawDocumentViewer } from '@/components/source/RawDocumentViewer'
 
 interface SourceDetailContentProps {
   sourceId: string
@@ -362,9 +363,9 @@ export function SourceDetailContent({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="pb-4 px-2">
+      <div className="pb-4 px-2 pt-2">
         <div className="flex items-start justify-between">
-          <div className="flex-1">
+          <div className="flex-1 pr-2">
             <InlineEdit
               value={source.title || ''}
               onSave={handleUpdateTitle}
@@ -377,7 +378,7 @@ export function SourceDetailContent({
               {t.sources.id}: {source.id}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 pr-10">
             {getSourceIcon()}
             <Badge variant="secondary" className="text-sm">
               {getSourceType()}
@@ -436,15 +437,24 @@ export function SourceDetailContent({
       </div>
 
       {/* Tabs Content */}
-      <div className="flex-1 overflow-y-auto px-2">
-        <Tabs defaultValue="content" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 sticky top-0 z-10">
+      <div className="flex-1 overflow-hidden px-2 min-h-0 flex flex-col">
+        <Tabs defaultValue="content" className="w-full h-full flex flex-col min-h-0">
+          <TabsList className="grid w-full grid-cols-4 flex-shrink-0 z-10">
+            <TabsTrigger value="raw">{t.sources.raw}</TabsTrigger>
             <TabsTrigger value="content">{t.sources.content}</TabsTrigger>
             <TabsTrigger value="insights">
               {t.common.insights} {insights.length > 0 && `(${insights.length})`}
             </TabsTrigger>
             <TabsTrigger value="details">{t.sources.details}</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="raw" className="flex-1 flex flex-col min-h-0 mt-2">
+            <RawDocumentViewer
+              sourceId={sourceId}
+              filePath={source.asset?.file_path}
+              fileAvailable={fileAvailable}
+            />
+          </TabsContent>
 
           <TabsContent value="content" className="mt-6">
             <Card>

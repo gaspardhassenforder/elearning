@@ -324,6 +324,7 @@ export const frFR = {
     insightsCount: "{count} aperçus",
     details: "Détails",
     detailsTitle: "Détails de la source",
+    raw: "Document brut",
     content: "Contenu",
     metadata: "Métadonnées",
     type: {
