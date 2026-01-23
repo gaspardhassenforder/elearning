@@ -13,6 +13,7 @@ async def generate_quiz(
     topic: Optional[str] = None,
     num_questions: int = 5,
     source_ids: Optional[List[str]] = None,
+    instructions: Optional[str] = None,
 ) -> dict:
     """
     Generate a quiz for a notebook.
@@ -22,6 +23,7 @@ async def generate_quiz(
         topic: Optional topic to focus on
         num_questions: Number of questions to generate
         source_ids: Optional specific source IDs to use
+        instructions: Optional specific instructions for quiz generation
         
     Returns:
         dict with quiz_id if successful, or error if failed
@@ -33,6 +35,7 @@ async def generate_quiz(
         topic=topic,
         num_questions=num_questions,
         source_ids=source_ids,
+        instructions=instructions,
     )
     
     return result

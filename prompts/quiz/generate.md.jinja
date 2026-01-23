@@ -9,6 +9,11 @@ Focus specifically on: {{ topic }}
 {% else %}
 Cover the main concepts and key points from the content.
 {% endif %}
+{% if instructions %}
+
+**Additional Instructions:**
+{{ instructions }}
+{% endif %}
 
 Generate exactly {{ num_questions }} multiple choice questions with:
 1. A clear, well-written question

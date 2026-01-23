@@ -21,6 +21,7 @@ class QuizGenerationState(TypedDict):
     topic: Optional[str]
     num_questions: int
     source_ids: Optional[List[str]]
+    instructions: Optional[str]
     sources_content: str
     generated_questions: List[dict]
     quiz_id: Optional[str]
@@ -117,6 +118,7 @@ async def generate_questions(state: QuizGenerationState) -> dict:
             "sources_content": state["sources_content"],
             "topic": state.get("topic"),
             "num_questions": state["num_questions"],
+            "instructions": state.get("instructions"),
         }
 
         # Render prompt using Prompter
@@ -275,6 +277,7 @@ async def generate_quiz(
     topic: Optional[str] = None,
     num_questions: int = 5,
     source_ids: Optional[List[str]] = None,
+    instructions: Optional[str] = None,
 ) -> dict:
     """
     Main entry point for quiz generation.
@@ -284,6 +287,7 @@ async def generate_quiz(
         topic: Optional topic to focus questions on
         num_questions: Number of questions to generate (default: 5)
         source_ids: Optional list of specific source IDs to use
+        instructions: Optional specific instructions for quiz generation
         
     Returns:
         dict with quiz_id if successful, or error message if failed
@@ -296,6 +300,7 @@ async def generate_quiz(
         "topic": topic,
         "num_questions": min(num_questions, 20),  # Cap at 20 questions
         "source_ids": source_ids,
+        "instructions": instructions,
         "sources_content": "",
         "generated_questions": [],
         "quiz_id": None,

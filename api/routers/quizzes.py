@@ -16,6 +16,7 @@ class QuizGenerateRequest(BaseModel):
     topic: Optional[str] = Field(None, description="Optional topic to focus questions on")
     num_questions: int = Field(5, ge=1, le=20, description="Number of questions to generate")
     source_ids: Optional[List[str]] = Field(None, description="Optional specific source IDs to use")
+    instructions: Optional[str] = Field(None, description="Optional specific instructions for quiz generation")
 
 
 class QuizAnswersRequest(BaseModel):
@@ -37,6 +38,7 @@ async def generate_quiz(notebook_id: str, request: QuizGenerateRequest):
             topic=request.topic,
             num_questions=request.num_questions,
             source_ids=request.source_ids,
+            instructions=request.instructions,
         )
 
         if result.get("error"):

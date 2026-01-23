@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { useGenerateQuiz } from '@/lib/hooks/use-artifacts'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { Loader2 } from 'lucide-react'
@@ -24,21 +25,47 @@ interface GenerateQuizDialogProps {
 export function GenerateQuizDialog({ notebookId, open, onOpenChange }: GenerateQuizDialogProps) {
   const { t } = useTranslation()
   const [topic, setTopic] = useState('')
-  const [numQuestions, setNumQuestions] = useState(5)
+  const [numQuestions, setNumQuestions] = useState<string>('5')
+  const [instructions, setInstructions] = useState('')
   const generateQuiz = useGenerateQuiz()
+
+  const handleNumQuestionsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    // Allow empty string for deletion, or valid numbers
+    if (value === '' || /^\d+$/.test(value)) {
+      setNumQuestions(value)
+    }
+  }
+
+  const handleNumQuestionsBlur = () => {
+    // Ensure we have a valid number on blur
+    const num = parseInt(numQuestions)
+    if (isNaN(num) || num < 1) {
+      setNumQuestions('5')
+    } else if (num > 20) {
+      setNumQuestions('20')
+    } else {
+      setNumQuestions(num.toString())
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const num = parseInt(numQuestions) || 5
+    const finalNum = Math.max(1, Math.min(20, num))
+    
     try {
       await generateQuiz.mutateAsync({
         notebookId,
         request: {
           topic: topic.trim() || undefined,
-          num_questions: numQuestions,
+          num_questions: finalNum,
+          instructions: instructions.trim() || undefined,
         },
       })
       setTopic('')
-      setNumQuestions(5)
+      setNumQuestions('5')
+      setInstructions('')
       onOpenChange(false)
     } catch (error) {
       // Error is handled by the mutation hook
@@ -72,11 +99,27 @@ export function GenerateQuizDialog({ notebookId, open, onOpenChange }: GenerateQ
             </Label>
             <Input
               id="numQuestions"
-              type="number"
+              type="text"
+              inputMode="numeric"
               min={1}
               max={20}
               value={numQuestions}
-              onChange={(e) => setNumQuestions(parseInt(e.target.value) || 5)}
+              onChange={handleNumQuestionsChange}
+              onBlur={handleNumQuestionsBlur}
+              placeholder="5"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="instructions">
+              {t.artifacts?.quizInstructions || 'Instructions (optional)'}
+            </Label>
+            <Textarea
+              id="instructions"
+              placeholder={t.artifacts?.quizInstructionsPlaceholder || 'e.g., Focus on practical examples, avoid theoretical questions'}
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              rows={3}
             />
           </div>
 

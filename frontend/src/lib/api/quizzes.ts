@@ -26,6 +26,7 @@ export interface QuizGenerateRequest {
   topic?: string
   num_questions?: number
   source_ids?: string[]
+  instructions?: string
 }
 
 export interface QuizCheckRequest {
