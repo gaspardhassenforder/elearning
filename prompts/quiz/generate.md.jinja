@@ -3,6 +3,8 @@ You are an expert educator creating quiz questions. Generate multiple choice que
 **Content to quiz:**
 {{ sources_content }}
 
+**Note:** The content above consists of pre-filtered, relevant chunks from the source materials. Each chunk is labeled with its source title. Use this focused content to create accurate quiz questions.
+
 **Instructions:**
 {% if topic %}
 Focus specifically on: {{ topic }}
@@ -25,8 +27,10 @@ Generate exactly {{ num_questions }} multiple choice questions with:
 - Questions should test understanding, not just memorization
 - Make distractors (wrong answers) plausible but clearly incorrect
 - Vary difficulty: include easy, medium, and challenging questions
-- Reference specific content from the sources when appropriate
+- Base questions only on the provided content chunks - do not add information not present in the chunks
+- Reference specific content from the chunks when appropriate (note the source titles)
 - Keep questions focused and unambiguous
+- Ensure all questions can be answered using only the provided content to avoid hallucinations
 
 **Output Format:**
 Return ONLY a valid JSON array with no additional text:

@@ -1,17 +1,21 @@
 """Quiz generation workflow using LangGraph."""
 
 import asyncio
+import hashlib
 import json
 import re
 from typing import List, Literal, Optional, TypedDict
 
 from ai_prompter import Prompter
+from langchain_core.output_parsers.pydantic import PydanticOutputParser
 from loguru import logger
+from pydantic import BaseModel, Field
 
 from open_notebook.ai.provision import provision_langchain_model
 from open_notebook.domain.artifact import Artifact
-from open_notebook.domain.notebook import Notebook
+from open_notebook.domain.notebook import Notebook, vector_search_for_notebook
 from open_notebook.domain.quiz import Quiz, QuizQuestion
+from open_notebook.utils import clean_thinking_content
 
 
 class QuizGenerationState(TypedDict):
@@ -22,6 +26,8 @@ class QuizGenerationState(TypedDict):
     num_questions: int
     source_ids: Optional[List[str]]
     instructions: Optional[str]
+    rag_queries: Optional[List[str]]
+    retrieved_chunks: List[dict]
     sources_content: str
     generated_questions: List[dict]
     quiz_id: Optional[str]
@@ -29,8 +35,136 @@ class QuizGenerationState(TypedDict):
     status: Literal["pending", "gathering", "generating", "saving", "completed", "failed"]
 
 
+class QuizSearch(BaseModel):
+    """A search query for quiz generation."""
+
+    term: str
+    instructions: str = Field(
+        description="What information should be extracted from this search for quiz generation"
+    )
+
+
+class QuizStrategy(BaseModel):
+    """Strategy for generating quiz search queries."""
+
+    reasoning: str
+    searches: List[QuizSearch] = Field(
+        default_factory=list,
+        description="Generate 2-5 search queries optimized for retrieving quiz-worthy content",
+    )
+
+
+async def generate_rag_queries(state: QuizGenerationState) -> dict:
+    """Generate optimized RAG search queries using LLM."""
+    logger.info("Generating RAG queries for quiz generation")
+
+    try:
+        parser = PydanticOutputParser(pydantic_object=QuizStrategy)
+        prompt_data = {
+            "topic": state.get("topic"),
+            "instructions": state.get("instructions"),
+            "num_questions": state["num_questions"],
+        }
+
+        prompter = Prompter(prompt_template="quiz/rag_queries.jinja", parser=parser)
+        system_prompt = prompter.render(data=prompt_data)
+
+        model = await provision_langchain_model(
+            content=system_prompt,
+            model_id=None,
+            default_type="default",
+            max_tokens=2000,
+            structured=dict(type="json"),
+        )
+
+        ai_message = await model.ainvoke(system_prompt)
+
+        # Clean the thinking content from the response
+        message_content = (
+            ai_message.content
+            if isinstance(ai_message.content, str)
+            else str(ai_message.content)
+        )
+        cleaned_content = clean_thinking_content(message_content)
+
+        # Parse the cleaned JSON content
+        strategy = parser.parse(cleaned_content)
+
+        queries = [search.term for search in strategy.searches]
+
+        logger.info(f"Generated {len(queries)} RAG queries: {queries}")
+
+        return {
+            "rag_queries": queries,
+            "status": "gathering",
+        }
+
+    except Exception as e:
+        logger.error(f"Error generating RAG queries: {e}")
+        logger.exception(e)
+        return {
+            "error": f"Failed to generate RAG queries: {str(e)}",
+            "status": "failed",
+        }
+
+
+async def retrieve_relevant_chunks(state: QuizGenerationState) -> dict:
+    """Retrieve relevant chunks using RAG queries."""
+    if state.get("error") or not state.get("rag_queries"):
+        return {}
+
+    logger.info(f"Retrieving chunks for {len(state['rag_queries'])} queries")
+
+    try:
+        all_chunks = []
+        seen_content_hashes = set()
+
+        for query in state["rag_queries"]:
+            try:
+                # Get top 15 chunks per query (no similarity threshold)
+                chunks = await vector_search_for_notebook(
+                    notebook_id=state["notebook_id"],
+                    keyword=query,
+                    results=15,
+                    source_ids=state.get("source_ids"),
+                )
+
+                # Deduplicate chunks by content hash
+                for chunk in chunks:
+                    content = chunk.get("content", "")
+                    if isinstance(content, list):
+                        content = " ".join(str(c) for c in content)
+                    content_str = str(content)
+                    content_hash = hashlib.md5(content_str.encode()).hexdigest()
+
+                    if content_hash not in seen_content_hashes:
+                        seen_content_hashes.add(content_hash)
+                        all_chunks.append(chunk)
+
+                logger.debug(f"Retrieved {len(chunks)} chunks for query: {query[:50]}...")
+
+            except Exception as e:
+                logger.warning(f"Error retrieving chunks for query '{query}': {e}")
+                continue
+
+        logger.info(f"Retrieved {len(all_chunks)} unique chunks total")
+
+        return {
+            "retrieved_chunks": all_chunks,
+            "status": "gathering",
+        }
+
+    except Exception as e:
+        logger.error(f"Error retrieving relevant chunks: {e}")
+        logger.exception(e)
+        return {
+            "error": f"Failed to retrieve relevant chunks: {str(e)}",
+            "status": "failed",
+        }
+
+
 async def gather_sources(state: QuizGenerationState) -> dict:
-    """Gather relevant source content from the notebook."""
+    """Gather relevant source content from the notebook using RAG or fallback to full sources."""
     logger.info(f"Gathering sources for notebook {state['notebook_id']}")
 
     try:
@@ -43,6 +177,39 @@ async def gather_sources(state: QuizGenerationState) -> dict:
                 "error": "Notebook not found",
                 "status": "failed",
             }
+        
+        # Check if we have retrieved chunks from RAG
+        if state.get("retrieved_chunks"):
+            logger.info(f"Using RAG-retrieved chunks: {len(state['retrieved_chunks'])} chunks")
+            
+            # Format retrieved chunks similar to current format
+            content_parts = []
+            for chunk in state["retrieved_chunks"]:
+                title = chunk.get("title", "Untitled")
+                content = chunk.get("content", "")
+                
+                # Handle content that might be a list
+                if isinstance(content, list):
+                    content = " ".join(str(c) for c in content)
+                content_str = str(content)
+                
+                if content_str:
+                    content_parts.append(f"## Source: {title}\n\n{content_str}")
+            
+            if not content_parts:
+                logger.warning("No content found in retrieved chunks, falling back to full sources")
+                # Fall through to full source retrieval
+            else:
+                combined_content = "\n\n---\n\n".join(content_parts)
+                logger.info(f"Formatted {len(content_parts)} chunks into {len(combined_content)} characters")
+                
+                return {
+                    "sources_content": combined_content,
+                    "status": "generating",
+                }
+        
+        # Fallback: Check if embeddings exist, if not use full sources
+        logger.info("Checking for embeddings or using full source fallback")
         
         # Fetch sources WITH full_text (notebook.get_sources() omits it for performance)
         srcs = await repo_query(
@@ -69,6 +236,25 @@ async def gather_sources(state: QuizGenerationState) -> dict:
                     "status": "failed",
                 }
 
+        # Check if any sources have embeddings
+        has_embeddings = False
+        try:
+            embedding_check = await repo_query(
+                """
+                SELECT VALUE count() FROM source_embedding 
+                WHERE source IN (SELECT VALUE in FROM reference WHERE out=$notebook_id)
+                GROUP ALL
+                """,
+                {"notebook_id": ensure_record_id(state["notebook_id"])},
+            )
+            if embedding_check and embedding_check[0] and embedding_check[0].get("count", 0) > 0:
+                has_embeddings = True
+        except Exception as e:
+            logger.debug(f"Could not check embeddings: {e}")
+
+        if has_embeddings:
+            logger.info("Sources have embeddings but RAG retrieval was not used, using full sources as fallback")
+
         # Combine source content with source titles for context
         content_parts = []
         for source in sources:
@@ -90,7 +276,7 @@ async def gather_sources(state: QuizGenerationState) -> dict:
         if len(combined_content) > max_content_length:
             combined_content = combined_content[:max_content_length] + "\n\n[Content truncated...]"
 
-        logger.info(f"Gathered {len(sources)} sources with {len(combined_content)} characters")
+        logger.info(f"Gathered {len(sources)} sources with {len(combined_content)} characters (fallback mode)")
 
         return {
             "sources_content": combined_content,
@@ -301,6 +487,8 @@ async def generate_quiz(
         "num_questions": min(num_questions, 20),  # Cap at 20 questions
         "source_ids": source_ids,
         "instructions": instructions,
+        "rag_queries": None,
+        "retrieved_chunks": [],
         "sources_content": "",
         "generated_questions": [],
         "quiz_id": None,
@@ -309,19 +497,36 @@ async def generate_quiz(
     }
 
     # Run workflow steps sequentially
-    # Step 1: Gather sources
+    # Step 1: Generate RAG queries
+    state.update(await generate_rag_queries(state))
+    if state.get("error"):
+        logger.warning(f"RAG query generation failed: {state['error']}, continuing with fallback")
+        # Continue with fallback - clear error to allow fallback
+        state["error"] = None
+        state["rag_queries"] = None
+
+    # Step 2: Retrieve relevant chunks (if RAG queries were generated)
+    if state.get("rag_queries"):
+        state.update(await retrieve_relevant_chunks(state))
+        if state.get("error"):
+            logger.warning(f"Chunk retrieval failed: {state['error']}, falling back to full sources")
+            # Continue with fallback - clear error and chunks
+            state["error"] = None
+            state["retrieved_chunks"] = []
+
+    # Step 3: Gather sources (uses RAG chunks if available, otherwise full sources)
     state.update(await gather_sources(state))
     if state.get("error"):
         return {"error": state["error"], "status": state["status"]}
 
-    # Step 2: Generate questions
+    # Step 4: Generate questions
     state.update(await generate_questions(state))
     logger.info(f"After generate_questions: generated_questions count = {len(state.get('generated_questions', []))}")
     if state.get("error"):
         logger.error(f"generate_questions failed: {state['error']}")
         return {"error": state["error"], "status": state["status"]}
 
-    # Step 3: Save quiz
+    # Step 5: Save quiz
     logger.info(f"Proceeding to save_quiz with {len(state['generated_questions'])} questions")
     state.update(await save_quiz(state))
     if state.get("error"):

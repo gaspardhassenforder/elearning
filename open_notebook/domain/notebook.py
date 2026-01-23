@@ -566,3 +566,132 @@ async def vector_search(
         logger.error(f"Error performing vector search: {str(e)}")
         logger.exception(e)
         raise DatabaseOperationError(e)
+
+
+async def vector_search_for_notebook(
+    notebook_id: str,
+    keyword: str,
+    results: int = 15,
+    source_ids: Optional[List[str]] = None,
+) -> List[dict]:
+    """
+    Perform vector search filtered by notebook sources.
+    Returns top N chunks ordered by similarity (no minimum threshold).
+    
+    Args:
+        notebook_id: ID of the notebook to search within
+        keyword: Search query string
+        results: Number of results to return (default: 15)
+        source_ids: Optional list of specific source IDs to filter by
+        
+    Returns:
+        List of search results with id, title, content, parent_id, similarity
+    """
+    if not keyword:
+        raise InvalidInputError("Search keyword cannot be empty")
+    
+    try:
+        EMBEDDING_MODEL = await model_manager.get_embedding_model()
+        if EMBEDDING_MODEL is None:
+            raise ValueError("EMBEDDING_MODEL is not configured")
+        
+        embed = (await EMBEDDING_MODEL.aembed([keyword]))[0]
+        notebook_id_clean = ensure_record_id(notebook_id)
+        
+        # Build base params
+        params = {
+            "notebook_id": notebook_id_clean,
+            "embed": embed,
+            "results": results,
+        }
+        
+        # Query source_embedding table
+        if source_ids:
+            source_ids_clean = [ensure_record_id(sid) for sid in source_ids]
+            query = """
+            SELECT 
+                source.id as id,
+                source.title as title,
+                content,
+                source.id as parent_id,
+                vector::similarity::cosine(embedding, $embed) as similarity
+            FROM source_embedding 
+            WHERE source IN $source_ids
+                AND source IN (SELECT VALUE in FROM reference WHERE out=$notebook_id)
+                AND embedding != none 
+                AND array::len(embedding) = array::len($embed)
+            ORDER BY similarity DESC
+            LIMIT $results
+            """
+            params_with_sources = {**params, "source_ids": source_ids_clean}
+            source_results = await repo_query(query, params_with_sources)
+        else:
+            query = """
+            SELECT 
+                source.id as id,
+                source.title as title,
+                content,
+                source.id as parent_id,
+                vector::similarity::cosine(embedding, $embed) as similarity
+            FROM source_embedding 
+            WHERE source IN (SELECT VALUE in FROM reference WHERE out=$notebook_id)
+                AND embedding != none 
+                AND array::len(embedding) = array::len($embed)
+            ORDER BY similarity DESC
+            LIMIT $results
+            """
+            source_results = await repo_query(query, params)
+        
+        # Query source_insight table
+        if source_ids:
+            source_ids_clean = [ensure_record_id(sid) for sid in source_ids]
+            insight_query = """
+            SELECT 
+                id,
+                insight_type + ' - ' + (source.title OR '') as title,
+                content,
+                source.id as parent_id,
+                vector::similarity::cosine(embedding, $embed) as similarity
+            FROM source_insight
+            WHERE source IN $source_ids
+                AND source IN (SELECT VALUE in FROM reference WHERE out=$notebook_id)
+                AND embedding != none 
+                AND array::len(embedding) = array::len($embed)
+            ORDER BY similarity DESC
+            LIMIT $results
+            """
+            params_with_sources = {**params, "source_ids": source_ids_clean}
+            insight_results = await repo_query(insight_query, params_with_sources)
+        else:
+            insight_query = """
+            SELECT 
+                id,
+                insight_type + ' - ' + (source.title OR '') as title,
+                content,
+                source.id as parent_id,
+                vector::similarity::cosine(embedding, $embed) as similarity
+            FROM source_insight
+            WHERE source IN (SELECT VALUE in FROM reference WHERE out=$notebook_id)
+                AND embedding != none 
+                AND array::len(embedding) = array::len($embed)
+            ORDER BY similarity DESC
+            LIMIT $results
+            """
+            insight_results = await repo_query(insight_query, params)
+        
+        # Combine and sort all results
+        all_results = []
+        if source_results:
+            all_results.extend(source_results)
+        if insight_results:
+            all_results.extend(insight_results)
+        
+        # Sort by similarity DESC and take top N
+        all_results.sort(key=lambda x: x.get("similarity", 0), reverse=True)
+        
+        return all_results[:results]
+        
+    except Exception as e:
+        logger.error(f"Error performing notebook-filtered vector search: {str(e)}")
+        logger.exception(e)
+        raise DatabaseOperationError(e)
