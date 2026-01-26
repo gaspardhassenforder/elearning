@@ -1,5 +1,25 @@
 # Scripts Documentation
 
+## clear_command_queue.py
+
+Clears the **surreal-commands** job queue (e.g. podcast generation backlog). Optionally removes artifact rows that reference pending jobs so the UI no longer shows stuck “generating” items.
+
+**Requirements:** `.env` (or `SURREAL_*` env vars) and SurrealDB reachable.
+
+```bash
+# Clear the job queue only (all pending/running commands)
+uv run python scripts/clear_command_queue.py
+
+# Also remove placeholder podcast artifacts (artifact_id starting with "command:")
+uv run python scripts/clear_command_queue.py --artifacts
+
+# See what would be deleted without changing the DB
+uv run python scripts/clear_command_queue.py --dry-run
+uv run python scripts/clear_command_queue.py --artifacts --dry-run
+```
+
+---
+
 ## export_docs.py
 
 Consolidates markdown documentation files for use with ChatGPT or other platforms with file upload limits.
