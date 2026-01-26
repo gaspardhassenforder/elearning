@@ -1,10 +1,11 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from fastapi import HTTPException
 from loguru import logger
 from pydantic import BaseModel
 from surreal_commands import get_command_status, submit_command
 
+from open_notebook.domain.artifact import Artifact
 from open_notebook.domain.notebook import Notebook
 from open_notebook.podcasts.models import EpisodeProfile, PodcastEpisode, SpeakerProfile
 
@@ -17,6 +18,7 @@ class PodcastGenerationRequest(BaseModel):
     episode_name: str
     content: Optional[str] = None
     notebook_id: Optional[str] = None
+    notebook_ids: Optional[list[str]] = None  # All notebooks that contributed content
     briefing_suffix: Optional[str] = None
 
 
@@ -28,6 +30,7 @@ class PodcastGenerationResponse(BaseModel):
     message: str
     episode_profile: str
     episode_name: str
+    artifact_id: Optional[str] = None
 
 
 class PodcastService:
@@ -39,20 +42,34 @@ class PodcastService:
         speaker_profile_name: str,
         episode_name: str,
         notebook_id: Optional[str] = None,
+        notebook_ids: Optional[list[str]] = None,
         content: Optional[str] = None,
         briefing_suffix: Optional[str] = None,
-    ) -> str:
-        """Submit a podcast generation job for background processing"""
+    ) -> Tuple[str, list[str]]:
+        """Submit a podcast generation job for background processing.
+        
+        Returns:
+            Tuple of (job_id, artifact_ids) - list of artifact IDs created for each notebook
+        """
+        logger.info(f"Submitting podcast generation: {episode_name}")
+        logger.debug(f"Parameters: episode_profile={episode_profile_name}, speaker_profile={speaker_profile_name}")
+        logger.debug(f"Notebooks: notebook_id={notebook_id}, notebook_ids={notebook_ids}")
         try:
             # Validate episode profile exists
+            logger.debug(f"Validating episode profile: {episode_profile_name}")
             episode_profile = await EpisodeProfile.get_by_name(episode_profile_name)
             if not episode_profile:
+                logger.error(f"Episode profile not found: {episode_profile_name}")
                 raise ValueError(f"Episode profile '{episode_profile_name}' not found")
 
             # Validate speaker profile exists
+            logger.debug(f"Validating speaker profile: {speaker_profile_name}")
             speaker_profile = await SpeakerProfile.get_by_name(speaker_profile_name)
             if not speaker_profile:
+                logger.error(f"Speaker profile not found: {speaker_profile_name}")
                 raise ValueError(f"Speaker profile '{speaker_profile_name}' not found")
+            
+            logger.debug(f"Validated profiles: episode={episode_profile_name}, speaker={speaker_profile_name}")
 
             # Get content from notebook if not provided directly
             if not content and notebook_id:
@@ -75,12 +92,20 @@ class PodcastService:
                     "Content is required - provide either content or notebook_id"
                 )
 
-            # Prepare command arguments
+            # Consolidate all notebook IDs (from both notebook_id and notebook_ids)
+            all_notebook_ids: list[str] = []
+            if notebook_ids:
+                all_notebook_ids.extend(notebook_ids)
+            if notebook_id and notebook_id not in all_notebook_ids:
+                all_notebook_ids.append(notebook_id)
+
+            # Prepare command arguments - pass all notebook IDs
             command_args = {
                 "episode_profile": episode_profile_name,
                 "speaker_profile": speaker_profile_name,
                 "episode_name": episode_name,
                 "content": str(content),
+                "notebook_ids": all_notebook_ids if all_notebook_ids else None,
                 "briefing_suffix": briefing_suffix,
             }
 
@@ -93,16 +118,39 @@ class PodcastService:
                 raise ValueError("Podcast commands not available")
 
             # Submit command to surreal-commands
+            logger.info(f"Submitting command to surreal-commands: open_notebook.generate_podcast")
+            logger.debug(f"Command args: {command_args}")
             job_id = submit_command("open_notebook", "generate_podcast", command_args)
 
             # Convert RecordID to string if needed
             if not job_id:
                 raise ValueError("Failed to get job_id from submit_command")
             job_id_str = str(job_id)
+            logger.info(f"Command submitted successfully, job_id: {job_id_str}")
+            
+            # Create artifact records for ALL notebooks that contributed content
+            # Use job_id as placeholder artifact_id (will be updated when episode is created)
+            artifact_ids: list[str] = []
+            for nb_id in all_notebook_ids:
+                try:
+                    artifact = await Artifact.create_for_artifact(
+                        notebook_id=nb_id,
+                        artifact_type="podcast",
+                        artifact_id=job_id_str,  # Use job_id as placeholder
+                        title=episode_name,
+                    )
+                    artifact_ids.append(str(artifact.id))
+                    logger.info(
+                        f"Created artifact {artifact.id} for podcast job {job_id_str} in notebook {nb_id}"
+                    )
+                except Exception as artifact_err:
+                    logger.warning(f"Failed to create artifact record for notebook {nb_id}: {artifact_err}")
+            
             logger.info(
-                f"Submitted podcast generation job: {job_id_str} for episode '{episode_name}'"
+                f"Submitted podcast generation job: {job_id_str} for episode '{episode_name}' "
+                f"with {len(artifact_ids)} artifact(s) in {len(all_notebook_ids)} notebook(s)"
             )
-            return job_id_str
+            return job_id_str, artifact_ids
 
         except Exception as e:
             logger.error(f"Failed to submit podcast generation job: {e}")
@@ -114,10 +162,29 @@ class PodcastService:
     @staticmethod
     async def get_job_status(job_id: str) -> Dict[str, Any]:
         """Get status of a podcast generation job"""
+        logger.debug(f"Getting podcast job status for: {job_id}")
         try:
-            status = await get_command_status(job_id)
+            # Remove command: prefix if present for status lookup
+            clean_job_id = job_id.replace("command:", "") if job_id.startswith("command:") else job_id
+            if clean_job_id != job_id:
+                logger.debug(f"Cleaned job_id: {job_id} -> {clean_job_id}")
+            
+            status = await get_command_status(clean_job_id)
+            
+            if not status:
+                logger.warning(f"Job status not found for job_id: {clean_job_id}")
+                return {
+                    "job_id": clean_job_id,
+                    "status": "unknown",
+                    "result": None,
+                    "error_message": "Job not found",
+                    "created": None,
+                    "updated": None,
+                    "progress": None,
+                }
+            
             return {
-                "job_id": job_id,
+                "job_id": clean_job_id,
                 "status": status.status if status else "unknown",
                 "result": status.result if status else None,
                 "error_message": getattr(status, "error_message", None)
@@ -132,7 +199,8 @@ class PodcastService:
                 "progress": getattr(status, "progress", None) if status else None,
             }
         except Exception as e:
-            logger.error(f"Failed to get podcast job status: {e}")
+            logger.error(f"Failed to get podcast job status for {job_id}: {e}")
+            logger.exception(e)
             raise HTTPException(
                 status_code=500, detail=f"Failed to get job status: {str(e)}"
             )

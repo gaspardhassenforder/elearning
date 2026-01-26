@@ -121,7 +121,7 @@ export function PodcastPlayer({ podcastId, notebookId, open, onOpenChange }: Pod
         setAudioSrc(revokeUrl)
       } catch (error) {
         console.error('Unable to load podcast audio', error)
-        setAudioError(t.podcasts?.audioUnavailable || 'Audio unavailable')
+        setAudioError(t.podcasts.audioUnavailable)
         setAudioSrc(undefined)
       }
     }
@@ -159,7 +159,7 @@ export function PodcastPlayer({ podcastId, notebookId, open, onOpenChange }: Pod
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-3xl max-h-[90vh]">
           <DialogHeader>
-            <DialogTitle>{t.artifacts?.podcast || 'Podcast'}</DialogTitle>
+            <DialogTitle>{t.artifacts.podcast}</DialogTitle>
           </DialogHeader>
           <div className="flex items-center justify-center py-12">
             <LoadingSpinner size="lg" />
@@ -174,11 +174,11 @@ export function PodcastPlayer({ podcastId, notebookId, open, onOpenChange }: Pod
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-3xl max-h-[90vh]">
           <DialogHeader>
-            <DialogTitle>{t.artifacts?.podcast || 'Podcast'}</DialogTitle>
+            <DialogTitle>{t.artifacts.podcast}</DialogTitle>
           </DialogHeader>
           <div className="flex items-center justify-center py-12">
             <p className="text-muted-foreground">
-              {t.podcasts?.episodeNotFound || 'Podcast episode not found'}
+              {t.podcasts.episodeNotFound}
             </p>
           </div>
         </DialogContent>
@@ -218,11 +218,11 @@ export function PodcastPlayer({ podcastId, notebookId, open, onOpenChange }: Pod
           <Tabs defaultValue="summary" className="flex-1 flex flex-col min-h-0">
             <TabsList>
               <TabsTrigger value="summary">
-                {t.podcasts?.summary || 'Summary'}
+                {t.podcasts.summaryTab}
               </TabsTrigger>
               {transcriptEntries.length > 0 && (
                 <TabsTrigger value="transcript">
-                  {t.podcasts?.transcript || 'Transcript'}
+                  {t.podcasts.transcriptTab}
                 </TabsTrigger>
               )}
             </TabsList>
@@ -243,7 +243,7 @@ export function PodcastPlayer({ podcastId, notebookId, open, onOpenChange }: Pod
                     ))
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      {t.podcasts?.noSummary || 'No summary available'}
+                      {t.podcasts.noSummary}
                     </p>
                   )}
                 </div>

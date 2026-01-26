@@ -145,10 +145,10 @@ export function ArtifactsPanel({ notebookId, className }: ArtifactsPanelProps) {
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)} className="h-full flex flex-col">
               <div className="px-4 pt-2 border-b">
                 <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="all">{t.artifacts?.all || 'All'}</TabsTrigger>
-                  <TabsTrigger value="quiz">{t.artifacts?.quizzes || 'Quizzes'}</TabsTrigger>
-                  <TabsTrigger value="podcast">{t.artifacts?.podcasts || 'Podcasts'}</TabsTrigger>
-                  <TabsTrigger value="transformation">{t.artifacts?.transformations || 'Transformations'}</TabsTrigger>
+                  <TabsTrigger value="all">{t.artifacts.all}</TabsTrigger>
+                  <TabsTrigger value="quiz">{t.artifacts.quizzes}</TabsTrigger>
+                  <TabsTrigger value="podcast">{t.artifacts.podcasts}</TabsTrigger>
+                  <TabsTrigger value="transformation">{t.artifacts.transformations}</TabsTrigger>
                 </TabsList>
               </div>
 
@@ -192,8 +192,8 @@ export function ArtifactsPanel({ notebookId, className }: ArtifactsPanelProps) {
                 ) : (
                   <EmptyState
                     icon={GraduationCap}
-                    title={t.artifacts?.noArtifacts || 'No artifacts yet'}
-                    description={t.artifacts?.noArtifactsDescription || 'Generate a quiz or podcast to get started'}
+                    title={t.artifacts.noArtifacts}
+                    description={t.artifacts.noArtifactsDescription}
                   />
                 )}
               </div>
@@ -202,20 +202,29 @@ export function ArtifactsPanel({ notebookId, className }: ArtifactsPanelProps) {
         </Card>
       </CollapsibleColumn>
 
-      <GenerateQuizDialog
-        notebookId={notebookId}
-        open={showQuizDialog}
-        onOpenChange={setShowQuizDialog}
-      />
-      <GeneratePodcastDialog
-        open={showPodcastDialog}
-        onOpenChange={setShowPodcastDialog}
-      />
-      <GenerateTransformationDialog
-        notebookId={notebookId}
-        open={showTransformationDialog}
-        onOpenChange={setShowTransformationDialog}
-      />
+      {showQuizDialog && (
+        <GenerateQuizDialog
+          notebookId={notebookId}
+          open={showQuizDialog}
+          onOpenChange={setShowQuizDialog}
+        />
+      )}
+
+      {showPodcastDialog && (
+        <GeneratePodcastDialog
+          open={showPodcastDialog}
+          onOpenChange={setShowPodcastDialog}
+          notebookId={notebookId}
+        />
+      )}
+
+      {showTransformationDialog && (
+        <GenerateTransformationDialog
+          notebookId={notebookId}
+          open={showTransformationDialog}
+          onOpenChange={setShowTransformationDialog}
+        />
+      )}
     </>
   )
 }

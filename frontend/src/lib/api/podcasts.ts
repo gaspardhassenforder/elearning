@@ -29,9 +29,32 @@ export async function resolvePodcastAssetUrl(path?: string | null): Promise<stri
   return `${base}/${path}`
 }
 
+interface JobStatusResponse {
+  job_id: string
+  status: string
+  result?: unknown
+  error_message?: string | null
+  created?: string | null
+  updated?: string | null
+  progress?: number | null
+}
+
 export const podcastsApi = {
   listEpisodes: async () => {
     const response = await apiClient.get<PodcastEpisode[]>('/podcasts/episodes')
+    return response.data
+  },
+
+  getEpisode: async (episodeId: string) => {
+    const response = await apiClient.get<PodcastEpisode>(`/podcasts/episodes/${episodeId}`)
+    return response.data
+  },
+
+  getJobStatus: async (jobId: string) => {
+    // Remove command: prefix if present and URL encode the job ID
+    const cleanJobId = jobId.replace(/^command:/, '')
+    const encodedJobId = encodeURIComponent(cleanJobId)
+    const response = await apiClient.get<JobStatusResponse>(`/podcasts/jobs/${encodedJobId}`)
     return response.data
   },
 
@@ -107,6 +130,16 @@ export const podcastsApi = {
     const response = await apiClient.post<PodcastGenerationResponse>(
       '/podcasts/generate',
       payload
+    )
+    return response.data
+  },
+
+  cancelJob: async (jobId: string) => {
+    // Remove command: prefix if present and URL encode the job ID
+    const cleanJobId = jobId.replace(/^command:/, '')
+    const encodedJobId = encodeURIComponent(cleanJobId)
+    const response = await apiClient.delete<{ success: boolean; message: string }>(
+      `/commands/jobs/${encodedJobId}`
     )
     return response.data
   },

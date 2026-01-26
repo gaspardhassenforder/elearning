@@ -362,9 +362,20 @@ export function useGeneratePodcast() {
   return useMutation({
     mutationFn: (payload: PodcastGenerationRequest) =>
       podcastsApi.generatePodcast(payload),
-    onSuccess: async (response) => {
+    onSuccess: async (response, variables) => {
       // Immediately refetch to show the new episode
       await queryClient.refetchQueries({ queryKey: QUERY_KEYS.podcastEpisodes })
+      
+      // Invalidate artifacts for ALL notebooks that contributed content
+      const notebookIds = variables.notebook_ids ?? []
+      if (variables.notebook_id && !notebookIds.includes(variables.notebook_id)) {
+        notebookIds.push(variables.notebook_id)
+      }
+      
+      for (const nbId of notebookIds) {
+        await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.artifacts(nbId) })
+      }
+      
       toast({
         title: t.podcasts.generationStarted,
         description: t.podcasts.generationStartedDesc.replace('{name}', response.episode_name),

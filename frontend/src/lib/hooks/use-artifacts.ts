@@ -15,8 +15,17 @@ export function useArtifacts(notebookId: string, type?: string) {
       : QUERY_KEYS.artifacts(notebookId),
     queryFn: () => artifactsApi.list(notebookId, type),
     enabled: !!notebookId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 30 * 1000, // 30 seconds - shorter to catch completed podcasts
     retry: 3,
+    // Auto-refresh if there are generating podcasts (artifact_id starts with 'command:')
+    refetchInterval: (query) => {
+      const data = query.state.data as ArtifactResponse[] | undefined
+      if (!data) return false
+      const hasGenerating = data.some(
+        (a) => a.artifact_type === 'podcast' && a.artifact_id.startsWith('command:')
+      )
+      return hasGenerating ? 10_000 : false // Poll every 10s if generating
+    },
   })
 }
 

@@ -71,15 +71,22 @@ async def execute_command(request: CommandExecutionRequest):
         )
 
 
-@router.get("/commands/jobs/{job_id}", response_model=CommandJobStatusResponse)
+@router.get("/commands/jobs/{job_id:path}", response_model=CommandJobStatusResponse)
 async def get_command_job_status(job_id: str):
-    """Get the status of a specific command job"""
+    """Get the status of a specific command job
+    
+    Note: Using {job_id:path} to handle job IDs that may contain colons (command:xxx)
+    """
     try:
-        status_data = await CommandService.get_command_status(job_id)
+        logger.debug(f"Getting command job status for job_id: {job_id}")
+        # Remove command: prefix if present (for compatibility)
+        clean_job_id = job_id.replace("command:", "") if job_id.startswith("command:") else job_id
+        status_data = await CommandService.get_command_status(clean_job_id)
         return CommandJobStatusResponse(**status_data)
 
     except Exception as e:
-        logger.error(f"Error fetching job status: {str(e)}")
+        logger.error(f"Error fetching job status for {job_id}: {str(e)}")
+        logger.exception(e)
         raise HTTPException(
             status_code=500, detail="Failed to fetch job status"
         )
@@ -105,15 +112,29 @@ async def list_command_jobs(
         )
 
 
-@router.delete("/commands/jobs/{job_id}")
+@router.delete("/commands/jobs/{job_id:path}")
 async def cancel_command_job(job_id: str):
-    """Cancel a running command job"""
+    """Cancel a running command job
+    
+    Note: Using {job_id:path} to handle job IDs that may contain colons (command:xxx)
+    """
     try:
-        success = await CommandService.cancel_command_job(job_id)
-        return {"job_id": job_id, "cancelled": success}
+        logger.debug(f"Cancelling command job: {job_id}")
+        # Remove command: prefix if present (for compatibility)
+        clean_job_id = job_id.replace("command:", "") if job_id.startswith("command:") else job_id
+        logger.debug(f"Cleaned job_id: {clean_job_id}")
+        
+        success = await CommandService.cancel_command_job(clean_job_id)
+        return {"job_id": clean_job_id, "cancelled": success}
 
+    except ValueError as e:
+        logger.warning(f"Job not found or cannot be cancelled: {str(e)}")
+        raise HTTPException(
+            status_code=404, detail=f"Job not found or cannot be cancelled: {str(e)}"
+        )
     except Exception as e:
         logger.error(f"Error cancelling command job: {str(e)}")
+        logger.exception(e)
         raise HTTPException(
             status_code=500, detail="Failed to cancel command job"
         )

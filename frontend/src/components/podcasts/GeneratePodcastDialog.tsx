@@ -5,7 +5,7 @@ import { Loader2 } from 'lucide-react'
 import { useQueries, useQueryClient } from '@tanstack/react-query'
 
 import { useNotebooks } from '@/lib/hooks/use-notebooks'
-import { useEpisodeProfiles, useGeneratePodcast } from '@/lib/hooks/use-podcasts'
+import { useEpisodeProfiles, useGeneratePodcast, useSpeakerProfiles } from '@/lib/hooks/use-podcasts'
 import { chatApi } from '@/lib/api/chat'
 import { sourcesApi } from '@/lib/api/sources'
 import { notesApi } from '@/lib/api/notes'
@@ -67,6 +67,8 @@ function getSourceDefaultMode(source: SourceListResponse): SourceMode {
 interface GeneratePodcastDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** Optional notebook ID to associate the generated podcast with */
+  notebookId?: string
 }
 
 // Extracted component for content selection panel
@@ -369,12 +371,13 @@ function ContentSelectionPanel({
   )
 }
 
-export function GeneratePodcastDialog({ open, onOpenChange }: GeneratePodcastDialogProps) {
+export function GeneratePodcastDialog({ open, onOpenChange, notebookId }: GeneratePodcastDialogProps) {
   const { t, language } = useTranslation()
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const [expandedNotebooks, setExpandedNotebooks] = useState<string[]>([])
   const [selections, setSelections] = useState<Record<string, NotebookSelection>>({})
+  const [didInitNotebookDefaults, setDidInitNotebookDefaults] = useState(false)
   const [episodeProfileId, setEpisodeProfileId] = useState<string>('')
   const [episodeName, setEpisodeName] = useState('')
   const [instructions, setInstructions] = useState('')
@@ -395,6 +398,7 @@ export function GeneratePodcastDialog({ open, onOpenChange }: GeneratePodcastDia
     () => episodeProfilesQuery.episodeProfiles ?? [],
     [episodeProfilesQuery.episodeProfiles]
   )
+  const speakerProfilesQuery = useSpeakerProfiles(episodeProfiles)
 
   // Fetch sources and notes for notebooks using useQueries
   const sourcesQueries = useQueries({
@@ -515,6 +519,7 @@ export function GeneratePodcastDialog({ open, onOpenChange }: GeneratePodcastDia
   const resetState = useCallback(() => {
     setExpandedNotebooks([])
     setSelections({})
+    setDidInitNotebookDefaults(false)
     setEpisodeProfileId('')
     setEpisodeName('')
     setInstructions('')
@@ -527,6 +532,65 @@ export function GeneratePodcastDialog({ open, onOpenChange }: GeneratePodcastDia
       resetState()
     }
   }, [open, resetState])
+
+  // If opened from a notebook, expand it immediately to load its content
+  useEffect(() => {
+    if (!open || !notebookId) {
+      return
+    }
+
+    setExpandedNotebooks((prev) => (prev.includes(notebookId) ? prev : [notebookId, ...prev]))
+  }, [open, notebookId])
+
+  // If opened from a notebook, default-select all its content once loaded
+  useEffect(() => {
+    if (!open || !notebookId || didInitNotebookDefaults) {
+      return
+    }
+
+    // Only run if the notebook exists in the list (prevents selecting stale ids)
+    const notebookExists = notebooks.some((nb) => nb.id === notebookId)
+    if (!notebookExists) {
+      return
+    }
+
+    const sources = sourcesByNotebook[notebookId]
+    const notes = notesByNotebook[notebookId]
+
+    // Wait for at least one to be loaded (empty arrays are valid loaded states)
+    if (!sources || !notes) {
+      return
+    }
+
+    setSelections((prev) => {
+      const nextSources: Record<string, SourceMode> = {}
+      sources.forEach((source) => {
+        nextSources[source.id] = getSourceDefaultMode(source)
+      })
+
+      const nextNotes: Record<string, SourceMode> = {}
+      notes.forEach((note) => {
+        nextNotes[note.id] = 'full'
+      })
+
+      return {
+        ...prev,
+        [notebookId]: {
+          sources: nextSources,
+          notes: nextNotes,
+        },
+      }
+    })
+
+    setDidInitNotebookDefaults(true)
+  }, [
+    open,
+    notebookId,
+    didInitNotebookDefaults,
+    notebooks,
+    sourcesByNotebook,
+    notesByNotebook,
+  ])
 
   // Update token/char counts when selections change
   useEffect(() => {
@@ -602,6 +666,15 @@ export function GeneratePodcastDialog({ open, onOpenChange }: GeneratePodcastDia
     }
     return episodeProfiles.find((profile) => profile.id === episodeProfileId)
   }, [episodeProfileId, episodeProfiles])
+
+  const selectedSpeakerProfile = useMemo(() => {
+    if (!selectedEpisodeProfile) {
+      return undefined
+    }
+    return speakerProfilesQuery.speakerProfiles.find(
+      (profile) => profile.name === selectedEpisodeProfile.speaker_config
+    )
+  }, [selectedEpisodeProfile, speakerProfilesQuery.speakerProfiles])
 
   const selectedNotebookSummaries = useMemo(() => {
     return notebooks.map((notebook) => {
@@ -785,11 +858,21 @@ export function GeneratePodcastDialog({ open, onOpenChange }: GeneratePodcastDia
         return
       }
 
+      // Collect all notebook IDs that have selected content
+      const notebookIdsWithContent = Object.entries(selections)
+        .filter(([, selection]) => 
+          Object.values(selection.sources).some((mode) => mode !== 'off') ||
+          Object.values(selection.notes).some((mode) => mode !== 'off')
+        )
+        .map(([nbId]) => nbId)
+
       const payload: PodcastGenerationRequest = {
         episode_profile: selectedEpisodeProfile.name,
         speaker_profile: selectedEpisodeProfile.speaker_config,
         episode_name: episodeName.trim(),
         content,
+        notebook_id: notebookId, // Keep for backwards compatibility
+        notebook_ids: notebookIdsWithContent, // All notebooks with selected content
         briefing_suffix: instructions.trim() ? instructions.trim() : undefined,
       }
 
@@ -897,10 +980,23 @@ export function GeneratePodcastDialog({ open, onOpenChange }: GeneratePodcastDia
                       </SelectContent>
                     </Select>
                     {selectedEpisodeProfile && (
-                      <p className="text-xs text-muted-foreground">
-                        {t.podcasts.usesSpeakerProfile}{' '}
-                        <strong>{selectedEpisodeProfile.speaker_config}</strong>
-                      </p>
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground">
+                          {t.podcasts.usesSpeakerProfile}{' '}
+                          <strong>{selectedEpisodeProfile.speaker_config}</strong>
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge variant="outline" className="text-xs">
+                            {selectedEpisodeProfile.num_segments} {t.podcasts.segmentsLabel}
+                          </Badge>
+                          {selectedSpeakerProfile?.speakers?.length ? (
+                            <Badge variant="outline" className="text-xs">
+                              {selectedSpeakerProfile.speakers.length}{' '}
+                              {t.podcasts.speakersLabel}
+                            </Badge>
+                          ) : null}
+                        </div>
+                      </div>
                     )}
                   </div>
 

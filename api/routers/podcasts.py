@@ -43,15 +43,32 @@ async def generate_podcast(request: PodcastGenerationRequest):
     Generate a podcast episode using Episode Profiles.
     Returns immediately with job ID for status tracking.
     """
+    logger.info("=" * 80)
+    logger.info(f"PODCAST GENERATION REQUEST RECEIVED")
+    logger.info(f"  Episode Name: {request.episode_name}")
+    logger.info(f"  Episode Profile: {request.episode_profile}")
+    logger.info(f"  Speaker Profile: {request.speaker_profile}")
+    logger.info(f"  Notebook ID: {request.notebook_id}")
+    logger.info(f"  Notebook IDs: {request.notebook_ids}")
+    logger.info(f"  Content Length: {len(request.content) if request.content else 0} chars")
+    logger.info("=" * 80)
+    
     try:
-        job_id = await PodcastService.submit_generation_job(
+        logger.info("Submitting podcast generation job...")
+        job_id, artifact_ids = await PodcastService.submit_generation_job(
             episode_profile_name=request.episode_profile,
             speaker_profile_name=request.speaker_profile,
             episode_name=request.episode_name,
             notebook_id=request.notebook_id,
+            notebook_ids=request.notebook_ids,
             content=request.content,
             briefing_suffix=request.briefing_suffix,
         )
+
+        logger.info(f"✓ Podcast generation job submitted successfully!")
+        logger.info(f"  Job ID: {job_id}")
+        logger.info(f"  Artifact IDs: {artifact_ids}")
+        logger.info("=" * 80)
 
         return PodcastGenerationResponse(
             job_id=job_id,
@@ -59,26 +76,41 @@ async def generate_podcast(request: PodcastGenerationRequest):
             message=f"Podcast generation started for episode '{request.episode_name}'",
             episode_profile=request.episode_profile,
             episode_name=request.episode_name,
+            artifact_id=artifact_ids[0] if artifact_ids else None,
         )
 
     except Exception as e:
-        logger.error(f"Error generating podcast: {str(e)}")
+        logger.error("=" * 80)
+        logger.error(f"✗ ERROR generating podcast: {str(e)}")
+        logger.exception(e)
+        logger.error("=" * 80)
         raise HTTPException(
             status_code=500, detail="Failed to generate podcast"
         )
 
 
-@router.get("/podcasts/jobs/{job_id}")
+@router.get("/podcasts/jobs/{job_id:path}")
 async def get_podcast_job_status(job_id: str):
-    """Get the status of a podcast generation job"""
+    """Get the status of a podcast generation job
+    
+    Note: Using {job_id:path} to handle job IDs that may contain colons (command:xxx)
+    """
     try:
-        status_data = await PodcastService.get_job_status(job_id)
+        logger.debug(f"Getting podcast job status for job_id: {job_id}")
+        # Remove command: prefix if present (for compatibility)
+        clean_job_id = job_id.replace("command:", "") if job_id.startswith("command:") else job_id
+        logger.debug(f"Cleaned job_id: {clean_job_id}")
+        status_data = await PodcastService.get_job_status(clean_job_id)
         return status_data
 
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
-        logger.error(f"Error fetching podcast job status: {str(e)}")
+        logger.error(f"Error fetching podcast job status for {job_id}: {str(e)}")
+        logger.exception(e)
         raise HTTPException(
-            status_code=500, detail="Failed to fetch job status"
+            status_code=500, detail=f"Failed to fetch job status: {str(e)}"
         )
 
 

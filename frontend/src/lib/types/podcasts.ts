@@ -57,6 +57,8 @@ export interface PodcastGenerationRequest {
   episode_name: string
   content?: string
   notebook_id?: string
+  /** List of all notebook IDs that contributed content to this podcast */
+  notebook_ids?: string[]
   briefing_suffix?: string | null
 }
 
@@ -66,6 +68,7 @@ export interface PodcastGenerationResponse {
   message: string
   episode_profile: string
   episode_name: string
+  artifact_id?: string | null
 }
 
 export type EpisodeStatusGroup = 'running' | 'completed' | 'failed' | 'pending'
