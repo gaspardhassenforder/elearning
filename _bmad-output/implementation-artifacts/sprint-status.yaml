@@ -68,8 +68,8 @@ development_status:
 
   # Epic 4: Learner AI Chat Experience
   epic-4: in-progress
-  4-1-learner-chat-interface-and-sse-streaming: review  # All 8 tasks complete: Backend (SSE endpoint, service, LangGraph) + Frontend (two-panel layout, sources panel, chat panel with streaming, API/state, i18n)
-  4-2-two-layer-prompt-system-and-proactive-ai-teacher: backlog
+  4-1-learner-chat-interface-and-sse-streaming: done  # Code review complete: All 4 ACs met, 13 issues found (5 HIGH + 5 MEDIUM + 3 LOW), all HIGH + MEDIUM fixed, 8 backend tests added, streaming cursor + auto-scroll + type safety + security hardening
+  4-2-two-layer-prompt-system-and-proactive-ai-teacher: ready-for-dev  # Comprehensive story created: Proactive greeting, Socratic methods, RAG grounding, objective progression
   4-3-inline-document-snippets-in-chat: backlog
   4-4-learning-objectives-assessment-and-progress-tracking: backlog
   4-5-adaptive-teaching-and-fast-track-for-advanced-learners: backlog
