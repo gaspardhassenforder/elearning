@@ -383,3 +383,16 @@ export interface BatchGenerationResponse {
   objective_ids?: string[]
   error?: string
 }
+
+// Module Prompt types (Story 3.4: AI Teacher Prompt Configuration)
+export interface ModulePrompt {
+  id: string
+  notebook_id: string
+  system_prompt: string | null
+  updated_by: string
+  updated_at: string
+}
+
+export interface ModulePromptUpdate {
+  system_prompt: string | null
+}

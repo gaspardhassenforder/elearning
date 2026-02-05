@@ -20,9 +20,11 @@ import { DocumentUploader } from '@/components/admin/DocumentUploader';
 import { ModuleCreationStepper } from '@/components/admin/ModuleCreationStepper';
 import { ArtifactGenerationPanel } from '@/components/admin/ArtifactGenerationPanel';
 import { LearningObjectivesEditor } from '@/components/admin/LearningObjectivesEditor';
+import { ModulePromptEditor } from '@/components/admin/ModulePromptEditor';
 import { useModuleCreationStore } from '@/lib/stores/module-creation-store';
 import { useArtifacts } from '@/lib/hooks/use-artifacts';
 import { useLearningObjectives } from '@/lib/hooks/use-learning-objectives';
+import { useState } from 'react';
 
 export default function ModulePage() {
   const { t } = useTranslation();
@@ -33,6 +35,9 @@ export default function ModulePage() {
   const { activeStep, setActiveStep } = useModuleCreationStore();
   const { data: artifacts } = useArtifacts(moduleId);
   const { data: objectives = [] } = useLearningObjectives(moduleId);
+
+  // Configure step has two sub-pages: objectives and prompt
+  const [configureSubStep, setConfigureSubStep] = useState<'objectives' | 'prompt'>('objectives');
 
   // Step validation logic
   const canProceedFromGenerate =
@@ -135,15 +140,43 @@ export default function ModulePage() {
       )}
 
       {activeStep === 'configure' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t.learningObjectives.title}</CardTitle>
-            <CardDescription>{t.learningObjectives.subtitle}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <LearningObjectivesEditor moduleId={moduleId} />
-          </CardContent>
-        </Card>
+        <div className="space-y-6">
+          {configureSubStep === 'objectives' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>{t.learningObjectives.title}</CardTitle>
+                <CardDescription>{t.learningObjectives.subtitle}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <LearningObjectivesEditor moduleId={moduleId} />
+                <div className="mt-6 flex justify-end">
+                  <Button
+                    onClick={() => setConfigureSubStep('prompt')}
+                    disabled={objectives.length < 1}
+                  >
+                    {t.common.next}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {configureSubStep === 'prompt' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>{t.modulePrompt.title}</CardTitle>
+                <CardDescription>{t.modulePrompt.description}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ModulePromptEditor
+                  moduleId={moduleId}
+                  onNext={() => setActiveStep('publish')}
+                  onBack={() => setConfigureSubStep('objectives')}
+                />
+              </CardContent>
+            </Card>
+          )}
+        </div>
       )}
 
       {/* Module Stats */}
