@@ -19,8 +19,10 @@ import { Badge } from '@/components/ui/badge';
 import { DocumentUploader } from '@/components/admin/DocumentUploader';
 import { ModuleCreationStepper } from '@/components/admin/ModuleCreationStepper';
 import { ArtifactGenerationPanel } from '@/components/admin/ArtifactGenerationPanel';
+import { LearningObjectivesEditor } from '@/components/admin/LearningObjectivesEditor';
 import { useModuleCreationStore } from '@/lib/stores/module-creation-store';
 import { useArtifacts } from '@/lib/hooks/use-artifacts';
+import { useLearningObjectives } from '@/lib/hooks/use-learning-objectives';
 
 export default function ModulePage() {
   const { t } = useTranslation();
@@ -30,11 +32,19 @@ export default function ModulePage() {
   const { data: module, isLoading, error } = useModule(moduleId);
   const { activeStep, setActiveStep } = useModuleCreationStore();
   const { data: artifacts } = useArtifacts(moduleId);
+  const { data: objectives = [] } = useLearningObjectives(moduleId);
 
-  // Step validation: For 'generate' step, require at least one completed artifact
+  // Step validation logic
   const canProceedFromGenerate =
     activeStep !== 'generate' ||
     (artifacts && artifacts.some((artifact) => artifact.status === 'completed'));
+
+  // Step validation: For 'configure' step, require at least one learning objective
+  const canProceedFromConfigure =
+    activeStep !== 'configure' || objectives.length >= 1;
+
+  // Combined validation for stepper
+  const canProceed = canProceedFromGenerate && canProceedFromConfigure;
 
   if (error) {
     return (
@@ -102,7 +112,7 @@ export default function ModulePage() {
       </div>
 
       {/* Pipeline Stepper */}
-      <ModuleCreationStepper canProceed={canProceedFromGenerate} />
+      <ModuleCreationStepper canProceed={canProceed} />
 
       {/* Main Content - Step-based rendering */}
       {activeStep === 'upload' && (
@@ -122,6 +132,18 @@ export default function ModulePage() {
           moduleId={moduleId}
           onComplete={() => setActiveStep('configure')}
         />
+      )}
+
+      {activeStep === 'configure' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t.learningObjectives.title}</CardTitle>
+            <CardDescription>{t.learningObjectives.subtitle}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <LearningObjectivesEditor moduleId={moduleId} />
+          </CardContent>
+        </Card>
       )}
 
       {/* Module Stats */}

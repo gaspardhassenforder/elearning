@@ -350,3 +350,36 @@ export interface LearnerModule {
   source_count: number
   assigned_at: string
 }
+
+// Learning Objectives types (Story 3.3: Learning Objectives Configuration)
+export interface LearningObjectiveResponse {
+  id: string
+  notebook_id: string
+  text: string
+  order: number
+  auto_generated: boolean
+  created: string
+  updated: string
+}
+
+export interface CreateLearningObjectiveRequest {
+  text: string
+  order?: number
+}
+
+export interface UpdateLearningObjectiveRequest {
+  text?: string
+}
+
+export interface ReorderLearningObjectivesRequest {
+  objectives: Array<{
+    id: string
+    order: number
+  }>
+}
+
+export interface BatchGenerationResponse {
+  status: 'completed' | 'error'
+  objective_ids?: string[]
+  error?: string
+}
