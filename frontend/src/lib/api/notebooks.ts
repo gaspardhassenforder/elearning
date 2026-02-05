@@ -34,5 +34,15 @@ export const notebooksApi = {
   removeSource: async (notebookId: string, sourceId: string) => {
     const response = await apiClient.delete(`/notebooks/${notebookId}/sources/${sourceId}`)
     return response.data
+  },
+
+  publish: async (id: string) => {
+    const response = await apiClient.post<NotebookResponse>(`/notebooks/${id}/publish`)
+    return response.data
+  },
+
+  unpublish: async (id: string) => {
+    const response = await apiClient.post<NotebookResponse>(`/notebooks/${id}/unpublish`)
+    return response.data
   }
 }

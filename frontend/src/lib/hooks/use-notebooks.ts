@@ -94,3 +94,63 @@ export function useDeleteNotebook() {
     },
   })
 }
+
+export function usePublishModule(notebookId: string) {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  const { t } = useTranslation()
+
+  return useMutation({
+    mutationFn: () => notebooksApi.publish(notebookId),
+    onSuccess: (data) => {
+      // Invalidate relevant queries
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notebooks })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notebook(notebookId) })
+
+      // Optimistically update cached data
+      queryClient.setQueryData(QUERY_KEYS.notebook(notebookId), data)
+
+      toast({
+        title: t.common.success,
+        description: t.modules.publish.success,
+      })
+    },
+    onError: (error: unknown) => {
+      toast({
+        title: t.common.error,
+        description: t(getApiErrorKey(error, t.modules.publish.error)),
+        variant: 'destructive',
+      })
+    },
+  })
+}
+
+export function useUnpublishModule(notebookId: string) {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  const { t } = useTranslation()
+
+  return useMutation({
+    mutationFn: () => notebooksApi.unpublish(notebookId),
+    onSuccess: (data) => {
+      // Invalidate relevant queries
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notebooks })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notebook(notebookId) })
+
+      // Optimistically update cached data
+      queryClient.setQueryData(QUERY_KEYS.notebook(notebookId), data)
+
+      toast({
+        title: t.common.success,
+        description: t.modules.publish.unpublishSuccess,
+      })
+    },
+    onError: (error: unknown) => {
+      toast({
+        title: t.common.error,
+        description: t(getApiErrorKey(error, t.modules.publish.unpublishError)),
+        variant: 'destructive',
+      })
+    },
+  })
+}
