@@ -32,7 +32,7 @@ export function useCreateCompany() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.companies })
       toast({
         title: t.common.success,
-        description: t.companies.createSuccess,
+        description: t.companies.companyCreated,
       })
     },
     onError: (error: unknown) => {
@@ -58,7 +58,7 @@ export function useUpdateCompany() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.company(id) })
       toast({
         title: t.common.success,
-        description: t.companies.updateSuccess,
+        description: t.companies.companyUpdated,
       })
     },
     onError: (error: unknown) => {
@@ -82,7 +82,7 @@ export function useDeleteCompany() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.companies })
       toast({
         title: t.common.success,
-        description: t.companies.deleteSuccess,
+        description: t.companies.companyDeleted,
       })
     },
     onError: (error: unknown) => {

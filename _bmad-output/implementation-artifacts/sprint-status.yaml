@@ -44,7 +44,7 @@ development_status:
   epic-1: in-progress
   1-1-user-registration-and-login-backend: review
   1-2-role-based-access-control-and-route-protection: in-progress
-  1-3-admin-creates-learner-accounts: in-progress
+  1-3-admin-creates-learner-accounts: review
   1-4-learner-onboarding-questionnaire: ready-for-dev
   epic-1-retrospective: optional
 
@@ -69,7 +69,7 @@ development_status:
   # Epic 4: Learner AI Chat Experience
   epic-4: in-progress
   4-1-learner-chat-interface-and-sse-streaming: done  # Code review complete: All 4 ACs met, 13 issues found (5 HIGH + 5 MEDIUM + 3 LOW), all HIGH + MEDIUM fixed, 8 backend tests added, streaming cursor + auto-scroll + type safety + security hardening
-  4-2-two-layer-prompt-system-and-proactive-ai-teacher: ready-for-dev  # Comprehensive story created: Proactive greeting, Socratic methods, RAG grounding, objective progression
+  4-2-two-layer-prompt-system-and-proactive-ai-teacher: in-progress  # Comprehensive story created: Proactive greeting, Socratic methods, RAG grounding, objective progression
   4-3-inline-document-snippets-in-chat: backlog
   4-4-learning-objectives-assessment-and-progress-tracking: backlog
   4-5-adaptive-teaching-and-fast-track-for-advanced-learners: backlog

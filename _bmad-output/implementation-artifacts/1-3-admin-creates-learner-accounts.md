@@ -1,6 +1,6 @@
 # Story 1.3: Admin Creates Learner Accounts
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -67,28 +67,23 @@ So that learners can access the platform with appropriate company grouping.
   - [x] 8.1: EXISTED - users and companies routers already imported
   - [x] 8.2: EXISTED - users router already registered
   - [x] 8.3: EXISTED - companies router already registered
-- [ ] Task 9: Add i18n keys for admin user management (AC: all)
-  - [ ] 9.1: Add `users` section to `frontend/src/lib/locales/en-US/index.ts`: createUser, updateUser, deleteUser, userCreated, userUpdated, userDeleted, role, company, email, username, password
-  - [ ] 9.2: Add `users` section to `frontend/src/lib/locales/fr-FR/index.ts`: French translations
-  - [ ] 9.3: Add `companies` section to both locale files: createCompany, updateCompany, deleteCompany, companyCreated, etc.
-- [ ] Task 10: Create frontend API modules (AC: all)
-  - [ ] 10.1: Create `frontend/src/lib/api/users.ts` with `usersApi` object: list, get, create, update, delete
-  - [ ] 10.2: Create `frontend/src/lib/api/companies.ts` with `companiesApi` object: list, get, create, update, delete
-- [ ] Task 11: Create frontend hooks (AC: all)
-  - [ ] 11.1: Create `frontend/src/lib/hooks/use-users.ts` with `useUsers`, `useUser`, `useCreateUser`, `useUpdateUser`, `useDeleteUser`
-  - [ ] 11.2: Create `frontend/src/lib/hooks/use-companies.ts` with `useCompanies`, `useCompany`, `useCreateCompany`, `useUpdateCompany`, `useDeleteCompany`
-  - [ ] 11.3: Add query keys to `frontend/src/lib/api/query-client.ts`: `users`, `user(id)`, `companies`, `company(id)`
-- [ ] Task 12: Create admin user management page (AC: #1, #3, #4)
-  - [ ] 12.1: Create `frontend/src/app/(dashboard)/users/page.tsx` — list all users in a table/grid with role badges, company names, and action buttons
-  - [ ] 12.2: Create `frontend/src/app/(dashboard)/users/components/UserList.tsx` — table component with columns: username, email, role, company, actions
-  - [ ] 12.3: Create `frontend/src/app/(dashboard)/users/components/CreateUserDialog.tsx` — form dialog with username, email, password, role dropdown, company dropdown
-  - [ ] 12.4: Create `frontend/src/app/(dashboard)/users/components/EditUserDialog.tsx` — form dialog for editing user fields (not password)
-- [ ] Task 13: Create admin companies management page (AC: #2)
-  - [ ] 13.1: Create `frontend/src/app/(dashboard)/companies/page.tsx` — list all companies with member counts
-  - [ ] 13.2: Create `frontend/src/app/(dashboard)/companies/components/CompanyCard.tsx`
-  - [ ] 13.3: Create `frontend/src/app/(dashboard)/companies/components/CompanyForm.tsx` — create/edit company form
-- [ ] Task 14: Add navigation links to admin sidebar (AC: all)
-  - [ ] 14.1: Add "Users" and "Companies" links to the admin sidebar navigation in the dashboard layout
+- [x] Task 9: Add i18n keys for admin user management (AC: all)
+  - [x] 9.1: Added `users` section to `frontend/src/lib/locales/en-US/index.ts` with all required keys
+  - [x] 9.2: Added `users` section to `frontend/src/lib/locales/fr-FR/index.ts` with French translations
+  - [x] 9.3: Added `companies` section to both locale files with all required keys
+- [x] Task 10: Create frontend API modules (AC: all)
+  - [x] 10.1: EXISTED - `frontend/src/lib/api/users.ts` already exists with complete implementation
+  - [x] 10.2: EXISTED - `frontend/src/lib/api/companies.ts` already exists with complete implementation
+- [x] Task 11: Create frontend hooks (AC: all)
+  - [x] 11.1: EXISTED - `frontend/src/lib/hooks/use-users.ts` with all hooks (fixed toast message keys)
+  - [x] 11.2: EXISTED - `frontend/src/lib/hooks/use-companies.ts` with all hooks (fixed toast message keys)
+  - [x] 11.3: EXISTED - Query keys already registered in `frontend/src/lib/api/query-client.ts`
+- [x] Task 12: Create admin user management page (AC: #1, #3, #4)
+  - [x] 12.1-12.4: EXISTED - `frontend/src/app/(dashboard)/users/page.tsx` with complete implementation including all dialogs inline
+- [x] Task 13: Create admin companies management page (AC: #2)
+  - [x] 13.1-13.3: EXISTED - `frontend/src/app/(dashboard)/companies/page.tsx` with complete implementation
+- [x] Task 14: Add navigation links to admin sidebar (AC: all)
+  - [x] 14.1: EXISTED - Users and Companies links already in AppSidebar.tsx under "Manage" section
 - [x] Task 15: Write tests (AC: #1, #2, #3, #4)
   - [x] 15.1: Create `tests/test_user_service.py` — 13 tests for create_user_admin (happy path + company not found + duplicates + invalid role), list_users, update_user, delete_user, get_user_with_company_name
   - [x] 15.2: EXISTED - `tests/test_company_service.py` already exists with company service tests
@@ -425,6 +420,7 @@ None - all tests pass, no debug sessions required.
 
 ### Completion Notes List
 
+**Backend Implementation:**
 - Backend fully implemented: Company domain, migration 25, routers, services, models
 - Migration 25 created and registered in AsyncMigrationManager
 - Company domain model with name validator and get_by_slug() class method
@@ -433,8 +429,21 @@ None - all tests pass, no debug sessions required.
 - company_service with auto-slug generation and N+1 optimization
 - user_service extended with create_user_admin, list_users, update_user, delete_user
 - Comprehensive test coverage: test_user_service.py with 13 passing tests
-- Frontend tasks (9-14) intentionally NOT implemented - awaiting instructions
-- All acceptance criteria for backend satisfied
+
+**Frontend Implementation:**
+- i18n translations added for users and companies in both en-US and fr-FR
+- API modules (users.ts, companies.ts) already existed with complete implementation
+- Hooks (use-users.ts, use-companies.ts) already existed - fixed toast message keys
+- Query keys already registered in query-client.ts
+- User management page already exists with complete CRUD functionality
+- Companies management page already exists with complete CRUD functionality
+- Navigation links already present in AppSidebar under "Manage" section
+
+**Story Complete:**
+- ALL tasks (1-15) completed and marked with [x]
+- ALL acceptance criteria satisfied
+- Backend and frontend fully integrated and functional
+- Ready for code review
 
 ### File List
 
@@ -449,3 +458,15 @@ None - all tests pass, no debug sessions required.
 - api/company_service.py (MODIFIED - already existed, updated implementation)
 - api/models.py (MODIFIED - made CompanyCreate.slug optional, removed description)
 - tests/test_user_service.py (NEW - 13 comprehensive tests)
+
+**Frontend Files Created/Modified:**
+- frontend/src/lib/locales/en-US/index.ts (MODIFIED - added users and companies i18n)
+- frontend/src/lib/locales/fr-FR/index.ts (MODIFIED - added users and companies i18n)
+- frontend/src/lib/hooks/use-users.ts (MODIFIED - fixed toast message keys)
+- frontend/src/lib/hooks/use-companies.ts (MODIFIED - fixed toast message keys)
+- frontend/src/lib/api/users.ts (EXISTED - complete implementation)
+- frontend/src/lib/api/companies.ts (EXISTED - complete implementation)
+- frontend/src/lib/api/query-client.ts (EXISTED - query keys registered)
+- frontend/src/app/(dashboard)/users/page.tsx (EXISTED - complete user management)
+- frontend/src/app/(dashboard)/companies/page.tsx (EXISTED - complete companies management)
+- frontend/src/components/layout/AppSidebar.tsx (EXISTED - nav links present)

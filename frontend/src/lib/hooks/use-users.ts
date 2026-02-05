@@ -32,7 +32,7 @@ export function useCreateUser() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.users })
       toast({
         title: t.common.success,
-        description: t.users.createSuccess,
+        description: t.users.userCreated,
       })
     },
     onError: (error: unknown) => {
@@ -58,7 +58,7 @@ export function useUpdateUser() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.user(id) })
       toast({
         title: t.common.success,
-        description: t.users.updateSuccess,
+        description: t.users.userUpdated,
       })
     },
     onError: (error: unknown) => {
@@ -82,7 +82,7 @@ export function useDeleteUser() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.users })
       toast({
         title: t.common.success,
-        description: t.users.deleteSuccess,
+        description: t.users.userDeleted,
       })
     },
     onError: (error: unknown) => {
