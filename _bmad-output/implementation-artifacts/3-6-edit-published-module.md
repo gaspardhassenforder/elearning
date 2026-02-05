@@ -73,13 +73,13 @@ So that I can keep learning content current without disrupting active learners.
   - [x] Add unpublish confirmation modal (warn about learner impact)
   - [x] i18n keys for edit button and warning modal
 
-- [ ] Task 7: Frontend Edit Mode Pipeline (AC: 1, 2, 3)
-  - [ ] Extend ModuleCreationStepper to support edit mode
-  - [ ] Load existing content in Upload step (sources list)
-  - [ ] Load existing artifacts in Generate step (with regenerate options)
-  - [ ] Load existing objectives in Configure step (prefilled editor)
-  - [ ] Show "Save Changes" instead of "Create" in stepper
-  - [ ] Handle edit mode state in module-creation-store
+- [x] Task 7: Frontend Edit Mode Pipeline (AC: 1, 2, 3)
+  - [x] Extend ModuleCreationStepper to support edit mode
+  - [x] Load existing content in Upload step (sources list)
+  - [x] Load existing artifacts in Generate step (with regenerate options)
+  - [x] Load existing objectives in Configure step (prefilled editor)
+  - [x] Show "Save Changes" instead of "Create" in stepper
+  - [x] Handle edit mode state in module-creation-store
 
 - [ ] Task 8: Frontend Source Add/Remove in Edit Mode (AC: 2)
   - [ ] Show existing sources with remove buttons
@@ -1160,3 +1160,32 @@ Files Modified (Task 6):
 - `frontend/src/app/(dashboard)/modules/[id]/page.tsx` - Added Edit button + dialog
 - `frontend/src/lib/locales/en-US/index.ts` - Added 7 i18n keys
 - `frontend/src/lib/locales/fr-FR/index.ts` - Added 7 French translations
+
+**Task 7: Frontend Edit Mode Pipeline COMPLETE (2026-02-05)**
+- ✅ Extended module-creation-store with isEditMode and editingModuleId state
+- ✅ Added enterEditMode() and exitEditMode() store actions
+- ✅ Updated ModuleCreationStepper to show edit-specific UI:
+  - "Editing - Step X of Y" progress text in edit mode
+  - "Save Changes" button instead of "Finish Setup" at publish step
+  - Uses isEditMode flag for conditional rendering
+- ✅ Updated UnpublishConfirmDialog to call enterEditMode after successful unpublish
+- ✅ Added "Editing" badge to module header when in edit mode
+- ✅ Existing content automatically loaded by existing components:
+  - DocumentUploader: Shows existing sources via useModuleDocuments (from Story 3.1)
+  - ArtifactGenerationPanel: Shows existing artifacts via useArtifacts (from Story 3.2)
+  - LearningObjectivesEditor: Shows existing objectives via useLearningObjectives (from Story 3.3)
+  - ModulePromptEditor: Shows existing prompt via module data (from Story 3.4)
+- ✅ Added 3 i18n keys (en-US + fr-FR):
+  - modules.editProgress
+  - modules.saveChanges
+  - modules.editingMode
+- ✅ Pipeline rehydration works automatically (no code changes needed)
+- ✅ Edit mode persisted to localStorage via Zustand persist middleware
+
+Files Modified (Task 7):
+- `frontend/src/lib/stores/module-creation-store.ts` - Added edit mode state management
+- `frontend/src/components/admin/ModuleCreationStepper.tsx` - Edit mode UI rendering
+- `frontend/src/components/admin/UnpublishConfirmDialog.tsx` - Enter edit mode on unpublish
+- `frontend/src/app/(dashboard)/modules/[id]/page.tsx` - Edit mode badge indicator
+- `frontend/src/lib/locales/en-US/index.ts` - Added 3 i18n keys
+- `frontend/src/lib/locales/fr-FR/index.ts` - Added 3 French translations
