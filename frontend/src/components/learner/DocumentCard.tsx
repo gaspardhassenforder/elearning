@@ -2,11 +2,17 @@
 
 /**
  * Story 4.1: Learner Document Card
+ * Story 4.3: Highlight animation support
  *
  * Collapsible card displaying document metadata in sources panel.
  * Read-only for learners (no edit/delete actions).
+ *
+ * Story 4.3 additions:
+ * - Ref forwarding for scroll-to functionality
+ * - Highlight animation (3s glow effect)
  */
 
+import { forwardRef } from 'react'
 import { FileText, File } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -21,9 +27,11 @@ interface DocumentCardProps {
     status?: string
     embedded?: boolean
   }
+  isHighlighted?: boolean // Story 4.3: Highlight state
 }
 
-export function DocumentCard({ source }: DocumentCardProps) {
+export const DocumentCard = forwardRef<HTMLDivElement, DocumentCardProps>(
+  ({ source, isHighlighted = false }, ref) => {
   const { t } = useTranslation()
 
   const getStatusBadge = () => {
@@ -60,10 +68,15 @@ export function DocumentCard({ source }: DocumentCardProps) {
   }
 
   return (
-    <Card className={cn(
-      "cursor-pointer transition-colors hover:bg-accent/50",
-      source.status === 'processing' && "opacity-60"
-    )}>
+    <Card
+      ref={ref}
+      className={cn(
+        "cursor-pointer transition-all hover:bg-accent/50",
+        source.status === 'processing' && "opacity-60",
+        // Story 4.3: Highlight animation
+        isHighlighted && "ring-2 ring-primary ring-offset-2 shadow-lg animate-pulse"
+      )}
+    >
       <CardContent className="p-3">
         <div className="flex items-start gap-3">
           <div className="flex-shrink-0 mt-0.5">
@@ -86,4 +99,6 @@ export function DocumentCard({ source }: DocumentCardProps) {
       </CardContent>
     </Card>
   )
-}
+})
+
+DocumentCard.displayName = 'DocumentCard'

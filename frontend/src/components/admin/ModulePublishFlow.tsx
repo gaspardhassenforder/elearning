@@ -7,6 +7,8 @@
  * - Success confirmation after publish
  * - Back navigation to Configure step
  * - Integration with ModuleCreationStepper
+ *
+ * Extended in Story 3.6, Task 11 to support edit mode with different messaging.
  */
 
 'use client'
@@ -22,11 +24,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 
 interface ModulePublishFlowProps {
   notebookId: string
+  isEditMode?: boolean
   onSuccess?: () => void
   onBack?: () => void
 }
 
-export function ModulePublishFlow({ notebookId, onSuccess, onBack }: ModulePublishFlowProps) {
+export function ModulePublishFlow({ notebookId, isEditMode = false, onSuccess, onBack }: ModulePublishFlowProps) {
   const { t } = useTranslation()
   const [publishSuccess, setPublishSuccess] = useState(false)
 
@@ -98,7 +101,9 @@ export function ModulePublishFlow({ notebookId, onSuccess, onBack }: ModulePubli
         <Alert>
           <CheckCircle2 className="h-4 w-4" />
           <AlertDescription className="font-medium">
-            {t.modules.publish.successMessage}
+            {isEditMode
+              ? t.modules.publish.successMessageEdit || 'Module updated and published'
+              : t.modules.publish.successMessage}
           </AlertDescription>
         </Alert>
       )}
@@ -114,7 +119,9 @@ export function ModulePublishFlow({ notebookId, onSuccess, onBack }: ModulePubli
             {publishMutation.isPending && (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             )}
-            {t.modules.publish.publishModule}
+            {isEditMode
+              ? t.modules.publish.publishChanges || 'Publish Changes'
+              : t.modules.publish.publishModule}
           </Button>
         ) : (
           <Button onClick={handleContinue}>

@@ -10,6 +10,15 @@ export interface LearnerChatMessage {
   role: 'user' | 'assistant'
   content: string
   timestamp?: string
+  toolCalls?: ToolCall[]  // Story 4.3: Track tool calls for document snippets
+}
+
+// Story 4.3: Tool call tracking
+export interface ToolCall {
+  id: string
+  toolName: string
+  args: Record<string, any>
+  result?: Record<string, any>
 }
 
 export interface SendLearnerChatMessageRequest {
@@ -63,17 +72,25 @@ export async function sendLearnerChatMessage(
   return response
 }
 
+// Story 4.3: Extended stream event for tracking tool calls
+export interface StreamEvent {
+  type: 'text' | 'tool_call' | 'tool_result' | 'message_complete'
+  delta?: string
+  toolCall?: ToolCall
+  toolResult?: { id: string; result: Record<string, any> }
+}
+
 /**
  * Parse SSE stream from learner chat response
  *
- * Yields text deltas as they arrive from the stream.
+ * Story 4.3: Extended to yield StreamEvent objects including tool calls
  *
  * @param response - Fetch response with SSE stream
- * @yields Text deltas from SSE events
+ * @yields Stream events (text deltas, tool calls, message complete)
  */
 export async function* parseLearnerChatStream(
   response: Response
-): AsyncGenerator<string, void, unknown> {
+): AsyncGenerator<StreamEvent, void, unknown> {
   const reader = response.body?.getReader()
   const decoder = new TextDecoder()
 
@@ -114,24 +131,35 @@ export async function* parseLearnerChatStream(
 
           // Yield text deltas
           if (eventType === 'text' && data.delta) {
-            yield data.delta
+            yield { type: 'text', delta: data.delta }
           }
 
-          // Handle tool calls (can be extended in future)
+          // Story 4.3: Yield tool calls
           if (eventType === 'tool_call') {
-            // Future: Handle tool execution display
-            console.log('Tool call:', data)
+            yield {
+              type: 'tool_call',
+              toolCall: {
+                id: data.id,
+                toolName: data.toolName,
+                args: data.args,
+              },
+            }
           }
 
-          // Handle tool results
+          // Story 4.3: Yield tool results
           if (eventType === 'tool_result') {
-            // Future: Display tool results
-            console.log('Tool result:', data)
+            yield {
+              type: 'tool_result',
+              toolResult: {
+                id: data.id,
+                result: data.result,
+              },
+            }
           }
 
-          // Handle message complete
+          // Story 4.3: Yield message complete event
           if (eventType === 'message_complete') {
-            console.log('Message complete:', data)
+            yield { type: 'message_complete' }
           }
 
           // Handle errors

@@ -23,19 +23,22 @@ import { LearningObjectivesEditor } from '@/components/admin/LearningObjectivesE
 import { ModulePromptEditor } from '@/components/admin/ModulePromptEditor';
 import { AdminAssistantChat } from '@/components/admin/AdminAssistantChat';
 import { UnpublishConfirmDialog } from '@/components/admin/UnpublishConfirmDialog';
+import { ModulePublishFlow } from '@/components/admin/ModulePublishFlow';
 import { useModuleCreationStore } from '@/lib/stores/module-creation-store';
 import { useArtifacts } from '@/lib/hooks/use-artifacts';
 import { useLearningObjectives } from '@/lib/hooks/use-learning-objectives';
 import { useState } from 'react';
 import { Edit } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function ModulePage() {
   const { t } = useTranslation();
   const params = useParams();
   const moduleId = params.id as string;
+  const router = useRouter();
 
   const { data: module, isLoading, error } = useModule(moduleId);
-  const { activeStep, setActiveStep, isEditMode } = useModuleCreationStore();
+  const { activeStep, setActiveStep, isEditMode, exitEditMode } = useModuleCreationStore();
   const { data: artifacts } = useArtifacts(moduleId);
   const { data: objectives = [] } = useLearningObjectives(moduleId);
 
@@ -201,6 +204,35 @@ export default function ModulePage() {
             </Card>
           )}
         </div>
+      )}
+
+      {/* Publish Step (Story 3.5, Task 7 + Story 3.6, Task 11) */}
+      {activeStep === 'publish' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              {isEditMode
+                ? t.modules.publish.titleEdit || 'Re-Publish Module'
+                : 'Publish Module'}
+            </CardTitle>
+            <CardDescription>
+              {isEditMode
+                ? t.modules.publish.descriptionEdit || 'Review changes and re-publish to make them visible to learners'
+                : 'Review module summary and publish to make it visible to learners'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ModulePublishFlow
+              notebookId={moduleId}
+              isEditMode={isEditMode}
+              onSuccess={() => {
+                exitEditMode();
+                router.push('/modules');
+              }}
+              onBack={() => setConfigureSubStep('prompt')}
+            />
+          </CardContent>
+        </Card>
       )}
 
       {/* Module Stats */}

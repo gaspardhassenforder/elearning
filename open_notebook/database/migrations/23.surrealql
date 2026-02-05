@@ -1,0 +1,14 @@
+-- Migration 23: Create learning_objective table
+-- Story 3.3: Learning Objectives Configuration
+
+DEFINE TABLE learning_objective SCHEMAFULL;
+
+DEFINE FIELD notebook_id ON learning_objective TYPE record<notebook>;
+DEFINE FIELD text ON learning_objective TYPE string;
+DEFINE FIELD order ON learning_objective TYPE int DEFAULT 0;
+DEFINE FIELD auto_generated ON learning_objective TYPE bool DEFAULT false;
+DEFINE FIELD created ON learning_objective TYPE datetime DEFAULT time::now();
+DEFINE FIELD updated ON learning_objective TYPE datetime DEFAULT time::now();
+
+-- Index for efficient retrieval by notebook (ordered)
+DEFINE INDEX idx_notebook_objectives ON learning_objective FIELDS notebook_id, order;

@@ -116,7 +116,15 @@ The learner is working toward these objectives in this module:
 {% if current_focus_objective %}
 **CURRENT FOCUS:** {{ current_focus_objective }}
 
+{% if objectives and objectives|selectattr('status', 'equalto', 'completed')|list|length == objectives|length %}
+**NOTE:** The learner has completed all learning objectives! This is the first objective shown for review/deeper exploration. Celebrate their achievement and offer to:
+- Review concepts in greater depth
+- Connect topics across objectives
+- Explore advanced applications
+- Prepare them for next steps/modules
+{% else %}
 This is the objective you should be guiding the learner toward RIGHT NOW. Keep the conversation centered on this topic until the learner demonstrates understanding, then naturally transition to the next objective.
+{% endif %}
 {% else %}
 **CURRENT FOCUS:** Start with the first incomplete objective.
 {% endif %}

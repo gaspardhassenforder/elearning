@@ -1,16 +1,19 @@
 /**
  * Story 4.1: Learner Chat Hook
  * Story 4.2: Proactive Greeting Support
+ * Story 4.3: Reactive Document Scroll After Streaming
  *
  * Manages learner chat state and SSE streaming.
  * Uses TanStack Query for server state caching.
  * Story 4.2: Automatically requests proactive greeting on first load.
+ * Story 4.3: Triggers scroll to referenced documents after streaming completes.
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { sendLearnerChatMessage, parseLearnerChatStream, LearnerChatMessage } from '../api/learner-chat'
+import { sendLearnerChatMessage, parseLearnerChatStream, LearnerChatMessage, ToolCall } from '../api/learner-chat'
 import { useToast } from './use-toast'
+import { useLearnerStore } from '../stores/learner-store'
 
 interface UseLearnerChatResult {
   messages: LearnerChatMessage[]
@@ -32,6 +35,14 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
   const { toast } = useToast()
   const [messages, setMessages] = useState<LearnerChatMessage[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
+
+  // Story 4.3: Access scroll actions from store
+  const { scrollToSourceId: setScrollToSourceId, panelManuallyCollapsed } = useLearnerStore(
+    (state) => ({
+      scrollToSourceId: state.setScrollToSourceId,
+      panelManuallyCollapsed: state.panelManuallyCollapsed,
+    })
+  )
 
   // For now, we don't persist chat history (Story 4.8 will add this)
   // This query is a placeholder for future chat history loading
@@ -69,11 +80,16 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
         const response = await sendLearnerChatMessage(notebookId, { message: content })
 
         // Parse SSE stream and accumulate response
+        // Story 4.3: Also track tool calls for reactive scroll
         let assistantContent = ''
+        const toolCalls: ToolCall[] = []
+        const toolCallsMap = new Map<string, ToolCall>()
+
         const assistantMessage: LearnerChatMessage = {
           role: 'assistant',
           content: '',
           timestamp: new Date().toISOString(),
+          toolCalls: [],
         }
 
         // Add empty assistant message that will be updated as stream arrives
@@ -83,18 +99,55 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
         })
 
         // Stream parsing with error handling
-        for await (const delta of parseLearnerChatStream(response)) {
-          assistantContent += delta
+        for await (const event of parseLearnerChatStream(response)) {
+          // Story 4.3: Handle different event types
+          if (event.type === 'text' && event.delta) {
+            assistantContent += event.delta
 
-          // Update assistant message with accumulated content
-          setMessages((prev) => {
-            const updated = [...prev]
-            const lastMessage = updated[updated.length - 1]
-            if (lastMessage && lastMessage.role === 'assistant') {
-              lastMessage.content = assistantContent
+            // Update assistant message with accumulated content
+            setMessages((prev) => {
+              const updated = [...prev]
+              const lastMessage = updated[updated.length - 1]
+              if (lastMessage && lastMessage.role === 'assistant') {
+                lastMessage.content = assistantContent
+              }
+              return updated
+            })
+          } else if (event.type === 'tool_call' && event.toolCall) {
+            // Track tool call
+            toolCallsMap.set(event.toolCall.id, event.toolCall)
+          } else if (event.type === 'tool_result' && event.toolResult) {
+            // Merge result into tool call
+            const toolCall = toolCallsMap.get(event.toolResult.id)
+            if (toolCall) {
+              toolCall.result = event.toolResult.result
             }
-            return updated
-          })
+          } else if (event.type === 'message_complete') {
+            // Story 4.3: Message streaming complete - trigger reactive scroll
+            const completedToolCalls = Array.from(toolCallsMap.values())
+
+            // Attach tool calls to message
+            setMessages((prev) => {
+              const updated = [...prev]
+              const lastMessage = updated[updated.length - 1]
+              if (lastMessage && lastMessage.role === 'assistant') {
+                lastMessage.toolCalls = completedToolCalls
+              }
+              return updated
+            })
+
+            // Extract document references from surface_document tool calls
+            const documentRefs = completedToolCalls
+              .filter((tc) => tc.toolName === 'surface_document' && tc.result?.source_id)
+              .map((tc) => tc.result!.source_id as string)
+
+            // Trigger scroll if documents were referenced AND panel not manually collapsed
+            if (documentRefs.length > 0 && !panelManuallyCollapsed) {
+              // Scroll to first referenced document
+              const firstDocId = documentRefs[0]
+              setScrollToSourceId(firstDocId)
+            }
+          }
         }
 
         return assistantContent

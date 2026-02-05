@@ -3,6 +3,7 @@
 /**
  * Story 4.1: Learner Chat Panel with assistant-ui
  * Story 4.2: Proactive AI Teacher Greeting
+ * Story 4.3: Document Snippet Rendering
  *
  * Features:
  * - SSE streaming with token-by-token rendering
@@ -10,6 +11,7 @@
  * - Proactive AI greeting (personalized on first load)
  * - Flowing AI messages, subtle user backgrounds
  * - Streaming cursor during generation
+ * - Document snippet cards inline (Story 4.3)
  */
 
 import { useEffect, useState, useRef } from 'react'
@@ -18,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { useLearnerChat } from '@/lib/hooks/use-learner-chat'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { DocumentSnippetCard } from './DocumentSnippetCard'
 
 interface ChatPanelProps {
   notebookId: string
@@ -136,6 +139,24 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
                           <span className="inline-block w-1.5 h-4 ml-1 bg-primary animate-pulse" />
                         )}
                       </p>
+
+                      {/* Story 4.3: Render document snippet cards for tool calls */}
+                      {message.role === 'assistant' && message.toolCalls && message.toolCalls.length > 0 && (
+                        <div className="mt-2 space-y-2">
+                          {message.toolCalls
+                            .filter((tc) => tc.toolName === 'surface_document' && tc.result)
+                            .map((tc, tcIndex) => (
+                              <DocumentSnippetCard
+                                key={`${index}-${tcIndex}`}
+                                sourceId={tc.result!.source_id}
+                                title={tc.result!.title}
+                                excerpt={tc.result!.excerpt}
+                                sourceType={tc.result!.source_type}
+                                relevance={tc.result!.relevance}
+                              />
+                            ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))

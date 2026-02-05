@@ -2,14 +2,20 @@
 
 /**
  * Story 4.1: Learner Sources Panel
+ * Story 4.3: Scroll-to-document and highlight animation
  *
  * Tabbed panel showing:
  * - Sources: Document cards (collapsible)
  * - Artifacts: Quizzes, podcasts (placeholder for Story 5.2)
  * - Progress: Learning objectives tracking (placeholder for Story 5.3)
+ *
+ * Story 4.3 additions:
+ * - Scroll to document when scrollToSourceId changes in store
+ * - Highlight animation on target document (3s glow)
+ * - Smooth scroll behavior
  */
 
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { FileText, GraduationCap, TrendingUp, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -18,6 +24,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { EmptyState } from '@/components/common/EmptyState'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { useNotebookSources } from '@/lib/hooks/use-sources'
+import { useLearnerStore } from '@/lib/stores/learner-store'
 import { DocumentCard } from './DocumentCard'
 
 interface SourcesPanelProps {
@@ -27,6 +34,14 @@ interface SourcesPanelProps {
 export function SourcesPanel({ notebookId }: SourcesPanelProps) {
   const { t } = useTranslation()
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  // Story 4.3: Track document card refs for scroll-to functionality
+  const documentRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+  const [highlightedSourceId, setHighlightedSourceId] = useState<string | null>(null)
+
+  // Story 4.3: Listen to scroll target from store
+  const scrollToSourceId = useLearnerStore((state) => state.scrollToSourceId)
+  const setScrollToSourceId = useLearnerStore((state) => state.setScrollToSourceId)
 
   const {
     sources,
@@ -55,6 +70,44 @@ export function SourcesPanel({ notebookId }: SourcesPanelProps) {
     container.addEventListener('scroll', handleScroll)
     return () => container.removeEventListener('scroll', handleScroll)
   }, [handleScroll])
+
+  // Story 4.3: Scroll to document when scrollToSourceId changes
+  useEffect(() => {
+    if (!scrollToSourceId) return
+
+    // Wait for panel expansion animation if needed (200ms)
+    setTimeout(() => {
+      const targetElement = documentRefs.current.get(scrollToSourceId)
+
+      if (targetElement && scrollContainerRef.current) {
+        // Scroll to element with smooth behavior, centered in view
+        targetElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        })
+
+        // Add highlight animation
+        setHighlightedSourceId(scrollToSourceId)
+
+        // Remove highlight after 3 seconds
+        setTimeout(() => {
+          setHighlightedSourceId(null)
+        }, 3000)
+      }
+
+      // Clear scroll target from store
+      setScrollToSourceId(null)
+    }, 200)
+  }, [scrollToSourceId, setScrollToSourceId])
+
+  // Story 4.3: Callback to register document refs
+  const setDocumentRef = useCallback((sourceId: string, element: HTMLDivElement | null) => {
+    if (element) {
+      documentRefs.current.set(sourceId, element)
+    } else {
+      documentRefs.current.delete(sourceId)
+    }
+  }, [])
 
   return (
     <Card className="h-full flex flex-col">
@@ -107,6 +160,8 @@ export function SourcesPanel({ notebookId }: SourcesPanelProps) {
                       <DocumentCard
                         key={source.id}
                         source={source}
+                        ref={(el) => setDocumentRef(source.id, el)}
+                        isHighlighted={highlightedSourceId === source.id}
                       />
                     ))}
                     {isFetchingNextPage && (
