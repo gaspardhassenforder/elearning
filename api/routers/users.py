@@ -9,7 +9,6 @@ from api.user_service import (
     create_user_admin,
     delete_user,
     get_user_by_id,
-    get_user_with_company_name,
     list_users,
     update_user,
 )
@@ -49,12 +48,7 @@ async def create_user(data: AdminUserCreate, _admin: User = Depends(require_admi
 async def get_users(_admin: User = Depends(require_admin)):
     """List all users with company names."""
     try:
-        users = await list_users()
-        response = []
-        for user in users:
-            user_data = await get_user_with_company_name(user)
-            response.append(UserListResponse(**user_data))
-        return response
+        return await list_users()
     except Exception as e:
         logger.error(f"Error listing users: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")

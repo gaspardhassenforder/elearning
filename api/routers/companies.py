@@ -46,8 +46,7 @@ async def create_company_endpoint(
 async def get_companies(_admin: User = Depends(require_admin)):
     """List all companies with member counts."""
     try:
-        companies = await list_companies()
-        return [CompanyResponse(**company) for company in companies]
+        return await list_companies()
     except Exception as e:
         logger.error(f"Error listing companies: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -60,7 +59,7 @@ async def get_company_endpoint(company_id: str, _admin: User = Depends(require_a
         company = await get_company(company_id)
         if not company:
             raise HTTPException(status_code=404, detail="Company not found")
-        return CompanyResponse(**company)
+        return company
     except HTTPException:
         raise
     except Exception as e:

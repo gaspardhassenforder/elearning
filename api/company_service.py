@@ -3,6 +3,7 @@ from typing import List, Optional
 
 from loguru import logger
 
+from api.models import CompanyResponse
 from open_notebook.database.repository import repo_query
 from open_notebook.domain.company import Company
 
@@ -35,10 +36,10 @@ async def create_company(name: str, slug: Optional[str] = None) -> Company:
     return company
 
 
-async def list_companies() -> List[dict]:
+async def list_companies() -> List[CompanyResponse]:
     """List all companies with user counts.
 
-    Returns list of dicts with company data + user_count field.
+    Returns list of CompanyResponse Pydantic models with user_count field.
     Uses single query to avoid N+1 problem.
     """
     try:
@@ -62,15 +63,15 @@ async def list_companies() -> List[dict]:
         # Build response with counts
         response = []
         for company in companies:
-            response.append({
-                "id": company.id,
-                "name": company.name,
-                "slug": company.slug,
-                "user_count": user_counts.get(company.id, 0),
-                "assignment_count": 0,  # Will be populated when Story 2.2 creates module_assignment table
-                "created": str(company.created),
-                "updated": str(company.updated),
-            })
+            response.append(CompanyResponse(
+                id=company.id,
+                name=company.name,
+                slug=company.slug,
+                user_count=user_counts.get(company.id, 0),
+                assignment_count=0,  # Will be populated when Story 2.2 creates module_assignment table
+                created=str(company.created),
+                updated=str(company.updated),
+            ))
 
         return response
     except Exception as e:
@@ -78,7 +79,7 @@ async def list_companies() -> List[dict]:
         raise
 
 
-async def get_company(company_id: str) -> Optional[dict]:
+async def get_company(company_id: str) -> Optional[CompanyResponse]:
     """Get company by ID with user count."""
     try:
         company = await Company.get(company_id)
@@ -87,15 +88,15 @@ async def get_company(company_id: str) -> Optional[dict]:
 
         user_count = await company.get_member_count()
 
-        return {
-            "id": company.id,
-            "name": company.name,
-            "slug": company.slug,
-            "user_count": user_count,
-            "assignment_count": 0,  # Will be populated when Story 2.2 creates module_assignment table
-            "created": str(company.created),
-            "updated": str(company.updated),
-        }
+        return CompanyResponse(
+            id=company.id,
+            name=company.name,
+            slug=company.slug,
+            user_count=user_count,
+            assignment_count=0,  # Will be populated when Story 2.2 creates module_assignment table
+            created=str(company.created),
+            updated=str(company.updated),
+        )
     except Exception as e:
         logger.error(f"Error getting company {company_id}: {e}")
         raise

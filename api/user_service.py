@@ -100,9 +100,54 @@ async def create_user_admin(
     return user
 
 
-async def list_users() -> List[User]:
-    """List all users."""
-    return await User.get_all()
+async def list_users() -> List["UserListResponse"]:
+    """List all users with company names.
+
+    Uses single JOIN query to avoid N+1 problem.
+    Returns UserListResponse Pydantic models, not raw dicts.
+    """
+    from api.models import UserListResponse
+    from open_notebook.database.repository import repo_query
+
+    try:
+        # Single JOIN query to get all users with company names (avoid N+1)
+        result = await repo_query(
+            """
+            SELECT
+                id,
+                username,
+                email,
+                role,
+                company_id,
+                onboarding_completed,
+                created,
+                updated,
+                (SELECT name FROM company WHERE id = $parent.company_id LIMIT 1)[0] AS company_name
+            FROM user
+            ORDER BY username
+            """,
+            {}
+        )
+
+        # Convert to Pydantic models (type-safe)
+        users = []
+        for row in result:
+            users.append(UserListResponse(
+                id=row.get("id"),
+                username=row.get("username"),
+                email=row.get("email"),
+                role=row.get("role"),
+                company_id=row.get("company_id"),
+                company_name=row.get("company_name"),
+                onboarding_completed=row.get("onboarding_completed", False),
+                created=str(row.get("created", "")),
+                updated=str(row.get("updated", ""))
+            ))
+
+        return users
+    except Exception as e:
+        logger.error(f"Error listing users: {e}")
+        raise
 
 
 async def update_user(
@@ -169,24 +214,5 @@ async def delete_user(user_id: str) -> bool:
     return True
 
 
-async def get_user_with_company_name(user: User) -> dict:
-    """Get user data with company name for list views."""
-    company_name = None
-    if user.company_id:
-        from open_notebook.domain.company import Company
-
-        company = await Company.get(user.company_id)
-        if company:
-            company_name = company.name
-
-    return {
-        "id": user.id,
-        "username": user.username,
-        "email": user.email,
-        "role": user.role,
-        "company_id": user.company_id,
-        "company_name": company_name,
-        "onboarding_completed": user.onboarding_completed,
-        "created": str(user.created),
-        "updated": str(user.updated),
-    }
+# REMOVED: get_user_with_company_name() - caused N+1 query problem
+# Now list_users() uses JOIN query and returns UserListResponse models directly
