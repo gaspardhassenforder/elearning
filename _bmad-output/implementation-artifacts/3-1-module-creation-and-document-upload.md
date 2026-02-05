@@ -50,20 +50,25 @@ So that I can build a learning module from my source materials.
   - [x] Error tracking via command status (no schema change needed)
   - [x] Error messages extracted from command result
 
-- [ ] Task 4: Frontend - Module Creation Form (AC: 1)
+- [ ] Task 4: Frontend - Module Creation Form (AC: 1) - IN PROGRESS
+  - [x] Create API client methods in `lib/api/modules.ts`
+  - [x] Create TanStack Query hooks in `lib/hooks/use-modules.ts`
+  - [x] Add i18n keys for both en-US and fr-FR locales (40+ keys)
   - [ ] Create `(dashboard)/modules/page.tsx` with module list + create button
   - [ ] Create `ModuleForm.tsx` component with title/description fields
-  - [ ] Add i18n keys for both en-US and fr-FR locales
-  - [ ] Implement module creation mutation with TanStack Query
+  - [ ] Wire up module creation mutation to form
 
-- [ ] Task 5: Frontend - Document Upload UI (AC: 2, 3)
+- [ ] Task 5: Frontend - Document Upload UI (AC: 2, 3) - IN PROGRESS
+  - [x] Create upload API client method with FormData
+  - [x] Create upload mutation hook with useUploadDocument()
+  - [x] Create polling hook with useModuleDocuments() (2s interval)
+  - [x] Add i18n keys for upload UI
   - [ ] Create `DocumentUploader.tsx` with drag-and-drop zone
   - [ ] Show upload progress for each file
-  - [ ] Poll document status endpoint and update UI
   - [ ] Display inline errors for failed documents with retry button
   - [ ] Show success state when all documents complete
 
-- [ ] Task 6: Frontend - Pipeline Navigation (AC: 4)
+- [ ] Task 6: Frontend - Pipeline Navigation (AC: 4) - NOT STARTED
   - [ ] Create horizontal stepper component for pipeline
   - [ ] Implement "Next" button with validation
   - [ ] Store active step in Zustand store
@@ -606,6 +611,41 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 - Tasks 2-3: Basic validation complete, full integration testing needed
 - No regressions in existing test suite (157 passing tests)
 
+**Session 2: Tasks 4-6 Frontend API Layer (2026-02-05)**
+
+**Task 4 - Module Creation Form (Data Layer):**
+1. Created modules.ts API client:
+   - Module CRUD operations (list, get, create, update, delete)
+   - TypeScript interfaces for all types
+   - Document upload with FormData handling
+   - Document status polling integration
+2. Created use-modules.ts TanStack Query hooks:
+   - useModules(), useModule(id) for data fetching
+   - useCreateModule(), useUpdateModule(), useDeleteModule() mutations
+   - useUploadDocument(moduleId) with file upload
+   - useModuleDocuments(moduleId) with smart polling
+   - Hierarchical query keys for cache management
+   - Toast notifications on all mutations
+3. Added i18n translations:
+   - 40+ keys in en-US locale
+   - Complete French (fr-FR) translations (MANDATORY)
+   - Admin-specific module creation keys
+   - Pipeline step labels
+
+**Remaining: UI Components**
+- Module list page with Card-based layout
+- Module creation dialog/form
+- Document uploader with drag-drop
+- Pipeline stepper component
+- Zustand store for pipeline state (step tracking)
+
+**Key Architectural Decisions:**
+- TanStack Query for ALL server state (not Zustand)
+- Zustand ONLY for UI state (active pipeline step)
+- Polling query uses conditional refetchInterval (2s when processing)
+- Hierarchical cache invalidation: ['modules'] → ['modules', id] → ['modules', id, 'documents']
+- FormData Content-Type header auto-set by browser (no manual override)
+
 ### Completion Notes
 
 **Tasks 1-3 Implementation Complete:**
@@ -675,14 +715,33 @@ This story file contains everything needed for flawless implementation:
 
 ### File List
 
-**Files Created:**
-- tests/test_module_creation.py - Unit tests for module creation
-- tests/test_document_upload.py - Unit tests for document upload (partial)
+**Backend Files Created:**
+- tests/test_module_creation.py - Unit tests for module creation (9 tests)
+- tests/test_document_upload.py - Unit tests for document upload patterns (partial)
 
-**Files Modified:**
-- api/models.py - Added published field to NotebookResponse, added DocumentUploadResponse and DocumentStatusResponse models
-- api/routers/notebooks.py - Added published field to all NotebookResponse, added POST /notebooks/{id}/documents and GET /notebooks/{id}/documents endpoints
-- _bmad-output/implementation-artifacts/3-1-module-creation-and-document-upload.md - Updated task checkboxes and Dev Agent Record
+**Backend Files Modified:**
+- api/models.py - Added published to NotebookResponse, DocumentUploadResponse, DocumentStatusResponse models
+- api/routers/notebooks.py - Added published field updates, POST /notebooks/{id}/documents, GET /notebooks/{id}/documents endpoints
+
+**Frontend Files Created:**
+- frontend/src/lib/api/modules.ts - Modules API client (CRUD + upload + status polling)
+- frontend/src/lib/hooks/use-modules.ts - TanStack Query hooks with polling and mutations
+
+**Frontend Files Modified:**
+- frontend/src/lib/locales/en-US/index.ts - Added 40+ module admin keys
+- frontend/src/lib/locales/fr-FR/index.ts - Added French translations for all module keys
+
+**Files Remaining to Create (UI Components):**
+- frontend/src/app/(dashboard)/modules/page.tsx - Module list page
+- frontend/src/app/(dashboard)/modules/create/page.tsx - Module creation route
+- frontend/src/components/admin/ModuleForm.tsx - Module creation/edit form
+- frontend/src/components/admin/DocumentUploader.tsx - Drag-drop file uploader
+- frontend/src/components/admin/ModuleCreationStepper.tsx - Pipeline stepper
+- frontend/src/lib/stores/module-creation-store.ts - Zustand store for pipeline state
+- frontend/src/lib/types/api.ts - Type definitions (if not already present)
+
+**Story File:**
+- _bmad-output/implementation-artifacts/3-1-module-creation-and-document-upload.md - Task checkboxes, Debug Log, Implementation Plan
 
 **Analysis Sources (Referenced):**
 - `_bmad-output/planning-artifacts/epics.md` - Epic and story requirements
