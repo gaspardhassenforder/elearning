@@ -15,6 +15,8 @@ from fastapi.responses import FileResponse, Response
 from loguru import logger
 from surreal_commands import execute_command_sync
 
+from api.auth import get_current_user, require_admin
+from open_notebook.domain.user import User
 from api.command_service import CommandService
 from api.models import (
     AssetModel,
@@ -33,7 +35,7 @@ from open_notebook.domain.notebook import Notebook, Source
 from open_notebook.domain.transformation import Transformation
 from open_notebook.exceptions import InvalidInputError
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 def generate_unique_filename(original_filename: str, upload_folder: str) -> str:
@@ -280,6 +282,7 @@ async def create_source(
     form_data: tuple[SourceCreate, Optional[UploadFile]] = Depends(
         parse_source_form_data
     ),
+    admin: User = Depends(require_admin),
 ):
     """Create a new source with support for both JSON and multipart form data."""
     source_data, upload_file = form_data
@@ -544,11 +547,11 @@ async def create_source(
 
 
 @router.post("/sources/json", response_model=SourceResponse)
-async def create_source_json(source_data: SourceCreate):
+async def create_source_json(source_data: SourceCreate, admin: User = Depends(require_admin)):
     """Create a new source using JSON payload (legacy endpoint for backward compatibility)."""
     # Convert to form data format and call main endpoint
     form_data = (source_data, None)
-    return await create_source(form_data)
+    return await create_source(form_data, admin)
 
 
 async def _resolve_source_file(source_id: str) -> tuple[str, str]:
@@ -743,7 +746,7 @@ async def get_source_status(source_id: str):
 
 
 @router.put("/sources/{source_id}", response_model=SourceResponse)
-async def update_source(source_id: str, source_update: SourceUpdate):
+async def update_source(source_id: str, source_update: SourceUpdate, admin: User = Depends(require_admin)):
     """Update a source."""
     try:
         source = await Source.get(source_id)
@@ -785,7 +788,7 @@ async def update_source(source_id: str, source_update: SourceUpdate):
 
 
 @router.post("/sources/{source_id}/retry", response_model=SourceResponse)
-async def retry_source_processing(source_id: str):
+async def retry_source_processing(source_id: str, admin: User = Depends(require_admin)):
     """Retry processing for a failed or stuck source."""
     try:
         # First, verify source exists
@@ -910,7 +913,7 @@ async def retry_source_processing(source_id: str):
 
 
 @router.delete("/sources/{source_id}")
-async def delete_source(source_id: str):
+async def delete_source(source_id: str, admin: User = Depends(require_admin)):
     """Delete a source."""
     try:
         source = await Source.get(source_id)
@@ -957,7 +960,7 @@ async def get_source_insights(source_id: str):
 
 
 @router.post("/sources/{source_id}/insights", response_model=SourceInsightResponse)
-async def create_source_insight(source_id: str, request: CreateSourceInsightRequest):
+async def create_source_insight(source_id: str, request: CreateSourceInsightRequest, admin: User = Depends(require_admin)):
     """Create a new insight for a source by running a transformation."""
     try:
         # Get source

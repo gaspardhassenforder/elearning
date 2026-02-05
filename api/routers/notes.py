@@ -1,13 +1,16 @@
 from typing import List, Literal, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from loguru import logger
+
+from api.auth import get_current_user, require_admin
+from open_notebook.domain.user import User
 
 from api.models import NoteCreate, NoteResponse, NoteUpdate
 from open_notebook.domain.notebook import Note
 from open_notebook.exceptions import InvalidInputError
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 @router.get("/notes", response_model=List[NoteResponse])
@@ -47,7 +50,7 @@ async def get_notes(
 
 
 @router.post("/notes", response_model=NoteResponse)
-async def create_note(note_data: NoteCreate):
+async def create_note(note_data: NoteCreate, admin: User = Depends(require_admin)):
     """Create a new note."""
     try:
         # Auto-generate title if not provided and it's an AI note
@@ -130,7 +133,7 @@ async def get_note(note_id: str):
 
 
 @router.put("/notes/{note_id}", response_model=NoteResponse)
-async def update_note(note_id: str, note_update: NoteUpdate):
+async def update_note(note_id: str, note_update: NoteUpdate, admin: User = Depends(require_admin)):
     """Update a note."""
     try:
         note = await Note.get(note_id)
@@ -170,7 +173,7 @@ async def update_note(note_id: str, note_update: NoteUpdate):
 
 
 @router.delete("/notes/{note_id}")
-async def delete_note(note_id: str):
+async def delete_note(note_id: str, admin: User = Depends(require_admin)):
     """Delete a note."""
     try:
         note = await Note.get(note_id)

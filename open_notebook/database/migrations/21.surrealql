@@ -1,0 +1,2 @@
+-- Migration 21: Add published field to notebook table
+DEFINE FIELD published ON notebook TYPE bool DEFAULT false;

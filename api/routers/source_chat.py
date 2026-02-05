@@ -2,7 +2,9 @@ import asyncio
 import json
 from typing import AsyncGenerator, List, Optional
 
-from fastapi import APIRouter, HTTPException, Path
+from fastapi import APIRouter, Depends, HTTPException, Path
+
+from api.auth import get_current_user
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
@@ -16,7 +18,7 @@ from open_notebook.exceptions import (
 )
 from open_notebook.graphs.source_chat import source_chat_graph as source_chat_graph
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 # Request/Response models

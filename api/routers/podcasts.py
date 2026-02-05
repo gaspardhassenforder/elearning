@@ -2,18 +2,20 @@ from pathlib import Path
 from typing import List, Optional
 from urllib.parse import unquote, urlparse
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from loguru import logger
 from pydantic import BaseModel
 
+from api.auth import get_current_user, require_admin
+from open_notebook.domain.user import User
 from api.podcast_service import (
     PodcastGenerationRequest,
     PodcastGenerationResponse,
     PodcastService,
 )
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 class PodcastEpisodeResponse(BaseModel):
@@ -38,7 +40,7 @@ def _resolve_audio_path(audio_file: str) -> Path:
 
 
 @router.post("/podcasts/generate", response_model=PodcastGenerationResponse)
-async def generate_podcast(request: PodcastGenerationRequest):
+async def generate_podcast(request: PodcastGenerationRequest, admin: User = Depends(require_admin)):
     """
     Generate a podcast episode using Episode Profiles.
     Returns immediately with job ID for status tracking.
@@ -236,7 +238,7 @@ async def stream_podcast_episode_audio(episode_id: str):
 
 
 @router.delete("/podcasts/episodes/{episode_id}")
-async def delete_podcast_episode(episode_id: str):
+async def delete_podcast_episode(episode_id: str, admin: User = Depends(require_admin)):
     """Delete a podcast episode and its associated audio file"""
     try:
         # Get the episode first to check if it exists and get the audio file path

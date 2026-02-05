@@ -41,6 +41,9 @@ import {
   Plus,
   Wrench,
   Command,
+  Users,
+  Building2,
+  LayoutGrid,
 } from 'lucide-react'
 
 const getNavigation = (t: TranslationKeys) => [
@@ -66,6 +69,9 @@ const getNavigation = (t: TranslationKeys) => [
   {
     title: t.navigation.manage,
     items: [
+      { name: t.navigation.users, href: '/users', icon: Users },
+      { name: t.navigation.companies, href: '/companies', icon: Building2 },
+      { name: t.navigation.assignments, href: '/assignments', icon: LayoutGrid },
       { name: t.navigation.models, href: '/models', icon: Bot },
       { name: t.navigation.transformations, href: '/transformations', icon: Shuffle },
       { name: t.navigation.settings, href: '/settings', icon: Settings },

@@ -2,8 +2,10 @@ import os
 from typing import List, Optional
 
 from esperanto import AIFactory
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from loguru import logger
+
+from api.auth import require_admin
 
 from api.models import (
     DefaultModelsResponse,
@@ -14,7 +16,7 @@ from api.models import (
 from open_notebook.ai.models import DefaultModels, Model
 from open_notebook.exceptions import InvalidInputError
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_admin)])
 
 
 def _check_openai_compatible_support(mode: str) -> bool:

@@ -1,0 +1,11 @@
+-- Migration 19: Create company table for B2B user grouping
+DEFINE TABLE company SCHEMAFULL;
+
+DEFINE FIELD name ON company TYPE string ASSERT string::len($value) >= 1;
+DEFINE FIELD slug ON company TYPE string ASSERT string::len($value) >= 1;
+DEFINE FIELD description ON company TYPE option<string>;
+DEFINE FIELD created ON company TYPE datetime DEFAULT time::now();
+DEFINE FIELD updated ON company TYPE datetime DEFAULT time::now();
+
+DEFINE INDEX idx_company_slug ON company FIELDS slug UNIQUE;
+DEFINE INDEX idx_company_name ON company FIELDS name;

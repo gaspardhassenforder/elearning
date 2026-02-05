@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>open-notebook - Design Direction Mockups</title>
+<style>
+  :root {
+    --bg: hsl(40, 20%, 98%);
+    --surface: hsl(40, 15%, 96%);
+    --surface-elevated: hsl(40, 10%, 92%);
+    --text-primary: hsl(30, 8%, 15%);
+    --text-secondary: hsl(30, 6%, 45%);
+    --text-muted: hsl(30, 4%, 65%);
+    --accent: hsl(220, 60%, 50%);
+    --accent-subtle: hsl(220, 50%, 95%);
+    --success: hsl(150, 40%, 45%);
+    --success-subtle: hsl(150, 35%, 92%);
+    --border: hsl(30, 8%, 88%);
+    --amber: hsl(35, 80%, 50%);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: hsl(30, 5%, 92%);
+    color: var(--text-primary);
+    line-height: 1.5;
+  }
+
+  /* Navigation */
+  .nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: var(--text-primary);
+    color: white;
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    height: 56px;
+    gap: 16px;
+  }
+  .nav h1 { font-size: 16px; font-weight: 600; }
+  .nav-tabs { display: flex; gap: 4px; margin-left: auto; }
+  .nav-tab {
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: hsla(0,0%,100%,0.6);
+    transition: all 0.15s;
+    border: none;
+    background: none;
+  }
+  .nav-tab:hover { color: white; background: hsla(0,0%,100%,0.1); }
+  .nav-tab.active { color: white; background: hsla(0,0%,100%,0.15); }
+
+  /* Mockup Container */
+  .mockup-container {
+    margin-top: 56px;
+    padding: 32px;
+  }
+  .mockup-section {
+    display: none;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  .mockup-section.active { display: block; }
+  .mockup-title {
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .mockup-subtitle {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+    max-width: 700px;
+  }
+
+  /* Mockup Frame */
+  .mockup-frame {
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px hsla(0,0%,0%,0.12);
+    background: var(--bg);
+    height: 680px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* App Header */
+  .app-header {
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .app-logo {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-primary);
+  }
+  .app-module-title {
+    font-size: 14px;
+    color: var(--text-secondary);
+  }
+  .app-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--accent-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    margin-left: auto;
+  }
+
+  /* Two-panel layout */
+  .app-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* Sources Panel */
+  .sources-panel {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .panel-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .panel-tab {
+    flex: 1;
+    padding: 10px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    text-align: center;
+    cursor: pointer;
+    color: var(--text-secondary);
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .panel-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+  .panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+  }
+
+  /* Document Cards */
+  .doc-card {
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .doc-card:hover { background: var(--surface-elevated); }
+  .doc-card-title {
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  .doc-card-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+  }
+  .doc-card.highlighted {
+    background: var(--accent-subtle);
+    border-left: 3px solid var(--accent);
+  }
+
+  /* Chat Panel */
+  .chat-panel {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+  }
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* Messages */
+  .message { max-width: 720px; }
+  .message-ai { padding: 12px 0; }
+  .message-user { padding: 12px 0; }
+  .message-gap { margin-top: 12px; }
+  .message-content {
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  .message-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  /* Input Bar */
+  .input-bar {
+    padding: 12px 20px 16px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .input-wrapper {
+    display: flex;
+    align-items: center;
+    border-radius: 24px;
+    padding: 8px 12px 8px 16px;
+    gap: 8px;
+  }
+  .input-text {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-size: 14px;
+    background: transparent;
+    color: var(--text-primary);
+  }
+  .input-text::placeholder { color: var(--text-muted); }
+  .input-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+
+  /* Inline Document Snippet */
+  .inline-snippet {
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 8px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .inline-snippet-title {
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .inline-snippet-body {
+    color: var(--text-secondary);
+    font-size: 12px;
+  }
+  .inline-snippet-action {
+    font-size: 11px;
+    color: var(--accent);
+    margin-top: 6px;
+    cursor: pointer;
+  }
+
+  /* Progress */
+  .progress-bar {
+    height: 3px;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s;
+  }
+  .objective-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 0;
+    font-size: 13px;
+  }
+  .objective-check {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 10px;
+    margin-top: 1px;
+  }
+
+  /* Objective notification */
+  .objective-notification {
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  /* Status bar */
+  .status-bar {
+    height: 32px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    font-size: 12px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  /* Comparison section */
+  .comparison {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-top: 24px;
+  }
+  .comparison .mockup-frame { height: 500px; }
+
+  /* Callout */
+  .callout {
+    background: var(--accent-subtle);
+    border-left: 3px solid var(--accent);
+    padding: 12px 16px;
+    border-radius: 0 8px 8px 0;
+    margin-top: 16px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .callout strong { color: var(--accent); }
+
+  /* Streaming indicator */
+  .streaming-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 16px;
+    background: var(--accent);
+    animation: blink 1s infinite;
+    vertical-align: text-bottom;
+    margin-left: 2px;
+  }
+  @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <h1>open-notebook Design Directions</h1>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showSection('dir-a')">A: Minimal Warmth</button>
+    <button class="nav-tab" onclick="showSection('dir-b')">B: Bordered Clarity</button>
+    <button class="nav-tab" onclick="showSection('dir-c')">C: Compact Dense</button>
+    <button class="nav-tab" onclick="showSection('dir-d')">D: Floating Cards</button>
+    <button class="nav-tab" onclick="showSection('compare')">Compare</button>
+    <button class="nav-tab" onclick="showSection('module-select')">Module Select</button>
+  </div>
+</div>
+
+<div class="mockup-container">
+
+<!-- DIRECTION A: Minimal Warmth -->
+<div id="dir-a" class="mockup-section active">
+  <div class="mockup-title">Direction A: Minimal Warmth</div>
+  <div class="mockup-subtitle">Maximum simplicity. No message bubbles, no borders between messages. Chat messages flow like a document. Sources panel uses subtle background to separate. This is the most ChatGPT-like direction.</div>
+
+  <div class="mockup-frame">
+    <div class="app-header" style="height: 48px;">
+      <div class="app-logo">open-notebook</div>
+      <div style="width: 1px; height: 20px; background: var(--border); margin: 0 12px;"></div>
+      <div class="app-module-title">Introduction to AI Fundamentals</div>
+      <div class="app-avatar">SL</div>
+    </div>
+    <div style="height: 3px; background: var(--surface-elevated);">
+      <div style="width: 35%; height: 100%; background: var(--success); border-radius: 0 2px 2px 0;"></div>
+    </div>
+    <div class="app-body">
+      <!-- Sources -->
+      <div class="sources-panel" style="width: 33%; background: var(--surface);">
+        <div class="panel-tabs">
+          <div class="panel-tab active">Sources</div>
+          <div class="panel-tab">Artifacts</div>
+          <div class="panel-tab">Progress</div>
+        </div>
+        <div class="panel-content">
+          <div class="doc-card highlighted">
+            <div class="doc-card-title">What is Machine Learning?</div>
+            <div class="doc-card-desc">Core concepts of ML: supervised, unsupervised, and reinforcement learning approaches.</div>
+          </div>
+          <div class="doc-card">
+            <div class="doc-card-title">AI in the Workplace</div>
+            <div class="doc-card-desc">Practical applications of AI tools across different business functions and roles.</div>
+          </div>
+          <div class="doc-card">
+            <div class="doc-card-title">Understanding LLMs</div>
+            <div class="doc-card-desc">How large language models work, their capabilities, and their limitations.</div>
+          </div>
+          <div class="doc-card">
+            <div class="doc-card-title">Ethics & Responsible AI</div>
+            <div class="doc-card-desc">Key considerations for deploying AI responsibly in organizations.</div>
+          </div>
+        </div>
+      </div>
+      <!-- Chat -->
+      <div class="chat-panel" style="width: 67%;">
+        <div class="chat-messages">
+          <div class="message message-ai">
+            <div class="message-content">Hi Sophie! I'm your AI learning guide for this module on AI fundamentals. I see you're a project manager at a logistics company — that's a great context for exploring how AI can transform operations. Let's start with the basics. <strong>What's your current understanding of artificial intelligence?</strong> Even a rough sense helps me tailor our conversation.</div>
+          </div>
+          <div class="message message-user message-gap">
+            <div class="message-content" style="background: var(--accent-subtle); padding: 12px 16px; border-radius: 16px; display: inline-block;">I've heard a lot about ChatGPT and AI tools, but I don't really understand how they work under the hood. My company wants us to "use AI" but nobody explained what that actually means.</div>
+          </div>
+          <div class="message message-ai message-gap">
+            <div class="message-content">That's a really common starting point — and an honest one. Let me demystify it. At its core, AI is about <strong>pattern recognition</strong>. Think of it like this: you've managed hundreds of logistics projects. Over time, you've developed intuition about which routes work, which timelines are realistic, which suppliers are reliable. AI does something similar, but with data instead of experience.</div>
+            <div class="inline-snippet" style="background: var(--surface); border: 1px solid var(--border);">
+              <div class="inline-snippet-title">📄 What is Machine Learning?</div>
+              <div class="inline-snippet-body">"Machine learning is the subset of AI that enables systems to learn from data and improve over time without being explicitly programmed for every scenario..."</div>
+              <div class="inline-snippet-action">Open in sources →</div>
+            </div>
+          </div>
+          <div class="message message-ai">
+            <div class="message-content">In your logistics work, where do you find yourself making repetitive decisions that feel like they follow a pattern?<span class="streaming-cursor"></span></div>
+          </div>
+        </div>
+        <div class="input-bar">
+          <div class="input-wrapper" style="background: var(--surface); border: 1px solid var(--border);">
+            <button class="input-btn" style="background: none; color: var(--text-muted);">🎤</button>
+            <input type="text" class="input-text" placeholder="Type your message...">
+            <button class="input-btn" style="background: var(--accent); color: white;">↑</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Key choices:</strong> No message bubbles for AI (text flows naturally). User messages have subtle rounded background. Progress bar is a thin ambient line below header. Document snippets use light border treatment. Minimal visual weight throughout.
+  </div>
+</div>
+
+<!-- DIRECTION B: Bordered Clarity -->
+<div id="dir-b" class="mockup-section">
+  <div class="mockup-title">Direction B: Bordered Clarity</div>
+  <div class="mockup-subtitle">Clear visual boundaries between all elements. Each message has a distinct container. Sources panel has stronger separation. More structured, slightly more formal. Good for users who need clear visual hierarchy.</div>
+
+  <div class="mockup-frame">
+    <div class="app-header" style="height: 48px; background: white;">
+      <div class="app-logo">open-notebook</div>
+      <div style="width: 1px; height: 20px; background: var(--border); margin: 0 12px;"></div>
+      <div class="app-module-title">Introduction to AI Fundamentals</div>
+      <div style="margin-left: auto; display: flex; align-items: center; gap: 12px;">
+        <div style="font-size: 12px; color: var(--success); font-weight: 500;">2/6 objectives</div>
+        <div class="app-avatar">SL</div>
+      </div>
+    </div>
+    <div class="app-body">
+      <!-- Sources -->
+      <div class="sources-panel" style="width: 33%; background: white;">
+        <div class="panel-tabs" style="padding: 0 12px;">
+          <div class="panel-tab active" style="border-bottom-width: 2px;">Sources</div>
+          <div class="panel-tab">Artifacts</div>
+          <div class="panel-tab">Progress</div>
+        </div>
+        <div class="panel-content">
+          <div class="doc-card" style="border: 1px solid var(--border); border-left: 3px solid var(--accent); background: var(--accent-subtle);">
+            <div class="doc-card-title">What is Machine Learning?</div>
+            <div class="doc-card-desc">Core concepts of ML: supervised, unsupervised, and reinforcement learning approaches.</div>
+          </div>
+          <div class="doc-card" style="border: 1px solid var(--border);">
+            <div class="doc-card-title">AI in the Workplace</div>
+            <div class="doc-card-desc">Practical applications of AI tools across different business functions.</div>
+          </div>
+          <div class="doc-card" style="border: 1px solid var(--border);">
+            <div class="doc-card-title">Understanding LLMs</div>
+            <div class="doc-card-desc">How large language models work, their capabilities, and limitations.</div>
+          </div>
+          <div class="doc-card" style="border: 1px solid var(--border);">
+            <div class="doc-card-title">Ethics & Responsible AI</div>
+            <div class="doc-card-desc">Key considerations for deploying AI responsibly in organizations.</div>
+          </div>
+        </div>
+      </div>
+      <!-- Chat -->
+      <div class="chat-panel" style="width: 67%; background: var(--bg);">
+        <div class="chat-messages">
+          <div class="message message-ai" style="background: white; border: 1px solid var(--border); border-radius: 12px; padding: 16px; max-width: 720px;">
+            <div style="font-size: 11px; font-weight: 500; color: var(--accent); margin-bottom: 6px;">AI Teacher</div>
+            <div class="message-content">Hi Sophie! I see you're a project manager in logistics. Let's explore how AI fundamentals connect to your daily work. <strong>What's your current understanding of AI?</strong></div>
+          </div>
+          <div class="message message-user message-gap" style="margin-left: auto; max-width: 720px;">
+            <div style="background: var(--accent); color: white; padding: 12px 16px; border-radius: 12px; display: inline-block; float: right;">I've used ChatGPT but I don't really understand how it works.</div>
+          </div>
+          <div style="clear: both;"></div>
+          <div class="message message-ai message-gap" style="background: white; border: 1px solid var(--border); border-radius: 12px; padding: 16px; max-width: 720px;">
+            <div style="font-size: 11px; font-weight: 500; color: var(--accent); margin-bottom: 6px;">AI Teacher</div>
+            <div class="message-content">Great starting point. At its core, AI is about <strong>pattern recognition</strong> — similar to the intuition you've built managing logistics projects over the years.</div>
+            <div class="inline-snippet" style="background: var(--surface); border: 1px solid var(--border); margin-top: 12px;">
+              <div class="inline-snippet-title">📄 What is Machine Learning?</div>
+              <div class="inline-snippet-body">"Machine learning enables systems to learn from data and improve without explicit programming..."</div>
+              <div class="inline-snippet-action">Open in sources →</div>
+            </div>
+            <div class="objective-notification" style="background: var(--success-subtle); color: var(--success); margin-top: 12px;">
+              ✓ Objective: Understand AI as pattern recognition
+            </div>
+          </div>
+        </div>
+        <div class="input-bar" style="background: white;">
+          <div class="input-wrapper" style="border: 2px solid var(--border); border-radius: 12px; padding: 10px 14px;">
+            <button class="input-btn" style="background: none; color: var(--text-muted); width: 32px; height: 32px;">🎤</button>
+            <input type="text" class="input-text" placeholder="Type your message...">
+            <button class="input-btn" style="background: var(--accent); color: white; border-radius: 8px; width: 32px; height: 32px;">↑</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Key choices:</strong> All messages in bordered containers. AI messages labeled with "AI Teacher". User messages right-aligned with accent color background. Objective notifications inline after the relevant message. Progress counter in header. Stronger card borders in sources panel.
+  </div>
+</div>
+
+<!-- DIRECTION C: Compact Dense -->
+<div id="dir-c" class="mockup-section">
+  <div class="mockup-title">Direction C: Compact Dense</div>
+  <div class="mockup-subtitle">Tighter spacing, more information visible at once. Good for learners who want to see more conversation history and sources simultaneously. Efficient use of space without feeling cramped.</div>
+
+  <div class="mockup-frame">
+    <div class="app-header" style="height: 40px; font-size: 13px;">
+      <div class="app-logo" style="font-size: 13px;">open-notebook</div>
+      <div style="margin: 0 8px; color: var(--text-muted);">·</div>
+      <div class="app-module-title" style="font-size: 13px;">AI Fundamentals</div>
+      <div style="margin-left: auto; display: flex; align-items: center; gap: 8px;">
+        <div style="width: 80px; height: 3px; background: var(--surface-elevated); border-radius: 2px; overflow: hidden;">
+          <div style="width: 35%; height: 100%; background: var(--success); border-radius: 2px;"></div>
+        </div>
+        <div style="font-size: 11px; color: var(--text-muted);">2/6</div>
+        <div class="app-avatar" style="width: 28px; height: 28px; font-size: 11px;">SL</div>
+      </div>
+    </div>
+    <div class="app-body">
+      <!-- Sources -->
+      <div class="sources-panel" style="width: 30%; background: var(--surface);">
+        <div class="panel-tabs" style="height: 32px;">
+          <div class="panel-tab active" style="padding: 6px 8px; font-size: 11px;">Sources</div>
+          <div class="panel-tab" style="padding: 6px 8px; font-size: 11px;">Artifacts</div>
+          <div class="panel-tab" style="padding: 6px 8px; font-size: 11px;">Progress</div>
+        </div>
+        <div class="panel-content" style="padding: 8px;">
+          <div class="doc-card highlighted" style="padding: 8px; margin-bottom: 4px;">
+            <div class="doc-card-title" style="font-size: 12px;">What is Machine Learning?</div>
+            <div class="doc-card-desc" style="font-size: 11px;">Core ML concepts: supervised, unsupervised, reinforcement.</div>
+          </div>
+          <div class="doc-card" style="padding: 8px; margin-bottom: 4px;">
+            <div class="doc-card-title" style="font-size: 12px;">AI in the Workplace</div>
+            <div class="doc-card-desc" style="font-size: 11px;">Practical AI applications across business functions.</div>
+          </div>
+          <div class="doc-card" style="padding: 8px; margin-bottom: 4px;">
+            <div class="doc-card-title" style="font-size: 12px;">Understanding LLMs</div>
+            <div class="doc-card-desc" style="font-size: 11px;">How large language models work and their limits.</div>
+          </div>
+          <div class="doc-card" style="padding: 8px; margin-bottom: 4px;">
+            <div class="doc-card-title" style="font-size: 12px;">Ethics & Responsible AI</div>
+            <div class="doc-card-desc" style="font-size: 11px;">Deploying AI responsibly in organizations.</div>
+          </div>
+          <div class="doc-card" style="padding: 8px; margin-bottom: 4px;">
+            <div class="doc-card-title" style="font-size: 12px;">Data Privacy Fundamentals</div>
+            <div class="doc-card-desc" style="font-size: 11px;">GDPR, data handling, and privacy-first AI design.</div>
+          </div>
+        </div>
+      </div>
+      <!-- Chat -->
+      <div class="chat-panel" style="width: 70%;">
+        <div class="chat-messages" style="padding: 12px 16px; gap: 4px;">
+          <div class="message message-ai" style="padding: 8px 0;">
+            <div class="message-content" style="font-size: 14px; line-height: 1.5;">Hi Sophie! You're a PM in logistics — great context for AI. <strong>What do you currently know about AI?</strong></div>
+          </div>
+          <div class="message message-user" style="padding: 6px 0;">
+            <div class="message-content" style="font-size: 14px; line-height: 1.5; background: var(--accent-subtle); padding: 8px 12px; border-radius: 12px; display: inline-block;">I've used ChatGPT but don't understand how it works under the hood.</div>
+          </div>
+          <div class="message message-ai" style="padding: 8px 0;">
+            <div class="message-content" style="font-size: 14px; line-height: 1.5;">AI is essentially <strong>pattern recognition</strong>. Your logistics intuition works the same way — patterns from experience. AI does it with data.</div>
+            <div class="inline-snippet" style="background: var(--surface); border: 1px solid var(--border); padding: 8px; margin-top: 6px; font-size: 12px;">
+              <div class="inline-snippet-title" style="font-size: 11px;">📄 What is Machine Learning?</div>
+              <div class="inline-snippet-body" style="font-size: 11px;">"ML enables systems to learn from data without explicit programming..."</div>
+              <div class="inline-snippet-action" style="font-size: 10px;">Open in sources →</div>
+            </div>
+          </div>
+          <div class="message message-ai" style="padding: 8px 0;">
+            <div class="objective-notification" style="background: var(--success-subtle); color: var(--success); padding: 6px 10px; font-size: 12px;">✓ Understand AI as pattern recognition</div>
+          </div>
+          <div class="message message-ai" style="padding: 8px 0;">
+            <div class="message-content" style="font-size: 14px; line-height: 1.5;">Now let's go deeper. There are three main types of machine learning. Think of them like three different ways to teach someone:</div>
+          </div>
+          <div class="message message-ai" style="padding: 4px 0;">
+            <div class="message-content" style="font-size: 14px; line-height: 1.5;"><strong>1. Supervised learning</strong> — like training with answer keys. You show the AI examples with correct answers.<br><strong>2. Unsupervised learning</strong> — like sorting without labels. The AI finds patterns on its own.<br><strong>3. Reinforcement learning</strong> — like learning by trial and error with rewards.</div>
+          </div>
+          <div class="message message-ai" style="padding: 8px 0;">
+            <div class="message-content" style="font-size: 14px; line-height: 1.5;">In your logistics work, which of these sounds most relevant? For example, do you deal more with <em>prediction</em> (supervised) or <em>optimization</em> (reinforcement)?<span class="streaming-cursor"></span></div>
+          </div>
+        </div>
+        <div class="input-bar" style="padding: 8px 16px 12px;">
+          <div class="input-wrapper" style="background: var(--surface); border: 1px solid var(--border); padding: 6px 10px;">
+            <button class="input-btn" style="background: none; color: var(--text-muted); width: 32px; height: 32px;">🎤</button>
+            <input type="text" class="input-text" placeholder="Type your message..." style="font-size: 13px;">
+            <button class="input-btn" style="background: var(--accent); color: white; width: 32px; height: 32px;">↑</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Key choices:</strong> Tighter spacing throughout — 4px and 8px gaps. Smaller fonts (14px chat, 12px/11px panel). 40px header with inline progress. More conversation visible. Same warm palette, just denser. Sources panel at 30% to give more room to chat.
+  </div>
+</div>
+
+<!-- DIRECTION D: Floating Cards -->
+<div id="dir-d" class="mockup-section">
+  <div class="mockup-title">Direction D: Floating Cards</div>
+  <div class="mockup-subtitle">Messages as floating cards with subtle shadows. Sources panel uses a clean card-based grid. More visual depth through elevation. Feels premium and polished. Slightly more personality than the minimal direction.</div>
+
+  <div class="mockup-frame" style="background: hsl(220, 15%, 97%);">
+    <div class="app-header" style="height: 48px; background: white; box-shadow: 0 1px 3px hsla(0,0%,0%,0.06);">
+      <div class="app-logo">open-notebook</div>
+      <div style="width: 1px; height: 20px; background: var(--border); margin: 0 12px;"></div>
+      <div class="app-module-title">Introduction to AI Fundamentals</div>
+      <div class="app-avatar" style="margin-left: auto;">SL</div>
+    </div>
+    <div class="app-body">
+      <!-- Sources -->
+      <div class="sources-panel" style="width: 33%; background: hsl(220, 15%, 97%); border-right: none;">
+        <div class="panel-tabs" style="background: white; margin: 8px 8px 0; border-radius: 8px; border-bottom: none; box-shadow: 0 1px 3px hsla(0,0%,0%,0.06);">
+          <div class="panel-tab active">Sources</div>
+          <div class="panel-tab">Artifacts</div>
+          <div class="panel-tab">Progress</div>
+        </div>
+        <div class="panel-content" style="padding: 8px;">
+          <div class="doc-card" style="background: white; border-radius: 10px; box-shadow: 0 1px 3px hsla(0,0%,0%,0.06); padding: 14px; margin-bottom: 8px; border-left: 3px solid var(--accent);">
+            <div class="doc-card-title">What is Machine Learning?</div>
+            <div class="doc-card-desc">Core concepts of ML: supervised, unsupervised, and reinforcement learning.</div>
+          </div>
+          <div class="doc-card" style="background: white; border-radius: 10px; box-shadow: 0 1px 3px hsla(0,0%,0%,0.06); padding: 14px; margin-bottom: 8px;">
+            <div class="doc-card-title">AI in the Workplace</div>
+            <div class="doc-card-desc">Practical applications across business functions and roles.</div>
+          </div>
+          <div class="doc-card" style="background: white; border-radius: 10px; box-shadow: 0 1px 3px hsla(0,0%,0%,0.06); padding: 14px; margin-bottom: 8px;">
+            <div class="doc-card-title">Understanding LLMs</div>
+            <div class="doc-card-desc">How large language models work, capabilities, and limitations.</div>
+          </div>
+        </div>
+      </div>
+      <!-- Divider -->
+      <div style="width: 1px; background: var(--border);"></div>
+      <!-- Chat -->
+      <div class="chat-panel" style="flex: 1; background: hsl(220, 15%, 97%);">
+        <div class="chat-messages" style="padding: 20px;">
+          <div class="message message-ai" style="background: white; border-radius: 16px; padding: 16px 20px; box-shadow: 0 1px 4px hsla(0,0%,0%,0.06); max-width: 680px;">
+            <div class="message-content">Hi Sophie! I'm your AI learning guide. I see you're a project manager at a logistics company — that's perfect for exploring AI fundamentals. <strong>What's your current understanding of AI?</strong></div>
+          </div>
+          <div class="message message-user message-gap" style="display: flex; justify-content: flex-end;">
+            <div style="background: var(--accent); color: white; padding: 14px 18px; border-radius: 16px; box-shadow: 0 1px 4px hsla(220,60%,50%,0.2); max-width: 680px; font-size: 15px; line-height: 1.6;">I've used ChatGPT but don't understand how it works.</div>
+          </div>
+          <div class="message message-ai message-gap" style="background: white; border-radius: 16px; padding: 16px 20px; box-shadow: 0 1px 4px hsla(0,0%,0%,0.06); max-width: 680px;">
+            <div class="message-content">AI is about <strong>pattern recognition</strong>. Your logistics intuition works the same way — built from hundreds of decisions over time. AI does that with data.</div>
+            <div class="inline-snippet" style="background: hsl(220, 15%, 97%); border-radius: 10px; margin-top: 12px; padding: 12px;">
+              <div class="inline-snippet-title" style="color: var(--accent);">📄 What is Machine Learning?</div>
+              <div class="inline-snippet-body">"ML enables systems to learn from data and improve without explicit programming..."</div>
+              <div class="inline-snippet-action">Open in sources →</div>
+            </div>
+          </div>
+          <div class="message message-ai" style="max-width: 680px;">
+            <div class="objective-notification" style="background: white; border: 1px solid var(--success); color: var(--success); border-radius: 12px; box-shadow: 0 1px 3px hsla(150,40%,45%,0.1);">
+              ✓ You've demonstrated understanding of: AI as pattern recognition
+            </div>
+          </div>
+        </div>
+        <div class="input-bar" style="padding: 12px 20px 20px;">
+          <div class="input-wrapper" style="background: white; border-radius: 16px; box-shadow: 0 2px 8px hsla(0,0%,0%,0.08); padding: 8px 12px;">
+            <button class="input-btn" style="background: none; color: var(--text-muted);">🎤</button>
+            <input type="text" class="input-text" placeholder="Type your message...">
+            <button class="input-btn" style="background: var(--accent); color: white;">↑</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="status-bar" style="background: white; color: var(--text-muted); font-size: 11px; box-shadow: 0 -1px 3px hsla(0,0%,0%,0.04);">
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <div style="width: 6px; height: 6px; border-radius: 50%; background: var(--success);"></div>
+        Progress: 2 of 6 objectives completed
+      </div>
+      <div style="margin-left: auto; display: flex; align-items: center; gap: 6px;">
+        <div style="width: 100px; height: 3px; background: var(--surface-elevated); border-radius: 2px; overflow: hidden;">
+          <div style="width: 33%; height: 100%; background: var(--success); border-radius: 2px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Key choices:</strong> Off-white page background with white floating cards for everything (messages, document cards, tabs, input). Subtle shadows create depth. User messages in accent color, right-aligned. Objective notification as a bordered card. Status bar at bottom with progress. Most visually rich direction.
+  </div>
+</div>
+
+<!-- COMPARISON -->
+<div id="compare" class="mockup-section">
+  <div class="mockup-title">Side-by-Side Comparison</div>
+  <div class="mockup-subtitle">Compare the four directions. Focus on: which message treatment feels right? Which density level? Which sources panel style?</div>
+
+  <div class="comparison">
+    <!-- A mini -->
+    <div>
+      <div style="font-weight: 600; margin-bottom: 8px; font-size: 14px;">A: Minimal Warmth</div>
+      <div class="mockup-frame" style="height: 400px;">
+        <div class="app-header" style="height: 40px; font-size: 12px;">
+          <div class="app-logo" style="font-size: 12px;">open-notebook</div>
+        </div>
+        <div class="app-body">
+          <div class="sources-panel" style="width: 33%; background: var(--surface);">
+            <div class="panel-content" style="padding: 8px;">
+              <div class="doc-card" style="padding: 8px;"><div class="doc-card-title" style="font-size: 11px;">What is Machine Learning?</div></div>
+              <div class="doc-card" style="padding: 8px;"><div class="doc-card-title" style="font-size: 11px;">AI in the Workplace</div></div>
+            </div>
+          </div>
+          <div class="chat-panel" style="width: 67%;">
+            <div class="chat-messages" style="padding: 12px; gap: 6px;">
+              <div style="font-size: 13px; line-height: 1.5; padding: 6px 0;">Hi Sophie! I see you're a PM in logistics...</div>
+              <div style="font-size: 13px; line-height: 1.5; padding: 6px 0;"><span style="background: var(--accent-subtle); padding: 6px 10px; border-radius: 10px; display: inline-block;">I've used ChatGPT but...</span></div>
+              <div style="font-size: 13px; line-height: 1.5; padding: 6px 0;">AI is about pattern recognition...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top: 8px; font-size: 12px; color: var(--text-secondary);">Minimal chrome. No bubbles for AI. Flowing text.</div>
+    </div>
+    <!-- B mini -->
+    <div>
+      <div style="font-weight: 600; margin-bottom: 8px; font-size: 14px;">B: Bordered Clarity</div>
+      <div class="mockup-frame" style="height: 400px;">
+        <div class="app-header" style="height: 40px; font-size: 12px; background: white;">
+          <div class="app-logo" style="font-size: 12px;">open-notebook</div>
+        </div>
+        <div class="app-body">
+          <div class="sources-panel" style="width: 33%; background: white;">
+            <div class="panel-content" style="padding: 8px;">
+              <div class="doc-card" style="padding: 8px; border: 1px solid var(--border);"><div class="doc-card-title" style="font-size: 11px;">What is Machine Learning?</div></div>
+              <div class="doc-card" style="padding: 8px; border: 1px solid var(--border);"><div class="doc-card-title" style="font-size: 11px;">AI in the Workplace</div></div>
+            </div>
+          </div>
+          <div class="chat-panel" style="width: 67%; background: var(--bg);">
+            <div class="chat-messages" style="padding: 12px; gap: 6px;">
+              <div style="font-size: 13px; line-height: 1.5; padding: 10px; background: white; border: 1px solid var(--border); border-radius: 8px;"><span style="font-size: 10px; color: var(--accent); display: block; margin-bottom: 2px;">AI Teacher</span>Hi Sophie! I see you're a PM...</div>
+              <div style="text-align: right; padding: 6px 0;"><span style="font-size: 13px; background: var(--accent); color: white; padding: 8px 12px; border-radius: 8px; display: inline-block;">I've used ChatGPT but...</span></div>
+              <div style="font-size: 13px; line-height: 1.5; padding: 10px; background: white; border: 1px solid var(--border); border-radius: 8px;">AI is about pattern recognition...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top: 8px; font-size: 12px; color: var(--text-secondary);">Clear containers. Labeled sender. Right-aligned user.</div>
+    </div>
+    <!-- C mini -->
+    <div>
+      <div style="font-weight: 600; margin-bottom: 8px; font-size: 14px;">C: Compact Dense</div>
+      <div class="mockup-frame" style="height: 400px;">
+        <div class="app-header" style="height: 36px; font-size: 11px;">
+          <div class="app-logo" style="font-size: 11px;">open-notebook · AI Fundamentals</div>
+        </div>
+        <div class="app-body">
+          <div class="sources-panel" style="width: 28%; background: var(--surface);">
+            <div class="panel-content" style="padding: 6px;">
+              <div class="doc-card" style="padding: 6px;"><div class="doc-card-title" style="font-size: 10px;">What is Machine Learning?</div></div>
+              <div class="doc-card" style="padding: 6px;"><div class="doc-card-title" style="font-size: 10px;">AI in the Workplace</div></div>
+              <div class="doc-card" style="padding: 6px;"><div class="doc-card-title" style="font-size: 10px;">Understanding LLMs</div></div>
+              <div class="doc-card" style="padding: 6px;"><div class="doc-card-title" style="font-size: 10px;">Ethics & Responsible AI</div></div>
+              <div class="doc-card" style="padding: 6px;"><div class="doc-card-title" style="font-size: 10px;">Data Privacy</div></div>
+            </div>
+          </div>
+          <div class="chat-panel" style="width: 72%;">
+            <div class="chat-messages" style="padding: 8px 12px; gap: 2px;">
+              <div style="font-size: 12px; line-height: 1.4; padding: 4px 0;">Hi Sophie! What's your understanding of AI?</div>
+              <div style="font-size: 12px; line-height: 1.4; padding: 3px 0;"><span style="background: var(--accent-subtle); padding: 4px 8px; border-radius: 8px; display: inline-block;">I've used ChatGPT but...</span></div>
+              <div style="font-size: 12px; line-height: 1.4; padding: 4px 0;">AI is pattern recognition. Your logistics intuition works the same way.</div>
+              <div style="font-size: 10px; color: var(--success); padding: 2px 0;">✓ AI as pattern recognition</div>
+              <div style="font-size: 12px; line-height: 1.4; padding: 4px 0;">Three types of ML: supervised, unsupervised, reinforcement...</div>
+              <div style="font-size: 12px; line-height: 1.4; padding: 4px 0;">Which sounds most relevant to your logistics work?</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top: 8px; font-size: 12px; color: var(--text-secondary);">Tight spacing. More visible at once. Efficient.</div>
+    </div>
+    <!-- D mini -->
+    <div>
+      <div style="font-weight: 600; margin-bottom: 8px; font-size: 14px;">D: Floating Cards</div>
+      <div class="mockup-frame" style="height: 400px; background: hsl(220, 15%, 97%);">
+        <div class="app-header" style="height: 40px; font-size: 12px; background: white; box-shadow: 0 1px 2px hsla(0,0%,0%,0.06);">
+          <div class="app-logo" style="font-size: 12px;">open-notebook</div>
+        </div>
+        <div class="app-body">
+          <div class="sources-panel" style="width: 33%; background: hsl(220, 15%, 97%); border-right: none;">
+            <div class="panel-content" style="padding: 8px;">
+              <div style="background: white; border-radius: 8px; padding: 8px; margin-bottom: 6px; box-shadow: 0 1px 2px hsla(0,0%,0%,0.06);"><div style="font-size: 11px; font-weight: 500;">What is Machine Learning?</div></div>
+              <div style="background: white; border-radius: 8px; padding: 8px; margin-bottom: 6px; box-shadow: 0 1px 2px hsla(0,0%,0%,0.06);"><div style="font-size: 11px; font-weight: 500;">AI in the Workplace</div></div>
+            </div>
+          </div>
+          <div style="width: 1px; background: var(--border);"></div>
+          <div class="chat-panel" style="flex: 1; background: hsl(220, 15%, 97%);">
+            <div class="chat-messages" style="padding: 12px; gap: 6px;">
+              <div style="font-size: 13px; line-height: 1.5; padding: 12px; background: white; border-radius: 12px; box-shadow: 0 1px 3px hsla(0,0%,0%,0.06);">Hi Sophie! What's your understanding of AI?</div>
+              <div style="text-align: right; padding: 4px 0;"><span style="font-size: 13px; background: var(--accent); color: white; padding: 10px 14px; border-radius: 12px; display: inline-block; box-shadow: 0 1px 3px hsla(220,60%,50%,0.2);">I've used ChatGPT but...</span></div>
+              <div style="font-size: 13px; line-height: 1.5; padding: 12px; background: white; border-radius: 12px; box-shadow: 0 1px 3px hsla(0,0%,0%,0.06);">AI is pattern recognition, like your logistics intuition...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top: 8px; font-size: 12px; color: var(--text-secondary);">Floating white cards on gray. Shadows. Premium feel.</div>
+    </div>
+  </div>
+
+  <div class="callout" style="margin-top: 24px;">
+    <strong>Evaluation criteria:</strong><br>
+    - <strong>Message treatment:</strong> A=flowing text, B=bordered containers, C=compact text, D=floating cards<br>
+    - <strong>Visual weight:</strong> A=lightest, D=heaviest, B=medium-structured, C=dense-light<br>
+    - <strong>Information density:</strong> C=highest, A=medium, B=medium, D=medium-low<br>
+    - <strong>Approachability:</strong> A=most approachable, D=most polished, B=most structured, C=most efficient
+  </div>
+</div>
+
+<!-- MODULE SELECTION SCREEN -->
+<div id="module-select" class="mockup-section">
+  <div class="mockup-title">Module Selection Screen</div>
+  <div class="mockup-subtitle">The learner's entry point after login. Shows available and locked modules. One click opens the AI conversation. Applied with Direction A's minimal warmth style.</div>
+
+  <div class="mockup-frame" style="background: var(--bg);">
+    <div class="app-header" style="height: 48px;">
+      <div class="app-logo">open-notebook</div>
+      <div class="app-avatar" style="margin-left: auto;">SL</div>
+    </div>
+    <div style="flex: 1; overflow-y: auto; padding: 40px;">
+      <div style="max-width: 800px; margin: 0 auto;">
+        <div style="margin-bottom: 32px;">
+          <div style="font-size: 24px; font-weight: 600; margin-bottom: 4px;">Welcome back, Sophie</div>
+          <div style="font-size: 15px; color: var(--text-secondary);">Continue your AI learning journey. Pick up where you left off or start a new module.</div>
+        </div>
+
+        <!-- Active modules -->
+        <div style="margin-bottom: 32px;">
+          <div style="font-size: 12px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">Available Modules</div>
+
+          <div style="background: white; border-radius: 12px; padding: 20px; margin-bottom: 12px; border: 1px solid var(--border); cursor: pointer; transition: box-shadow 0.15s;" onmouseover="this.style.boxShadow='0 2px 8px hsla(0,0%,0%,0.08)'" onmouseout="this.style.boxShadow='none'">
+            <div style="display: flex; align-items: center; gap: 16px;">
+              <div style="flex: 1;">
+                <div style="font-size: 16px; font-weight: 600; margin-bottom: 4px;">Introduction to AI Fundamentals</div>
+                <div style="font-size: 13px; color: var(--text-secondary);">Core AI concepts, machine learning basics, and understanding how AI tools work.</div>
+              </div>
+              <div style="text-align: right; flex-shrink: 0;">
+                <div style="font-size: 12px; color: var(--success); font-weight: 500;">In Progress</div>
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">2 of 6 objectives</div>
+              </div>
+            </div>
+            <div style="margin-top: 12px; height: 3px; background: var(--surface-elevated); border-radius: 2px; overflow: hidden;">
+              <div style="width: 33%; height: 100%; background: var(--success); border-radius: 2px;"></div>
+            </div>
+          </div>
+
+          <div style="background: white; border-radius: 12px; padding: 20px; margin-bottom: 12px; border: 1px solid var(--border); cursor: pointer; transition: box-shadow 0.15s;" onmouseover="this.style.boxShadow='0 2px 8px hsla(0,0%,0%,0.08)'" onmouseout="this.style.boxShadow='none'">
+            <div style="display: flex; align-items: center; gap: 16px;">
+              <div style="flex: 1;">
+                <div style="font-size: 16px; font-weight: 600; margin-bottom: 4px;">AI Ethics & Responsible Use</div>
+                <div style="font-size: 13px; color: var(--text-secondary);">Ethical frameworks, bias awareness, and responsible AI deployment in your organization.</div>
+              </div>
+              <div style="text-align: right; flex-shrink: 0;">
+                <div style="font-size: 12px; color: var(--text-muted); font-weight: 500;">Not started</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Locked modules -->
+        <div>
+          <div style="font-size: 12px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">Unlocks After Workshop</div>
+
+          <div style="background: var(--surface); border-radius: 12px; padding: 20px; margin-bottom: 12px; border: 1px solid var(--border); opacity: 0.6;">
+            <div style="display: flex; align-items: center; gap: 16px;">
+              <div style="flex: 1;">
+                <div style="font-size: 16px; font-weight: 600; margin-bottom: 4px;">AI for Project Management</div>
+                <div style="font-size: 13px; color: var(--text-secondary);">Practical AI applications for project managers: automation, estimation, and decision support.</div>
+              </div>
+              <div style="font-size: 20px; flex-shrink: 0;">🔒</div>
+            </div>
+          </div>
+
+          <div style="background: var(--surface); border-radius: 12px; padding: 20px; margin-bottom: 12px; border: 1px solid var(--border); opacity: 0.6;">
+            <div style="display: flex; align-items: center; gap: 16px;">
+              <div style="flex: 1;">
+                <div style="font-size: 16px; font-weight: 600; margin-bottom: 4px;">Building Your AI Workflow</div>
+                <div style="font-size: 13px; color: var(--text-secondary);">Design and implement AI-enhanced workflows specific to your role and industry.</div>
+              </div>
+              <div style="font-size: 20px; flex-shrink: 0;">🔒</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Module selection principles:</strong> Clean list, not a grid. Progress shown per module as a subtle bar. Locked modules are visually muted but visible (learners know what's coming). One click opens the AI conversation — no intermediate screen. Personalized greeting at top.
+  </div>
+</div>
+
+</div>
+
+<script>
+function showSection(id) {
+  document.querySelectorAll('.mockup-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+}
+</script>
+
+</body>
+</html>

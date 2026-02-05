@@ -2,12 +2,14 @@
 
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from api.auth import get_current_user, require_admin
+from open_notebook.domain.user import User
 from api import quiz_service
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 class QuizGenerateRequest(BaseModel):
@@ -26,7 +28,7 @@ class QuizAnswersRequest(BaseModel):
 
 
 @router.post("/notebooks/{notebook_id}/quizzes/generate")
-async def generate_quiz(notebook_id: str, request: QuizGenerateRequest):
+async def generate_quiz(notebook_id: str, request: QuizGenerateRequest, admin: User = Depends(require_admin)):
     """
     Generate a new quiz for the notebook.
     
@@ -133,7 +135,7 @@ async def reset_quiz(quiz_id: str):
 
 
 @router.delete("/quizzes/{quiz_id}")
-async def delete_quiz(quiz_id: str):
+async def delete_quiz(quiz_id: str, admin: User = Depends(require_admin)):
     """Delete a quiz."""
     success = await quiz_service.delete_quiz(quiz_id)
     if not success:

@@ -1,6 +1,6 @@
 'use client'
 
-import { useAuthStore } from '@/lib/stores/auth-store'
+import { useAuthStore, AuthUser } from '@/lib/stores/auth-store'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 
@@ -9,8 +9,9 @@ export function useAuth() {
   const {
     isAuthenticated,
     isLoading,
-    login,
-    logout,
+    user,
+    login: storeLogin,
+    logout: storeLogout,
     checkAuth,
     checkAuthRequired,
     error,
@@ -38,29 +39,44 @@ export function useAuth() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasHydrated, authRequired])
 
-  const handleLogin = async (password: string) => {
-    const success = await login(password)
+  /**
+   * Login with username and password.
+   * On success, redirects based on user role:
+   * - admin → /notebooks
+   * - learner → /modules
+   */
+  const handleLogin = async (username: string, password: string) => {
+    const success = await storeLogin(username, password)
     if (success) {
       // Check if there's a stored redirect path
       const redirectPath = sessionStorage.getItem('redirectAfterLogin')
+
+      // Determine default path based on role
+      const currentUser = useAuthStore.getState().user
+      const defaultPath = currentUser?.role === 'admin' ? '/notebooks' : '/modules'
+
       if (redirectPath) {
         sessionStorage.removeItem('redirectAfterLogin')
         router.push(redirectPath)
       } else {
-        router.push('/notebooks')
+        router.push(defaultPath)
       }
     }
     return success
   }
 
-  const handleLogout = () => {
-    logout()
+  /**
+   * Logout and redirect to login page.
+   */
+  const handleLogout = async () => {
+    await storeLogout()
     router.push('/login')
   }
 
   return {
     isAuthenticated,
     isLoading: isLoading || !hasHydrated, // Treat lack of hydration as loading
+    user,
     error,
     login: handleLogin,
     logout: handleLogout

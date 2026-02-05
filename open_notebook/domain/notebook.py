@@ -20,6 +20,7 @@ class Notebook(ObjectModel):
     name: str
     description: str
     archived: Optional[bool] = False
+    published: bool = False  # Whether the notebook is published (visible to learners)
 
     @field_validator("name")
     @classmethod

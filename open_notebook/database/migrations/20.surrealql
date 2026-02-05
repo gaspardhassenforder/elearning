@@ -1,0 +1,13 @@
+-- Migration 20: Create module_assignment table for assigning notebooks to companies
+DEFINE TABLE module_assignment SCHEMAFULL;
+
+DEFINE FIELD company_id ON module_assignment TYPE record<company>;
+DEFINE FIELD notebook_id ON module_assignment TYPE record<notebook>;
+DEFINE FIELD is_locked ON module_assignment TYPE bool DEFAULT false;
+DEFINE FIELD assigned_at ON module_assignment TYPE datetime DEFAULT time::now();
+DEFINE FIELD assigned_by ON module_assignment TYPE option<record<user>>;
+DEFINE FIELD created ON module_assignment TYPE datetime DEFAULT time::now();
+DEFINE FIELD updated ON module_assignment TYPE datetime DEFAULT time::now();
+
+-- Unique constraint: one assignment per company-notebook pair
+DEFINE INDEX unique_company_notebook ON module_assignment FIELDS company_id, notebook_id UNIQUE;

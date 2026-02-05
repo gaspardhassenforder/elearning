@@ -1,12 +1,13 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
 
+from api.auth import get_current_user
 from api.models import ContextRequest, ContextResponse
 from open_notebook.domain.notebook import Note, Notebook, Source
 from open_notebook.exceptions import InvalidInputError
 from open_notebook.utils import token_count
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 @router.post("/notebooks/{notebook_id}/context", response_model=ContextResponse)

@@ -2,11 +2,13 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
+from api.auth import get_current_user, require_admin
+from open_notebook.domain.user import User
 from api import artifacts_service
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 @router.get("/notebooks/{notebook_id}/artifacts")
@@ -56,7 +58,7 @@ async def get_artifact(artifact_id: str):
 
 
 @router.delete("/artifacts/{artifact_id}")
-async def delete_artifact(artifact_id: str):
+async def delete_artifact(artifact_id: str, admin: User = Depends(require_admin)):
     """Delete an artifact and its associated content."""
     success = await artifacts_service.delete_artifact(artifact_id)
     if not success:

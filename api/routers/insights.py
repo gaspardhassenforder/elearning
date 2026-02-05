@@ -1,11 +1,13 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
 
+from api.auth import get_current_user, require_admin
+from open_notebook.domain.user import User
 from api.models import NoteResponse, SaveAsNoteRequest, SourceInsightResponse
 from open_notebook.domain.notebook import SourceInsight
 from open_notebook.exceptions import InvalidInputError
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 @router.get("/insights/{insight_id}", response_model=SourceInsightResponse)
@@ -35,7 +37,7 @@ async def get_insight(insight_id: str):
 
 
 @router.delete("/insights/{insight_id}")
-async def delete_insight(insight_id: str):
+async def delete_insight(insight_id: str, admin: User = Depends(require_admin)):
     """Delete a specific insight."""
     try:
         insight = await SourceInsight.get(insight_id)
@@ -53,7 +55,7 @@ async def delete_insight(insight_id: str):
 
 
 @router.post("/insights/{insight_id}/save-as-note", response_model=NoteResponse)
-async def save_insight_as_note(insight_id: str, request: SaveAsNoteRequest):
+async def save_insight_as_note(insight_id: str, request: SaveAsNoteRequest, admin: User = Depends(require_admin)):
     """Convert an insight to a note."""
     try:
         insight = await SourceInsight.get(insight_id)

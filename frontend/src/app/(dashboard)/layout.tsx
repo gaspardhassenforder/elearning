@@ -1,6 +1,6 @@
 'use client'
 
-import { useAuth } from '@/lib/hooks/use-auth'
+import { useAuthStore } from '@/lib/stores/auth-store'
 import { useVersionCheck } from '@/lib/hooks/use-version-check'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -10,35 +10,51 @@ import { ModalProvider } from '@/components/providers/ModalProvider'
 import { CreateDialogsProvider } from '@/lib/hooks/use-create-dialogs'
 import { CommandPalette } from '@/components/common/CommandPalette'
 
+/**
+ * Dashboard (Admin) Layout
+ *
+ * This layout is for admin-only routes:
+ * - /notebooks, /sources, /search, /models, /settings, /advanced, /podcasts, /transformations
+ *
+ * Role Guard:
+ * - If user is not authenticated, redirect to /login (handled by AuthProvider)
+ * - If user is authenticated but NOT admin, redirect to /modules (learner home)
+ */
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const { isAuthenticated, isLoading } = useAuth()
+  const { isAuthenticated, user, hasHydrated } = useAuthStore()
   const router = useRouter()
-  const [hasCheckedAuth, setHasCheckedAuth] = useState(false)
+  const [hasCheckedRole, setHasCheckedRole] = useState(false)
 
   // Check for version updates once per session
   useVersionCheck()
 
   useEffect(() => {
-    // Mark that we've completed the initial auth check
-    if (!isLoading) {
-      setHasCheckedAuth(true)
-
-      // Redirect to login if not authenticated
-      if (!isAuthenticated) {
-        // Store the current path to redirect back after login
-        const currentPath = window.location.pathname + window.location.search
-        sessionStorage.setItem('redirectAfterLogin', currentPath)
-        router.push('/login')
-      }
+    // Wait for store to hydrate
+    if (!hasHydrated) {
+      return
     }
-  }, [isAuthenticated, isLoading, router])
 
-  // Show loading spinner during initial auth check or while loading
-  if (isLoading || !hasCheckedAuth) {
+    // If not authenticated, AuthProvider will handle redirect to login
+    if (!isAuthenticated || !user) {
+      setHasCheckedRole(true)
+      return
+    }
+
+    // Role guard: If user is not admin, redirect to learner home
+    if (user.role !== 'admin') {
+      router.replace('/modules')
+      return
+    }
+
+    setHasCheckedRole(true)
+  }, [hasHydrated, isAuthenticated, user, router])
+
+  // Show loading spinner during initial role check
+  if (!hasHydrated || !hasCheckedRole) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner />
@@ -46,8 +62,13 @@ export default function DashboardLayout({
     )
   }
 
-  // Don't render anything if not authenticated (during redirect)
-  if (!isAuthenticated) {
+  // Don't render if not authenticated (AuthProvider handles redirect)
+  if (!isAuthenticated || !user) {
+    return null
+  }
+
+  // Don't render if not admin (redirect in progress)
+  if (user.role !== 'admin') {
     return null
   }
 

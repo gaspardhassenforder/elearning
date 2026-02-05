@@ -1,7 +1,9 @@
 import asyncio
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from api.auth import get_current_user
 from langchain_core.runnables import RunnableConfig
 from loguru import logger
 from pydantic import BaseModel, Field
@@ -13,7 +15,7 @@ from open_notebook.exceptions import (
 )
 from open_notebook.graphs.chat import graph as chat_graph
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 # Request/Response models

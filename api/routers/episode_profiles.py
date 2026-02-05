@@ -1,12 +1,13 @@
 from typing import List
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
 from pydantic import BaseModel, Field
 
+from api.auth import require_admin
 from open_notebook.podcasts.models import EpisodeProfile
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_admin)])
 
 
 class EpisodeProfileResponse(BaseModel):

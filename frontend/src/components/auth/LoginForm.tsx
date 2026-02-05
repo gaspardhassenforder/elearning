@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { useAuth } from '@/lib/hooks/use-auth'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { getConfig } from '@/lib/config'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AlertCircle } from 'lucide-react'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -14,12 +14,22 @@ import { useTranslation } from '@/lib/hooks/use-translation'
 
 export function LoginForm() {
   const { t, language } = useTranslation()
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const { login, isLoading, error } = useAuth()
-  const { authRequired, checkAuthRequired, hasHydrated, isAuthenticated } = useAuthStore()
+  const {
+    login,
+    isLoading,
+    error,
+    authRequired,
+    checkAuthRequired,
+    hasHydrated,
+    isAuthenticated,
+    user,
+  } = useAuthStore()
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const [configInfo, setConfigInfo] = useState<{ apiUrl: string; version: string; buildTime: string } | null>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   // Load config info for debugging
   useEffect(() => {
@@ -127,9 +137,22 @@ export function LoginForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (password.trim()) {
+    if (username.trim() && password.trim()) {
       try {
-        await login(password)
+        const success = await login(username, password)
+        if (success) {
+          // Get redirect path from query params or session storage
+          const redirectPath = searchParams.get('from')
+          const storedPath = sessionStorage.getItem('redirectAfterLogin')
+          sessionStorage.removeItem('redirectAfterLogin')
+
+          // Determine redirect based on user role
+          const currentUser = useAuthStore.getState().user
+          const defaultPath = currentUser?.role === 'admin' ? '/notebooks' : '/modules'
+          const targetPath = redirectPath || storedPath || defaultPath
+
+          router.push(targetPath)
+        }
       } catch (error) {
         console.error('Unhandled error during login:', error)
         // The auth store should handle most errors, but this catches any unhandled ones
@@ -148,13 +171,30 @@ export function LoginForm() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
+            <div className="space-y-2">
+              <Label htmlFor="username">{t.auth.username || 'Username'}</Label>
               <Input
+                id="username"
+                type="text"
+                placeholder={t.auth.usernamePlaceholder || 'Enter your username'}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                disabled={isLoading}
+                autoComplete="username"
+                autoFocus
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password">{t.auth.password || 'Password'}</Label>
+              <Input
+                id="password"
                 type="password"
                 placeholder={t.auth.passwordPlaceholder}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={isLoading}
+                autoComplete="current-password"
               />
             </div>
 
@@ -168,7 +208,7 @@ export function LoginForm() {
             <Button
               type="submit"
               className="w-full"
-              disabled={isLoading || !password.trim()}
+              disabled={isLoading || !username.trim() || !password.trim()}
             >
               {isLoading ? t.auth.signingIn : t.auth.signIn}
             </Button>

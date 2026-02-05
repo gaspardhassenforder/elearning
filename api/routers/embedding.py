@@ -1,12 +1,13 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
 
+from api.auth import require_admin
 from api.command_service import CommandService
 from api.models import EmbedRequest, EmbedResponse
 from open_notebook.ai.models import model_manager
 from open_notebook.domain.notebook import Note, Source
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_admin)])
 
 
 @router.post("/embed", response_model=EmbedResponse)

@@ -1,13 +1,14 @@
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from loguru import logger
 from pydantic import BaseModel, Field
 from surreal_commands import registry
 
+from api.auth import require_admin
 from api.command_service import CommandService
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_admin)])
 
 
 class CommandExecutionRequest(BaseModel):
