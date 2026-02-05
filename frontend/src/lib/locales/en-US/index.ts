@@ -1341,6 +1341,5 @@ export const enUS = {
       comingSoonDesc: "Your learning progress and objectives will be tracked here.",
     },
   },
-  },
 }
 
