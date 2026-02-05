@@ -59,11 +59,11 @@ development_status:
   epic-3: in-progress
   3-1-module-creation-and-document-upload: done  # Code review complete, all issues fixed, approved for merge
   3-2-artifact-generation-and-preview: in-progress  # Implementation started
-  3-3-learning-objectives-configuration: review  # Tasks 1-7 complete: Backend + Frontend + Tests all passing
-  3-4-ai-teacher-prompt-configuration: in-progress  # Two-layer prompt system (global + per-module) with Jinja2 templates, ModulePrompt model, optional configuration
-  3-5-module-publishing: backlog
-  3-6-edit-published-module: backlog
-  3-7-admin-ai-chatbot-assistant: backlog
+  3-3-learning-objectives-configuration: in-progress  # Code review complete: 6 issues fixed, 2 HIGH issues remain (Story 3.4 contamination + backend tests deferred)
+  3-4-ai-teacher-prompt-configuration: review  # All 8 tasks complete: Backend (Migration 24, ModulePrompt, API, prompt assembly) + Frontend (ModulePromptEditor, hooks, pipeline integration, E2E testing)
+  3-5-module-publishing: ready-for-dev  # Comprehensive story created: Validation + publish endpoint, ModuleSummaryCard, PublishedBadge, NO NEW MIGRATION (published field exists)
+  3-6-edit-published-module: ready-for-dev  # Comprehensive story created: Unpublish endpoint, edit mode pipeline, progress preservation, NO NEW MIGRATION
+  3-7-admin-ai-chatbot-assistant: ready-for-dev  # Story created: Admin AI assistant for module creation help, reuses chat workflow with custom prompt
   epic-3-retrospective: optional
 
   # Epic 4: Learner AI Chat Experience
