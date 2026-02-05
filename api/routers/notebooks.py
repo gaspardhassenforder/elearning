@@ -8,7 +8,16 @@ from loguru import logger
 from api.auth import get_current_user, require_admin
 from open_notebook.domain.user import User
 
-from api.models import NotebookCreate, NotebookResponse, NotebookUpdate, DocumentUploadResponse, DocumentStatusResponse
+from api.models import (
+    NotebookCreate,
+    NotebookResponse,
+    NotebookUpdate,
+    DocumentUploadResponse,
+    DocumentStatusResponse,
+    BatchGenerationRequest,
+    BatchGenerationResponse,
+    ArtifactGenerationResult,
+)
 from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.notebook import Notebook, Source, Note, Asset
 from open_notebook.domain.transformation import Transformation
@@ -581,4 +590,76 @@ async def delete_notebook(notebook_id: str, admin: User = Depends(require_admin)
         logger.error(f"Error deleting notebook {notebook_id}: {str(e)}")
         raise HTTPException(
             status_code=500, detail=f"Error deleting notebook: {str(e)}"
+        )
+
+
+@router.post("/notebooks/{notebook_id}/generate-artifacts", response_model=BatchGenerationResponse)
+async def generate_artifacts(
+    notebook_id: str,
+    request: Optional[BatchGenerationRequest] = None,
+    admin: User = Depends(require_admin)
+):
+    """
+    Generate all artifacts for a notebook (Story 3.2, Task 1).
+
+    This endpoint orchestrates parallel artifact generation:
+    - Quiz: sync workflow (30-60s)
+    - Summary: sync transformation (10-30s)
+    - Podcast: async job (2-5min, fire-and-forget)
+
+    Uses asyncio.gather with error isolation so one failure doesn't break others.
+
+    Returns:
+        Batch generation status with artifact IDs and command IDs for async jobs
+    """
+    try:
+        # Verify notebook exists
+        notebook = await Notebook.get(notebook_id)
+        if not notebook:
+            logger.error(f"Notebook not found: {notebook_id}")
+            raise HTTPException(status_code=404, detail="Notebook not found")
+
+        # Import artifact generation service
+        from api import artifact_generation_service
+
+        # Execute batch generation
+        logger.info(f"Starting batch artifact generation for notebook {notebook_id}")
+        status = await artifact_generation_service.generate_all_artifacts(notebook_id)
+
+        # Convert to response model
+        response = BatchGenerationResponse(
+            notebook_id=notebook_id,
+            quiz=ArtifactGenerationResult(
+                status=status.quiz_status,  # type: ignore
+                id=status.quiz_id,
+                error=status.quiz_error,
+            ),
+            summary=ArtifactGenerationResult(
+                status=status.summary_status,  # type: ignore
+                id=status.summary_id,
+                error=status.summary_error,
+            ),
+            transformations={
+                "status": status.transformations_status,
+                "ids": status.transformation_ids,
+                "errors": status.transformation_errors,
+            },
+            podcast={
+                "status": status.podcast_status,
+                "command_id": status.podcast_command_id,
+                "artifact_ids": status.podcast_artifact_ids,
+                "error": status.podcast_error,
+            },
+        )
+
+        logger.info(f"Batch artifact generation completed for notebook {notebook_id}")
+        return response
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating artifacts for notebook {notebook_id}: {str(e)}")
+        logger.exception(e)
+        raise HTTPException(
+            status_code=500, detail=f"Error generating artifacts: {str(e)}"
         )

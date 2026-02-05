@@ -656,3 +656,112 @@ class SourceStatusResponse(BaseModel):
 class ErrorResponse(BaseModel):
     error: str
     message: str
+
+
+# Batch artifact generation models (Story 3.2)
+class BatchGenerationRequest(BaseModel):
+    """Request to generate all artifacts for a notebook."""
+
+    notebook_id: str = Field(..., description="Notebook ID to generate artifacts for")
+    options: Optional[Dict[str, Any]] = Field(
+        None, description="Optional generation options per artifact type"
+    )
+
+
+class ArtifactGenerationResult(BaseModel):
+    """Result of a single artifact generation."""
+
+    status: Literal["pending", "processing", "completed", "error"] = Field(
+        ..., description="Generation status"
+    )
+    id: Optional[str] = Field(None, description="Artifact ID if completed")
+    error: Optional[str] = Field(None, description="Error message if failed")
+
+
+class BatchGenerationResponse(BaseModel):
+    """Response from batch artifact generation."""
+
+    notebook_id: str
+    quiz: ArtifactGenerationResult
+    summary: ArtifactGenerationResult
+    transformations: Dict[str, Any] = Field(
+        default_factory=dict, description="Transformation generation results"
+    )
+    podcast: Dict[str, Any] = Field(
+        default_factory=dict, description="Podcast generation results with command_id"
+    )
+
+
+# Artifact preview models (Story 3.2)
+class QuizPreviewResponse(BaseModel):
+    """Preview response for quiz artifacts."""
+
+    artifact_type: str = "quiz"
+    id: str
+    title: str
+    question_count: int
+    questions: List[Dict[str, Any]] = Field(..., description="Quiz questions with answers")
+
+
+class PodcastPreviewResponse(BaseModel):
+    """Preview response for podcast artifacts."""
+
+    artifact_type: str = "podcast"
+    id: str
+    title: str
+    duration: Optional[str] = Field(None, description="Audio duration")
+    audio_url: Optional[str] = Field(None, description="URL to audio file")
+    transcript: Optional[str] = Field(None, description="Episode transcript")
+
+
+class SummaryPreviewResponse(BaseModel):
+    """Preview response for summary artifacts."""
+
+    artifact_type: str = "summary"
+    id: str
+    title: str
+    word_count: int
+    content: str = Field(..., description="Summary markdown content")
+
+
+class TransformationPreviewResponse(BaseModel):
+    """Preview response for transformation artifacts."""
+
+    artifact_type: str = "transformation"
+    id: str
+    title: str
+    word_count: int
+    content: str = Field(..., description="Transformed content")
+    transformation_name: Optional[str] = Field(
+        None, description="Name of the transformation applied"
+    )
+
+
+class ArtifactPreviewResponse(BaseModel):
+    """Generic artifact preview response (union type)."""
+
+    artifact_type: Literal["quiz", "podcast", "summary", "transformation"]
+    data: Dict[str, Any] = Field(..., description="Type-specific preview data")
+
+
+# Artifact regeneration models (Story 3.2)
+class RegenerateArtifactRequest(BaseModel):
+    """Request to regenerate an artifact."""
+
+    options: Optional[Dict[str, Any]] = Field(
+        None, description="Optional regeneration options"
+    )
+
+
+class RegenerateArtifactResponse(BaseModel):
+    """Response from artifact regeneration."""
+
+    artifact_id: str
+    status: Literal["pending", "processing", "completed", "error"]
+    message: str
+    new_artifact_id: Optional[str] = Field(
+        None, description="New artifact ID if regeneration started"
+    )
+    command_id: Optional[str] = Field(
+        None, description="Command ID for async operations"
+    )
