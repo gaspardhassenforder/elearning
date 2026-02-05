@@ -35,7 +35,7 @@ export default function ModulePage() {
   const moduleId = params.id as string;
 
   const { data: module, isLoading, error } = useModule(moduleId);
-  const { activeStep, setActiveStep } = useModuleCreationStore();
+  const { activeStep, setActiveStep, isEditMode } = useModuleCreationStore();
   const { data: artifacts } = useArtifacts(moduleId);
   const { data: objectives = [] } = useLearningObjectives(moduleId);
 
@@ -113,11 +113,17 @@ export default function ModulePage() {
       <div>
         <div className="flex items-center gap-2 mb-2">
           <h1 className="text-3xl font-bold tracking-tight">{module.name}</h1>
-          {!module.published && (
+          {!module.published && !isEditMode && (
             <Badge variant="secondary">{t.assignments.draft}</Badge>
           )}
+          {/* Edit mode indicator (Story 3.6, Task 7) */}
+          {isEditMode && (
+            <Badge variant="outline" className="border-primary text-primary">
+              {t.modules.editingMode || 'Editing'}
+            </Badge>
+          )}
           {/* Edit button for published modules (Story 3.6, Task 6) */}
-          {module.published && (
+          {module.published && !isEditMode && (
             <Button
               variant="outline"
               size="sm"

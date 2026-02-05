@@ -9,6 +9,8 @@
  * 3. Generate - Artifacts (quizzes, podcasts)
  * 4. Configure - Learning objectives, AI prompts
  * 5. Publish - Make available to learners
+ *
+ * Extended in Story 3.6, Task 7 to support edit mode with different button text.
  */
 
 import { Check } from 'lucide-react';
@@ -35,7 +37,7 @@ interface ModuleCreationStepperProps {
 
 export function ModuleCreationStepper({ canProceed = true }: ModuleCreationStepperProps) {
   const { t } = useTranslation();
-  const { activeStep, setActiveStep } = useModuleCreationStore();
+  const { activeStep, setActiveStep, isEditMode } = useModuleCreationStore();
 
   const currentStepIndex = STEPS.findIndex((step) => step.id === activeStep);
 
@@ -131,28 +133,31 @@ export function ModuleCreationStepper({ canProceed = true }: ModuleCreationStepp
       {/* Navigation Buttons */}
       <div className="flex items-center justify-between pt-4 border-t">
         <div className="text-sm text-muted-foreground">
-          {t.modules.pipelineProgress
-            .replace('{current}', String(currentStepIndex + 1))
-            .replace('{total}', String(STEPS.length))}
+          {isEditMode
+            ? t.modules.editProgress?.replace('{current}', String(currentStepIndex + 1))?.replace('{total}', String(STEPS.length)) ||
+              t.modules.pipelineProgress.replace('{current}', String(currentStepIndex + 1)).replace('{total}', String(STEPS.length))
+            : t.modules.pipelineProgress
+                .replace('{current}', String(currentStepIndex + 1))
+                .replace('{total}', String(STEPS.length))}
         </div>
 
         <div className="flex gap-2">
           {currentStepIndex > 0 && (
             <Button variant="outline" onClick={handleBack}>
-              {t.modules.previousStep}
+              {t.common.back}
             </Button>
           )}
 
           {currentStepIndex < STEPS.length - 1 && (
             <Button onClick={handleNext} disabled={!canProceed}>
-              {t.modules.nextStep}
+              {t.common.next}
             </Button>
           )}
 
           {/* Publish button will be implemented in Story 3.5 */}
           {currentStepIndex === STEPS.length - 1 && (
             <Button disabled>
-              {t.modules.finishSetup}
+              {isEditMode ? t.modules.saveChanges : t.modules.finishSetup}
             </Button>
           )}
         </div>

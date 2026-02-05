@@ -1183,6 +1183,9 @@ export const frFR = {
     unpublishButton: "Dépublier et modifier",
     moduleUnpublished: "Module dépublié avec succès",
     unpublishError: "Échec de la dépublication du module",
+    editProgress: "Modification - Étape {current} sur {total}",
+    saveChanges: "Enregistrer les modifications",
+    editingMode: "Modification",
   },
   assignments: {
     title: "Affectations des modules",

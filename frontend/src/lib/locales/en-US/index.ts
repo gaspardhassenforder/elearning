@@ -1183,6 +1183,9 @@ export const enUS = {
     unpublishButton: "Unpublish & Edit",
     moduleUnpublished: "Module unpublished successfully",
     unpublishError: "Failed to unpublish module",
+    editProgress: "Editing - Step {current} of {total}",
+    saveChanges: "Save Changes",
+    editingMode: "Editing",
   },
   assignments: {
     title: "Module Assignments",

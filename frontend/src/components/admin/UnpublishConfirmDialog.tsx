@@ -5,10 +5,13 @@
  *
  * Displays warning about learner impact when admin wants to edit a published module.
  * Confirms unpublish action before reverting module to draft status.
+ *
+ * Extended in Story 3.6, Task 7 to enter edit mode after unpublish.
  */
 
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { useUnpublishModule } from '@/lib/hooks/use-modules';
+import { useModuleCreationStore } from '@/lib/stores/module-creation-store';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,10 +40,13 @@ export function UnpublishConfirmDialog({
 }: UnpublishConfirmDialogProps) {
   const { t } = useTranslation();
   const unpublishModule = useUnpublishModule();
+  const { enterEditMode } = useModuleCreationStore();
 
   const handleConfirm = async () => {
     try {
       await unpublishModule.mutateAsync(moduleId);
+      // Enter edit mode after successful unpublish (Story 3.6, Task 7)
+      enterEditMode(moduleId);
       onOpenChange(false);
     } catch (error) {
       // Error already handled by mutation hook with toast
