@@ -238,6 +238,7 @@ class NotebookResponse(BaseModel):
     updated: str
     source_count: int
     note_count: int
+    objectives_count: int = 0  # Count of learning objectives (Story 3.6)
 
 
 # Document Upload models (Story 3.1)
@@ -829,3 +830,33 @@ class ModulePromptResponse(BaseModel):
     system_prompt: Optional[str] = None
     updated_by: str
     updated_at: Optional[str] = None
+
+
+# ==============================================================================
+# Story 4.1: Learner Chat Interface & SSE Streaming
+# ==============================================================================
+
+
+class LearnerChatRequest(BaseModel):
+    """Request body for learner chat message."""
+
+    message: str = Field(..., min_length=1, description="Learner's message content")
+
+
+class LearnerNotebookSummary(BaseModel):
+    """Notebook summary for learner view (excludes admin fields)."""
+
+    id: str
+    name: str
+    description: Optional[str] = None
+    is_locked: bool
+    source_count: int
+
+
+class LearnerSourceDocument(BaseModel):
+    """Source document metadata for learner sources panel."""
+
+    id: str
+    title: str
+    file_type: Optional[str] = None
+    size: Optional[int] = None  # File size in bytes

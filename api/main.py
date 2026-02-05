@@ -24,6 +24,7 @@ from api.routers import (
     episode_profiles,
     insights,
     learner,
+    learner_chat,
     learning_objectives,
     models,
     module_assignments,
@@ -202,6 +203,7 @@ app.include_router(users.router, prefix="/api", tags=["users"])
 app.include_router(companies.router, prefix="/api", tags=["companies"])
 app.include_router(module_assignments.router, prefix="/api", tags=["module-assignments"])
 app.include_router(learner.router, prefix="/api", tags=["learner"])
+app.include_router(learner_chat.router, prefix="/api", tags=["learner-chat"])
 app.include_router(learning_objectives.router, prefix="/api", tags=["learning-objectives"])
 app.include_router(module_prompts.router, prefix="/api", tags=["module-prompts"])
 

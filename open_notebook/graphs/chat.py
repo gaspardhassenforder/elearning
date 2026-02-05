@@ -22,10 +22,17 @@ class ThreadState(TypedDict):
     context: Optional[str]
     context_config: Optional[dict]
     model_override: Optional[str]
+    system_prompt_override: Optional[str]  # Story 4.1: For learner chat with assembled prompts
 
 
 def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict:
-    system_prompt = Prompter(prompt_template="chat/system").render(data=state)  # type: ignore[arg-type]
+    # Story 4.1: Use system_prompt_override if provided (for learner chat)
+    # Otherwise fall back to default admin chat prompt
+    if state.get("system_prompt_override"):
+        system_prompt = state["system_prompt_override"]
+    else:
+        system_prompt = Prompter(prompt_template="chat/system").render(data=state)  # type: ignore[arg-type]
+
     payload = [SystemMessage(content=system_prompt)] + state.get("messages", [])
     model_id = config.get("configurable", {}).get("model_id") or state.get(
         "model_override"
