@@ -13,7 +13,7 @@
 
 import { useState } from 'react'
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'
-import { GripVertical, Trash2, Plus, Sparkles, Loader2 } from 'lucide-react'
+import { GripVertical, Trash2, Plus, Sparkles, Loader2, Info } from 'lucide-react'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import {
   useLearningObjectives,
@@ -38,7 +38,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { useModuleCreationStore } from '@/lib/stores/module-creation-store'
 
 interface LearningObjectivesEditorProps {
   moduleId: string
@@ -46,6 +53,7 @@ interface LearningObjectivesEditorProps {
 
 export function LearningObjectivesEditor({ moduleId }: LearningObjectivesEditorProps) {
   const { t } = useTranslation()
+  const { isEditMode } = useModuleCreationStore()
 
   // Query and mutations
   const { data: objectives = [], isLoading, error } = useLearningObjectives(moduleId)
@@ -224,9 +232,29 @@ export function LearningObjectivesEditor({ moduleId }: LearningObjectivesEditorP
       {objectives.length > 0 && (
         <>
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-muted-foreground">
-              {t.learningObjectives.listDescription}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-muted-foreground">
+                {t.learningObjectives.listDescription}
+              </p>
+              {/* Progress preservation tooltip in edit mode */}
+              {isEditMode && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-sm">
+                      <p className="font-semibold mb-1">
+                        {t.learningObjectives.progressPreservationTitle}
+                      </p>
+                      <p className="text-sm">
+                        {t.learningObjectives.progressPreservationDesc}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
             {objectives.length > 0 && (
               <Button
                 variant="outline"
