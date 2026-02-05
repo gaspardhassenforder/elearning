@@ -233,10 +233,33 @@ class NotebookResponse(BaseModel):
     name: str
     description: str
     archived: bool
+    published: bool  # Whether the notebook is published (visible to learners)
     created: str
     updated: str
     source_count: int
     note_count: int
+
+
+# Document Upload models (Story 3.1)
+class DocumentUploadResponse(BaseModel):
+    """Response after uploading a document to a notebook."""
+
+    id: str = Field(..., description="Source ID")
+    title: str = Field(..., description="Document title")
+    status: str = Field(..., description="Processing status (processing, completed, error)")
+    command_id: Optional[str] = Field(None, description="Async job command ID for status polling")
+
+
+class DocumentStatusResponse(BaseModel):
+    """Status of a document being processed."""
+
+    id: str = Field(..., description="Source ID")
+    title: str = Field(..., description="Document title")
+    status: str = Field(..., description="Processing status (pending, processing, completed, error)")
+    command_id: Optional[str] = Field(None, description="Async job command ID")
+    error_message: Optional[str] = Field(None, description="Error message if processing failed")
+    created: Optional[str] = Field(None, description="Creation timestamp")
+    updated: Optional[str] = Field(None, description="Last update timestamp")
 
 
 # Search models

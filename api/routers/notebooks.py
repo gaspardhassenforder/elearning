@@ -1,18 +1,22 @@
 from typing import List, Optional
+from pathlib import Path
 from pydantic import BaseModel, Field
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from loguru import logger
 
-from api.models import NotebookCreate, NotebookResponse, NotebookUpdate
+from api.auth import get_current_user, require_admin
+from open_notebook.domain.user import User
+
+from api.models import NotebookCreate, NotebookResponse, NotebookUpdate, DocumentUploadResponse, DocumentStatusResponse
 from open_notebook.database.repository import ensure_record_id, repo_query
-from open_notebook.domain.notebook import Notebook, Source, Note
+from open_notebook.domain.notebook import Notebook, Source, Note, Asset
 from open_notebook.domain.transformation import Transformation
 from open_notebook.domain.artifact import Artifact
 from open_notebook.exceptions import InvalidInputError
 from open_notebook.graphs.transformation import graph as transformation_graph
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 @router.get("/notebooks", response_model=List[NotebookResponse])
@@ -43,6 +47,7 @@ async def get_notebooks(
                 name=nb.get("name", ""),
                 description=nb.get("description", ""),
                 archived=nb.get("archived", False),
+                published=nb.get("published", False),
                 created=str(nb.get("created", "")),
                 updated=str(nb.get("updated", "")),
                 source_count=nb.get("source_count", 0),
@@ -58,7 +63,7 @@ async def get_notebooks(
 
 
 @router.post("/notebooks", response_model=NotebookResponse)
-async def create_notebook(notebook: NotebookCreate):
+async def create_notebook(notebook: NotebookCreate, admin: User = Depends(require_admin)):
     """Create a new notebook."""
     try:
         new_notebook = Notebook(
@@ -72,6 +77,7 @@ async def create_notebook(notebook: NotebookCreate):
             name=new_notebook.name,
             description=new_notebook.description,
             archived=new_notebook.archived or False,
+            published=new_notebook.published,  # Default: False (unpublished)
             created=str(new_notebook.created),
             updated=str(new_notebook.updated),
             source_count=0,  # New notebook has no sources
@@ -108,6 +114,7 @@ async def get_notebook(notebook_id: str):
             name=nb.get("name", ""),
             description=nb.get("description", ""),
             archived=nb.get("archived", False),
+            published=nb.get("published", False),
             created=str(nb.get("created", "")),
             updated=str(nb.get("updated", "")),
             source_count=nb.get("source_count", 0),
@@ -123,7 +130,7 @@ async def get_notebook(notebook_id: str):
 
 
 @router.put("/notebooks/{notebook_id}", response_model=NotebookResponse)
-async def update_notebook(notebook_id: str, notebook_update: NotebookUpdate):
+async def update_notebook(notebook_id: str, notebook_update: NotebookUpdate, admin: User = Depends(require_admin)):
     """Update a notebook."""
     try:
         notebook = await Notebook.get(notebook_id)
@@ -156,6 +163,7 @@ async def update_notebook(notebook_id: str, notebook_update: NotebookUpdate):
                 name=nb.get("name", ""),
                 description=nb.get("description", ""),
                 archived=nb.get("archived", False),
+                published=nb.get("published", False),
                 created=str(nb.get("created", "")),
                 updated=str(nb.get("updated", "")),
                 source_count=nb.get("source_count", 0),
@@ -168,6 +176,7 @@ async def update_notebook(notebook_id: str, notebook_update: NotebookUpdate):
             name=notebook.name,
             description=notebook.description,
             archived=notebook.archived or False,
+            published=notebook.published,
             created=str(notebook.created),
             updated=str(notebook.updated),
             source_count=0,
@@ -185,7 +194,7 @@ async def update_notebook(notebook_id: str, notebook_update: NotebookUpdate):
 
 
 @router.post("/notebooks/{notebook_id}/sources/{source_id}")
-async def add_source_to_notebook(notebook_id: str, source_id: str):
+async def add_source_to_notebook(notebook_id: str, source_id: str, admin: User = Depends(require_admin)):
     """Add an existing source to a notebook (create the reference)."""
     try:
         # Check if notebook exists
@@ -230,7 +239,7 @@ async def add_source_to_notebook(notebook_id: str, source_id: str):
 
 
 @router.delete("/notebooks/{notebook_id}/sources/{source_id}")
-async def remove_source_from_notebook(notebook_id: str, source_id: str):
+async def remove_source_from_notebook(notebook_id: str, source_id: str, admin: User = Depends(require_admin)):
     """Remove a source from a notebook (delete the reference)."""
     try:
         # Check if notebook exists
@@ -259,6 +268,178 @@ async def remove_source_from_notebook(notebook_id: str, source_id: str):
         )
 
 
+@router.post("/notebooks/{notebook_id}/documents", response_model=DocumentUploadResponse)
+async def upload_document_to_notebook(
+    notebook_id: str,
+    file: UploadFile = File(...),
+    admin: User = Depends(require_admin)
+):
+    """
+    Upload a document to a notebook (Story 3.1, Task 2).
+
+    This endpoint:
+    1. Saves the uploaded file with a unique name
+    2. Creates a Source record
+    3. Submits an async processing job (content extraction + embedding)
+    4. Returns immediately with processing status and command_id for polling
+    """
+    try:
+        # Verify notebook exists
+        notebook = await Notebook.get(notebook_id)
+        if not notebook:
+            logger.error(f"Notebook not found: {notebook_id}")
+            raise HTTPException(status_code=404, detail="Notebook not found")
+
+        # Import file upload utility from sources router
+        from api.routers.sources import save_uploaded_file
+
+        # Save uploaded file
+        file_path = await save_uploaded_file(file)
+        logger.info(f"Saved uploaded file to: {file_path}")
+
+        # Extract title from filename (without extension)
+        title = Path(file.filename or "untitled").stem
+
+        # Create Source record
+        source = Source(
+            title=title,
+            asset=Asset(
+                url=f"file://{file_path}",
+                file_type=file.content_type or "application/octet-stream",
+                file_path=file_path,
+            )
+        )
+        await source.save()
+        logger.info(f"Created source: {source.id}")
+
+        # Link source to notebook
+        await source.add_to_notebook(notebook_id)
+        logger.info(f"Linked source {source.id} to notebook {notebook_id}")
+
+        # Submit async processing job (content extraction + embedding)
+        # Import command modules to ensure they're registered
+        import commands.source_commands  # noqa: F401
+        from api.command_service import CommandService
+        from commands.source_commands import SourceProcessingInput
+
+        # Prepare content state for processing
+        from open_notebook.graphs.source import StateDict
+
+        content_state: StateDict = {
+            "source_id": source.id or "",
+            "notebook_ids": [notebook_id],
+            "file_path": file_path,
+            "type": "file",
+            "title": title,
+            "transformations": [],
+            "embed": True,
+        }
+
+        command_input = SourceProcessingInput(
+            source_id=source.id or "",
+            content_state=content_state,
+            notebook_ids=[notebook_id],
+            transformations=[],
+            embed=True,
+        )
+
+        command_id = await CommandService.submit_command_job(
+            "open_notebook",  # app name
+            "process_source",  # command name
+            command_input.model_dump(),
+        )
+
+        logger.info(f"Submitted async processing command: {command_id} for source {source.id}")
+
+        # Update source with command reference
+        source.command = ensure_record_id(command_id)
+        await source.save()
+
+        # Return response immediately with command_id for polling
+        return DocumentUploadResponse(
+            id=source.id or "",
+            title=source.title or title,
+            status="processing",
+            command_id=command_id
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading document to notebook {notebook_id}: {str(e)}")
+        logger.exception(e)
+        raise HTTPException(
+            status_code=500, detail=f"Error uploading document: {str(e)}"
+        )
+
+
+@router.get("/notebooks/{notebook_id}/documents", response_model=List[DocumentStatusResponse])
+async def get_notebook_documents(
+    notebook_id: str,
+    admin: User = Depends(require_admin)
+):
+    """
+    Get list of documents (sources) in a notebook with processing status (Story 3.1, Task 3).
+
+    Returns all sources with their processing status for the UI to poll and update.
+    """
+    try:
+        # Verify notebook exists
+        notebook = await Notebook.get(notebook_id)
+        if not notebook:
+            logger.error(f"Notebook not found: {notebook_id}")
+            raise HTTPException(status_code=404, detail="Notebook not found")
+
+        # Get all sources for this notebook
+        sources = await notebook.get_sources()
+
+        # Build response list with status for each source
+        documents = []
+        for source in sources:
+            # Get processing status
+            try:
+                status = await source.get_status()
+            except Exception as e:
+                logger.warning(f"Failed to get status for source {source.id}: {e}")
+                status = "unknown"
+
+            # Extract error message if available (from command result)
+            error_message = None
+            if status == "error" and source.command:
+                try:
+                    from api.command_service import CommandService
+                    command_status = await CommandService.get_command_status(str(source.command))
+                    if command_status and command_status.get("result"):
+                        result = command_status["result"]
+                        if isinstance(result, dict) and "error" in result:
+                            error_message = str(result["error"])
+                except Exception as e:
+                    logger.warning(f"Failed to extract error message: {e}")
+
+            documents.append(
+                DocumentStatusResponse(
+                    id=source.id or "",
+                    title=source.title or "Untitled",
+                    status=status or "unknown",
+                    command_id=str(source.command) if source.command else None,
+                    error_message=error_message,
+                    created=str(source.created) if source.created else None,
+                    updated=str(source.updated) if source.updated else None,
+                )
+            )
+
+        return documents
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching documents for notebook {notebook_id}: {str(e)}")
+        logger.exception(e)
+        raise HTTPException(
+            status_code=500, detail=f"Error fetching documents: {str(e)}"
+        )
+
+
 class NotebookTransformationRequest(BaseModel):
     """Request body for notebook transformation generation."""
     transformation_id: str = Field(..., description="ID of the transformation to apply")
@@ -266,7 +447,7 @@ class NotebookTransformationRequest(BaseModel):
 
 
 @router.post("/notebooks/{notebook_id}/transformations/generate")
-async def generate_transformation(notebook_id: str, request: NotebookTransformationRequest):
+async def generate_transformation(notebook_id: str, request: NotebookTransformationRequest, admin: User = Depends(require_admin)):
     """
     Generate a transformation artifact for a notebook.
     
@@ -384,7 +565,7 @@ async def generate_transformation(notebook_id: str, request: NotebookTransformat
 
 
 @router.delete("/notebooks/{notebook_id}")
-async def delete_notebook(notebook_id: str):
+async def delete_notebook(notebook_id: str, admin: User = Depends(require_admin)):
     """Delete a notebook."""
     try:
         notebook = await Notebook.get(notebook_id)
