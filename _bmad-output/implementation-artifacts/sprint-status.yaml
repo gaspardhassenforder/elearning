@@ -44,7 +44,7 @@ development_status:
   epic-1: in-progress
   1-1-user-registration-and-login-backend: review
   1-2-role-based-access-control-and-route-protection: in-progress
-  1-3-admin-creates-learner-accounts: ready-for-dev
+  1-3-admin-creates-learner-accounts: in-progress
   1-4-learner-onboarding-questionnaire: ready-for-dev
   epic-1-retrospective: optional
 
@@ -61,7 +61,7 @@ development_status:
   3-2-artifact-generation-and-preview: in-progress  # Implementation started
   3-3-learning-objectives-configuration: in-progress  # Code review complete: 6 issues fixed, 2 HIGH issues remain (Story 3.4 contamination + backend tests deferred)
   3-4-ai-teacher-prompt-configuration: review  # All 8 tasks complete: Backend (Migration 24, ModulePrompt, API, prompt assembly) + Frontend (ModulePromptEditor, hooks, pipeline integration, E2E testing)
-  3-5-module-publishing: review  # All 9 tasks complete: Backend (publish/unpublish endpoints, validation, 13 tests), Frontend (ModuleSummaryCard, ModulePublishFlow, PublishedBadge, i18n)
+  3-5-module-publishing: done  # Code review complete: All ACs met, 6/6 blocking issues fixed, comprehensive tests (8 backend + 5 frontend)
   3-6-edit-published-module: in-progress  # Comprehensive story created: Unpublish endpoint, edit mode pipeline, progress preservation, NO NEW MIGRATION
   3-7-admin-ai-chatbot-assistant: review  # Story created: Admin AI assistant for module creation help, reuses chat workflow with custom prompt
   epic-3-retrospective: optional
