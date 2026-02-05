@@ -1243,5 +1243,42 @@ export const enUS = {
     helpVariables: "Use template variables like {{ learner_profile.role }} to personalize teaching",
     helpJinja: "Supports Jinja2 syntax for conditional logic ({% if %} statements)",
     helpEmpty: "Leave empty to rely on global prompt only (no module-specific customization)",
-  }
+  },
+  learner: {
+    // Story 4.1: Learner Chat Interface & SSE Streaming
+    moduleNotAccessible: "You do not have access to this module",
+    moduleNotFound: "Module not found",
+    moduleNotFoundDesc: "The module you are looking for does not exist or has been removed.",
+    chat: {
+      title: "AI Teacher",
+      placeholder: "Ask a question or share your thoughts...",
+      send: "Send",
+      error: "Unable to connect to AI teacher",
+      errorDesc: "Please check your connection and try again.",
+      greeting: "Hello! I'm your AI teacher. I'm here to guide you through this module. What would you like to explore first?",
+    },
+    sources: {
+      title: "Documents",
+      description: "{count} documents available",
+      noSources: "No documents yet",
+      noSourcesDesc: "Documents will appear here once added by your instructor.",
+      untitled: "Untitled Document",
+      processing: "Processing",
+      error: "Error",
+      ready: "Ready",
+    },
+    tabs: {
+      sources: "Sources",
+      artifacts: "Artifacts",
+      progress: "Progress",
+    },
+    artifacts: {
+      comingSoon: "Artifacts Coming Soon",
+      comingSoonDesc: "Quizzes and podcasts will be available here soon.",
+    },
+    progress: {
+      comingSoon: "Progress Tracking Coming Soon",
+      comingSoonDesc: "Your learning progress and objectives will be tracked here.",
+    },
+  },
 }

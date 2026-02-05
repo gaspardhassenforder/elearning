@@ -1243,5 +1243,42 @@ export const frFR = {
     helpVariables: "Utilisez des variables de modèle comme {{ learner_profile.role }} pour personnaliser l'enseignement",
     helpJinja: "Prend en charge la syntaxe Jinja2 pour la logique conditionnelle (instructions {% if %})",
     helpEmpty: "Laissez vide pour s'appuyer uniquement sur l'invite globale (aucune personnalisation spécifique au module)",
-  }
+  },
+  learner: {
+    // Story 4.1: Interface de chat apprenant et streaming SSE
+    moduleNotAccessible: "Vous n'avez pas accès à ce module",
+    moduleNotFound: "Module introuvable",
+    moduleNotFoundDesc: "Le module que vous recherchez n'existe pas ou a été supprimé.",
+    chat: {
+      title: "Enseignant IA",
+      placeholder: "Posez une question ou partagez vos réflexions...",
+      send: "Envoyer",
+      error: "Impossible de se connecter à l'enseignant IA",
+      errorDesc: "Veuillez vérifier votre connexion et réessayer.",
+      greeting: "Bonjour ! Je suis votre enseignant IA. Je suis là pour vous guider à travers ce module. Qu'aimeriez-vous explorer en premier ?",
+    },
+    sources: {
+      title: "Documents",
+      description: "{count} documents disponibles",
+      noSources: "Pas encore de documents",
+      noSourcesDesc: "Les documents apparaîtront ici une fois ajoutés par votre instructeur.",
+      untitled: "Document sans titre",
+      processing: "Traitement",
+      error: "Erreur",
+      ready: "Prêt",
+    },
+    tabs: {
+      sources: "Sources",
+      artifacts: "Artefacts",
+      progress: "Progrès",
+    },
+    artifacts: {
+      comingSoon: "Artefacts à venir",
+      comingSoonDesc: "Les quiz et podcasts seront bientôt disponibles ici.",
+    },
+    progress: {
+      comingSoon: "Suivi des progrès à venir",
+      comingSoonDesc: "Vos progrès d'apprentissage et objectifs seront suivis ici.",
+    },
+  },
 }
