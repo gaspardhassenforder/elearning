@@ -1027,7 +1027,10 @@ export const frFR = {
     regenerateSuccess: "Artefact régénéré avec succès",
     regenerateStarted: "Régénération de l'artefact démarrée",
     regenerateConfirmTitle: "Régénérer l'artefact ?",
-    regenerateConfirmDescription: "Cela supprimera l'artefact actuel et en génèrera un nouveau. Cette action ne peut pas être annulée.",
+    regenerateConfirmDescription: "Cela régénérera l'artefact et remplacera l'existant.",
+    regenerateWarning: "L'artefact existant sera définitivement remplacé. Cette action ne peut pas être annulée.",
+    regenerateButton: "Régénérer",
+    regenerateError: "Échec de la régénération de l'artefact",
   },
   users: {
     title: "Utilisateurs",

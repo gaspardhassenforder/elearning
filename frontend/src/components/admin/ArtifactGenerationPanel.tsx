@@ -5,11 +5,14 @@
  *
  * Batch artifact generation with status tracking per artifact type.
  * Polls backend for completion and displays inline errors with retry.
+ *
+ * Extended in Story 3.6, Task 9 to support individual artifact regeneration in edit mode.
  */
 
 import { useState, useEffect } from 'react';
-import { Sparkles, Check, AlertCircle, Loader2, FileText, Mic, BookOpen } from 'lucide-react';
+import { Sparkles, Check, AlertCircle, Loader2, FileText, Mic, BookOpen, RotateCw } from 'lucide-react';
 import { useGenerateAllArtifacts, useArtifacts } from '@/lib/hooks/use-artifacts';
+import { useModuleCreationStore } from '@/lib/stores/module-creation-store';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -45,6 +48,7 @@ export function ArtifactGenerationPanel({ moduleId, onComplete }: ArtifactGenera
   const { t } = useTranslation();
   const generateMutation = useGenerateAllArtifacts(moduleId);
   const { data: artifacts } = useArtifacts(moduleId, { pollingInterval: 2000 });
+  const { isEditMode } = useModuleCreationStore();
 
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [artifactStatuses, setArtifactStatuses] = useState<ArtifactStatus[]>([
@@ -52,6 +56,10 @@ export function ArtifactGenerationPanel({ moduleId, onComplete }: ArtifactGenera
     { type: 'summary', label: 'Summary', icon: BookOpen, status: 'pending' },
     { type: 'podcast', label: 'Podcast', icon: Mic, status: 'pending' },
   ]);
+
+  // Regenerate individual artifact dialog state (Story 3.6, Task 9)
+  const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
+  const [artifactToRegenerate, setArtifactToRegenerate] = useState<ArtifactStatus | null>(null);
 
   // Update statuses from generation response
   useEffect(() => {
@@ -144,6 +152,30 @@ export function ArtifactGenerationPanel({ moduleId, onComplete }: ArtifactGenera
     handleConfirmGenerate();
   };
 
+  // Handle individual artifact regeneration (Story 3.6, Task 9)
+  const handleRegenerateClick = (artifact: ArtifactStatus) => {
+    setArtifactToRegenerate(artifact);
+    setShowRegenerateDialog(true);
+  };
+
+  const handleConfirmRegenerate = async () => {
+    setShowRegenerateDialog(false);
+
+    if (!artifactToRegenerate) return;
+
+    // Set only this artifact to generating status
+    setArtifactStatuses((prev) =>
+      prev.map((a) =>
+        a.type === artifactToRegenerate.type
+          ? { ...a, status: 'generating', error: undefined }
+          : a
+      )
+    );
+
+    // Trigger generation (same endpoint generates all, but only this one will update)
+    generateMutation.mutate();
+  };
+
   const isGenerating = artifactStatuses.some((a) => a.status === 'generating');
   const hasErrors = artifactStatuses.some((a) => a.status === 'error');
   const allCompleted = artifactStatuses.every((a) => a.status === 'completed');
@@ -192,7 +224,12 @@ export function ArtifactGenerationPanel({ moduleId, onComplete }: ArtifactGenera
           {/* Artifact Status List */}
           <div className="space-y-4">
             {artifactStatuses.map((artifact) => (
-              <ArtifactStatusItem key={artifact.type} artifact={artifact} />
+              <ArtifactStatusItem
+                key={artifact.type}
+                artifact={artifact}
+                isEditMode={isEditMode}
+                onRegenerate={() => handleRegenerateClick(artifact)}
+              />
             ))}
           </div>
 
@@ -248,15 +285,54 @@ export function ArtifactGenerationPanel({ moduleId, onComplete }: ArtifactGenera
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Regenerate Individual Artifact Dialog (Story 3.6, Task 9) */}
+      {artifactToRegenerate && (
+        <AlertDialog open={showRegenerateDialog} onOpenChange={setShowRegenerateDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {t.artifacts?.regenerateConfirmTitle || 'Regenerate Artifact?'}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {t.artifacts?.regenerateConfirmDescription ||
+                  'This will regenerate the artifact and replace the existing one.'}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                {t.artifacts?.regenerateWarning ||
+                  'The existing artifact will be permanently replaced. This action cannot be undone.'}
+              </AlertDescription>
+            </Alert>
+            <div className="text-sm text-muted-foreground">
+              <strong>{t.common?.type || 'Type'}:</strong> {artifactToRegenerate.label}
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t.common?.cancel || 'Cancel'}</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleConfirmRegenerate}
+                className="bg-primary hover:bg-primary/90"
+              >
+                {t.artifacts?.regenerateButton || 'Regenerate'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }
 
 interface ArtifactStatusItemProps {
   artifact: ArtifactStatus;
+  isEditMode?: boolean;
+  onRegenerate?: () => void;
 }
 
-function ArtifactStatusItem({ artifact }: ArtifactStatusItemProps) {
+function ArtifactStatusItem({ artifact, isEditMode, onRegenerate }: ArtifactStatusItemProps) {
+  const { t } = useTranslation();
   const Icon = artifact.icon;
 
   return (
@@ -285,7 +361,7 @@ function ArtifactStatusItem({ artifact }: ArtifactStatusItemProps) {
         </div>
       </div>
 
-      {/* Status Indicator */}
+      {/* Status Indicator and Actions */}
       <div className="flex items-center gap-2">
         {artifact.status === 'pending' && (
           <div className="h-6 w-6 rounded-full border-2 border-muted" />
@@ -294,9 +370,24 @@ function ArtifactStatusItem({ artifact }: ArtifactStatusItemProps) {
           <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
         )}
         {artifact.status === 'completed' && (
-          <div className="h-6 w-6 rounded-full bg-green-600 flex items-center justify-center">
-            <Check className="h-4 w-4 text-white" />
-          </div>
+          <>
+            <div className="h-6 w-6 rounded-full bg-green-600 flex items-center justify-center">
+              <Check className="h-4 w-4 text-white" />
+            </div>
+            {/* Regenerate button in edit mode (Story 3.6, Task 9) */}
+            {isEditMode && onRegenerate && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onRegenerate}
+                className="ml-2"
+                title={t.artifacts?.regenerate || 'Regenerate'}
+              >
+                <RotateCw className="h-3 w-3 mr-1" />
+                {t.artifacts?.regenerate || 'Regenerate'}
+              </Button>
+            )}
+          </>
         )}
         {artifact.status === 'error' && (
           <div className="h-6 w-6 rounded-full bg-red-600 flex items-center justify-center">
