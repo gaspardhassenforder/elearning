@@ -22,6 +22,8 @@ from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.notebook import Notebook, Source, Note, Asset
 from open_notebook.domain.transformation import Transformation
 from open_notebook.domain.artifact import Artifact
+from open_notebook.domain.learning_objective import LearningObjective
+from open_notebook.domain.module_prompt import ModulePrompt
 from open_notebook.exceptions import InvalidInputError
 from open_notebook.graphs.transformation import graph as transformation_graph
 
@@ -50,6 +52,17 @@ async def get_notebooks(
         if archived is not None:
             result = [nb for nb in result if nb.get("archived") == archived]
 
+        # Get objectives counts for all notebooks
+        objectives_counts = {}
+        for nb in result:
+            nb_id = str(nb.get("id", ""))
+            try:
+                count = await LearningObjective.count_for_notebook(nb_id)
+                objectives_counts[nb_id] = count
+            except Exception as e:
+                logger.warning(f"Failed to get objectives count for {nb_id}: {e}")
+                objectives_counts[nb_id] = 0
+
         return [
             NotebookResponse(
                 id=str(nb.get("id", "")),
@@ -61,6 +74,7 @@ async def get_notebooks(
                 updated=str(nb.get("updated", "")),
                 source_count=nb.get("source_count", 0),
                 note_count=nb.get("note_count", 0),
+                objectives_count=objectives_counts.get(str(nb.get("id", "")), 0),
             )
             for nb in result
         ]
@@ -91,6 +105,7 @@ async def create_notebook(notebook: NotebookCreate, admin: User = Depends(requir
             updated=str(new_notebook.updated),
             source_count=0,  # New notebook has no sources
             note_count=0,  # New notebook has no notes
+            objectives_count=0,  # New notebook has no objectives
         )
     except InvalidInputError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -118,8 +133,17 @@ async def get_notebook(notebook_id: str):
             raise HTTPException(status_code=404, detail="Notebook not found")
 
         nb = result[0]
+        nb_id = str(nb.get("id", ""))
+
+        # Get objectives count for this notebook
+        objectives_count = 0
+        try:
+            objectives_count = await LearningObjective.count_for_notebook(nb_id)
+        except Exception as e:
+            logger.warning(f"Failed to get objectives count for {nb_id}: {e}")
+
         return NotebookResponse(
-            id=str(nb.get("id", "")),
+            id=nb_id,
             name=nb.get("name", ""),
             description=nb.get("description", ""),
             archived=nb.get("archived", False),
@@ -128,6 +152,7 @@ async def get_notebook(notebook_id: str):
             updated=str(nb.get("updated", "")),
             source_count=nb.get("source_count", 0),
             note_count=nb.get("note_count", 0),
+            objectives_count=objectives_count,
         )
     except HTTPException:
         raise
@@ -167,8 +192,17 @@ async def update_notebook(notebook_id: str, notebook_update: NotebookUpdate, adm
 
         if result:
             nb = result[0]
+            nb_id = str(nb.get("id", ""))
+
+            # Get objectives count for this notebook
+            objectives_count = 0
+            try:
+                objectives_count = await LearningObjective.count_for_notebook(nb_id)
+            except Exception as e:
+                logger.warning(f"Failed to get objectives count for {nb_id}: {e}")
+
             return NotebookResponse(
-                id=str(nb.get("id", "")),
+                id=nb_id,
                 name=nb.get("name", ""),
                 description=nb.get("description", ""),
                 archived=nb.get("archived", False),
@@ -177,6 +211,7 @@ async def update_notebook(notebook_id: str, notebook_update: NotebookUpdate, adm
                 updated=str(nb.get("updated", "")),
                 source_count=nb.get("source_count", 0),
                 note_count=nb.get("note_count", 0),
+                objectives_count=objectives_count,
             )
 
         # Fallback if query fails
@@ -190,6 +225,7 @@ async def update_notebook(notebook_id: str, notebook_update: NotebookUpdate, adm
             updated=str(notebook.updated),
             source_count=0,
             note_count=0,
+            objectives_count=0,
         )
     except HTTPException:
         raise
@@ -662,4 +698,196 @@ async def generate_artifacts(
         logger.exception(e)
         raise HTTPException(
             status_code=500, detail=f"Error generating artifacts: {str(e)}"
+        )
+
+
+@router.post("/notebooks/{notebook_id}/publish", response_model=NotebookResponse)
+async def publish_notebook(
+    notebook_id: str,
+    admin: User = Depends(require_admin)
+):
+    """
+    Publish a module after validation (Story 3.5, Task 2).
+
+    Validates:
+        - At least 1 document (source)
+        - At least 1 learning objective
+
+    Returns:
+        Updated notebook with published=True
+
+    Raises:
+        400: Validation failed
+        404: Notebook not found
+    """
+    try:
+        # 1. Validate module is ready for publishing
+        # Get notebook with source count
+        query = """
+            SELECT *,
+            count(<-reference.in) as source_count,
+            count(<-artifact.in) as note_count
+            FROM $notebook_id
+        """
+        result = await repo_query(query, {"notebook_id": ensure_record_id(notebook_id)})
+        notebook_data = result[0] if result else None
+
+        if not notebook_data:
+            logger.error(f"Notebook {notebook_id} not found for publishing")
+            raise HTTPException(status_code=404, detail="Notebook not found")
+
+        source_count = notebook_data.get("source_count", 0)
+        note_count = notebook_data.get("note_count", 0)
+
+        # Get objective count
+        objective_count = await LearningObjective.count_for_notebook(notebook_id)
+
+        # Validate requirements
+        errors = []
+        if source_count < 1:
+            errors.append({
+                "field": "sources",
+                "message": "At least 1 document is required to publish"
+            })
+
+        if objective_count < 1:
+            errors.append({
+                "field": "objectives",
+                "message": "At least 1 learning objective is required to publish"
+            })
+
+        if errors:
+            logger.error(f"Publish validation failed for notebook {notebook_id}: {errors}")
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "Module cannot be published - validation failed",
+                    "errors": errors
+                }
+            )
+
+        # 2. Get notebook and update published status
+        notebook = await Notebook.get(notebook_id)
+        if not notebook:
+            logger.error(f"Notebook {notebook_id} not found for publishing")
+            raise HTTPException(status_code=404, detail="Notebook not found")
+
+        notebook.published = True
+        await notebook.save()
+
+        logger.info(f"Notebook {notebook_id} published by admin {admin.id}")
+
+        # 3. Return updated notebook with counts
+        return NotebookResponse(
+            id=notebook.id or "",
+            name=notebook.name,
+            description=notebook.description,
+            archived=notebook.archived or False,
+            published=True,
+            created=str(notebook.created),
+            updated=str(notebook.updated),
+            source_count=source_count,
+            note_count=note_count,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error publishing notebook {notebook_id}: {str(e)}")
+        logger.exception(e)
+        raise HTTPException(
+            status_code=500, detail=f"Error publishing notebook: {str(e)}"
+        )
+
+
+@router.post("/notebooks/{notebook_id}/unpublish", response_model=NotebookResponse)
+async def unpublish_notebook(
+    notebook_id: str,
+    admin: User = Depends(require_admin)
+):
+    """
+    Unpublish a module to allow editing (Story 3.6, Task 1).
+
+    Sets published=false, which:
+    - Hides module from learners (existing behavior from Story 2.3)
+    - Allows admin to edit content
+    - Preserves all existing data (sources, artifacts, objectives)
+
+    Returns:
+        Updated notebook with published=False
+
+    Raises:
+        404: Notebook not found
+        400: Notebook not published (can't unpublish draft)
+    """
+    try:
+        notebook = await Notebook.get(notebook_id)
+        if not notebook:
+            logger.error(f"Notebook {notebook_id} not found for unpublishing")
+            raise HTTPException(status_code=404, detail="Notebook not found")
+
+        if not notebook.published:
+            logger.error(f"Notebook {notebook_id} is not published - cannot unpublish")
+            raise HTTPException(
+                status_code=400,
+                detail="Module is not published - nothing to unpublish"
+            )
+
+        notebook.published = False
+        await notebook.save()
+
+        logger.info(f"Notebook {notebook_id} unpublished by admin {admin.id}")
+
+        # Query with counts after unpublish
+        query = """
+            SELECT *,
+            count(<-reference.in) as source_count,
+            count(<-artifact.in) as note_count
+            FROM $notebook_id
+        """
+        result = await repo_query(query, {"notebook_id": ensure_record_id(notebook_id)})
+
+        if result:
+            nb = result[0]
+            nb_id = str(nb.get("id", ""))
+
+            # Get objectives count for this notebook
+            objectives_count = 0
+            try:
+                objectives_count = await LearningObjective.count_for_notebook(nb_id)
+            except Exception as e:
+                logger.warning(f"Failed to get objectives count for {nb_id}: {e}")
+
+            return NotebookResponse(
+                id=nb_id,
+                name=nb.get("name", ""),
+                description=nb.get("description", ""),
+                archived=nb.get("archived", False),
+                published=False,  # Explicitly False after unpublish
+                created=str(nb.get("created", "")),
+                updated=str(nb.get("updated", "")),
+                source_count=nb.get("source_count", 0),
+                note_count=nb.get("note_count", 0),
+                objectives_count=objectives_count,
+            )
+
+        # Fallback if query fails
+        return NotebookResponse(
+            id=notebook.id or "",
+            name=notebook.name,
+            description=notebook.description,
+            archived=notebook.archived or False,
+            published=False,
+            created=str(notebook.created),
+            updated=str(notebook.updated),
+            source_count=0,
+            note_count=0,
+            objectives_count=0,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error unpublishing notebook {notebook_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error unpublishing notebook: {str(e)}"
         )
