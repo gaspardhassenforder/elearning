@@ -92,7 +92,7 @@ export default function ModulePage() {
       </div>
 
       {/* Pipeline Stepper */}
-      <ModuleCreationStepper moduleId={moduleId} />
+      <ModuleCreationStepper />
 
       {/* Main Content - Document Upload */}
       <Card>

@@ -90,7 +90,7 @@ export function ModuleForm({ open, onOpenChange, module }: ModuleFormProps) {
         router.push(`/modules/${newModule.id}`);
       }
     } catch (error) {
-      console.error('Failed to save module:', error);
+      // Error already handled by mutation hook with toast
     }
   };
 

@@ -17,10 +17,6 @@ import { useModuleCreationStore } from '@/lib/stores/module-creation-store';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-interface ModuleCreationStepperProps {
-  moduleId: string;
-}
-
 const STEPS = [
   { id: 'create', label: 'stepCreate' },
   { id: 'upload', label: 'stepUpload' },
@@ -29,7 +25,7 @@ const STEPS = [
   { id: 'publish', label: 'stepPublish' },
 ] as const;
 
-export function ModuleCreationStepper({ moduleId }: ModuleCreationStepperProps) {
+export function ModuleCreationStepper() {
   const { t } = useTranslation();
   const { activeStep, setActiveStep } = useModuleCreationStore();
 
@@ -143,8 +139,9 @@ export function ModuleCreationStepper({ moduleId }: ModuleCreationStepperProps) 
             <Button onClick={handleNext}>{t.modules.nextStep}</Button>
           )}
 
+          {/* Publish button will be implemented in Story 3.5 */}
           {currentStepIndex === STEPS.length - 1 && (
-            <Button onClick={() => alert('Publish module!')}>
+            <Button disabled>
               {t.modules.finishSetup}
             </Button>
           )}

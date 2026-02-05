@@ -94,14 +94,10 @@ export const modulesApi = {
     const formData = new FormData();
     formData.append('file', file);
 
+    // Content-Type header auto-removed by API client interceptor for FormData
     const response = await apiClient.post<DocumentUpload>(
       `/notebooks/${moduleId}/documents`,
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }
+      formData
     );
     return response.data;
   },

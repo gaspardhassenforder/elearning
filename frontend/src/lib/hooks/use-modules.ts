@@ -5,6 +5,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { modulesApi, Module, ModuleCreate, ModuleUpdate, DocumentStatus } from '@/lib/api/modules';
 import { toast } from 'sonner';
+import { useTranslation } from './use-translation';
 
 /**
  * Query keys for modules
@@ -44,15 +45,16 @@ export function useModule(id: string) {
  */
 export function useCreateModule() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   return useMutation({
     mutationFn: (data: ModuleCreate) => modulesApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: moduleKeys.lists() });
-      toast.success('Module created successfully');
+      toast.success(t.modules.moduleCreated);
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.detail || 'Failed to create module');
+      toast.error(error?.response?.data?.detail || t.modules.loadError);
     },
   });
 }
@@ -62,16 +64,17 @@ export function useCreateModule() {
  */
 export function useUpdateModule(id: string) {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   return useMutation({
     mutationFn: (data: ModuleUpdate) => modulesApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: moduleKeys.detail(id) });
       queryClient.invalidateQueries({ queryKey: moduleKeys.lists() });
-      toast.success('Module updated successfully');
+      toast.success(t.modules.moduleUpdated);
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.detail || 'Failed to update module');
+      toast.error(error?.response?.data?.detail || t.modules.loadError);
     },
   });
 }
@@ -81,15 +84,16 @@ export function useUpdateModule(id: string) {
  */
 export function useDeleteModule() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   return useMutation({
     mutationFn: (id: string) => modulesApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: moduleKeys.lists() });
-      toast.success('Module deleted successfully');
+      toast.success(t.modules.moduleDeleted);
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.detail || 'Failed to delete module');
+      toast.error(error?.response?.data?.detail || t.modules.loadError);
     },
   });
 }
@@ -99,6 +103,7 @@ export function useDeleteModule() {
  */
 export function useUploadDocument(moduleId: string) {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   return useMutation({
     mutationFn: (file: File) => modulesApi.uploadDocument(moduleId, file),
@@ -107,7 +112,7 @@ export function useUploadDocument(moduleId: string) {
       queryClient.invalidateQueries({ queryKey: moduleKeys.documents(moduleId) });
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.detail || 'Failed to upload document');
+      toast.error(error?.response?.data?.detail || t.modules.uploadFailed);
     },
   });
 }

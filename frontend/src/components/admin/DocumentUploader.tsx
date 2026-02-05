@@ -7,7 +7,7 @@
  * Polls backend for processing status and displays inline errors.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Upload, FileText, Check, AlertCircle, Loader2, X } from 'lucide-react';
 import { useUploadDocument, useModuleDocuments } from '@/lib/hooks/use-modules';
 import { useTranslation } from '@/lib/hooks/use-translation';
@@ -152,8 +152,8 @@ export function DocumentUploader({ moduleId }: DocumentUploaderProps) {
     setUploadingFiles((prev) => prev.filter((f) => f !== uploadingFile));
   };
 
-  // Update status from polling
-  const updateStatusFromDocuments = () => {
+  // Update status from polling when documents change
+  useEffect(() => {
     if (!documents) return;
 
     setUploadingFiles((prev) =>
@@ -176,12 +176,7 @@ export function DocumentUploader({ moduleId }: DocumentUploaderProps) {
         return uploadingFile;
       })
     );
-  };
-
-  // Run status update when documents change
-  if (documents) {
-    updateStatusFromDocuments();
-  }
+  }, [documents, t.modules.documentError]);
 
   return (
     <div className="space-y-4">
