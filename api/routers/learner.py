@@ -41,17 +41,8 @@ async def get_learner_modules(
     """
     logger.info(f"Fetching modules for learner {learner.user.id} (company {learner.company_id})")
     modules = await assignment_service.get_learner_modules(learner.company_id)
-    return [
-        LearnerModuleResponse(
-            id=m["id"],
-            name=m["name"],
-            description=m.get("description"),
-            is_locked=m["is_locked"],
-            source_count=m["source_count"],
-            assigned_at=m["assigned_at"],
-        )
-        for m in modules
-    ]
+    # Service already returns List[LearnerModuleResponse], no reconstruction needed
+    return modules
 
 
 @router.get("/learner/modules/{notebook_id}", response_model=LearnerModuleResponse)
@@ -115,6 +106,16 @@ async def get_learner_module(
     except Exception:
         logger.error(f"Notebook {notebook_id} not found")
         raise HTTPException(status_code=404, detail="Module not found")
+
+    # Check if module is published (Story 3.5 enforcement)
+    is_published = getattr(notebook, "published", False)
+    if not is_published:
+        logger.warning(
+            f"Module {notebook_id} is not published - access denied for learner {learner.user.id}"
+        )
+        raise HTTPException(
+            status_code=403, detail="This module is not accessible to you"
+        )
 
     # Count sources
     source_count = len(getattr(notebook, "sources", []))

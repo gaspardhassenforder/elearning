@@ -625,6 +625,7 @@ class TestDirectModuleAccess:
         mock_notebook.name = "Test Module"
         mock_notebook.description = "Test Description"
         mock_notebook.sources = ["source:1", "source:2"]
+        mock_notebook.published = True  # Published module
 
         # Patch at the import site in the learner router
         with patch("api.routers.learner.ModuleAssignment") as MockAssignment, \
@@ -654,3 +655,44 @@ class TestDirectModuleAccess:
             assert result.name == "Test Module"
             assert result.is_locked is False
             assert result.source_count == 2
+
+    @pytest.mark.asyncio
+    async def test_direct_access_unpublished_module_403(self):
+        """Learner accessing unpublished module should get 403."""
+        mock_assignment = MagicMock()
+        mock_assignment.is_locked = False
+        mock_assignment.assigned_at = "2024-01-01T00:00:00"
+
+        mock_notebook = MagicMock()
+        mock_notebook.name = "Unpublished Module"
+        mock_notebook.description = "Not published yet"
+        mock_notebook.sources = ["source:1"]
+        mock_notebook.published = False  # NOT published
+
+        # Patch at the import site in the learner router
+        with patch("api.routers.learner.ModuleAssignment") as MockAssignment, \
+             patch("api.routers.learner.Notebook") as MockNotebook:
+            MockAssignment.get_by_company_and_notebook = AsyncMock(
+                return_value=mock_assignment
+            )
+            MockNotebook.get = AsyncMock(return_value=mock_notebook)
+
+            from api.routers.learner import get_learner_module
+            from api.auth import LearnerContext
+            from open_notebook.domain.user import User
+
+            # User model requires password_hash field
+            mock_user = User(
+                username="learner",
+                email="learner@test.com",
+                role="learner",
+                password_hash="fake_hash"
+            )
+            mock_user.id = "user:learner"
+            learner_context = LearnerContext(user=mock_user, company_id="company:test123")
+
+            with pytest.raises(HTTPException) as exc_info:
+                await get_learner_module("notebook:unpublished", learner_context)
+
+            assert exc_info.value.status_code == 403
+            assert "not accessible" in exc_info.value.detail.lower()

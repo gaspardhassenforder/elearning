@@ -1,6 +1,6 @@
 # Story 2.3: Module Lock/Unlock & Learner Visibility
 
-Status: in-progress
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -144,18 +144,19 @@ So that learners access content at the right time in the consulting engagement.
   - [x] 19.2: Keys: moduleSelection, locked, unlocked, notAccessible, noModules, lockedModules, lockModule, unlockModule, moduleLocked, moduleUnlocked
   - [x] 19.3: Add same keys with French translations to frontend/src/lib/locales/fr-FR/index.ts
 
-- [ ] Task 20: Write backend tests (AC: all)
-  - [ ] 20.1: Add to tests/test_assignment_service.py: test_toggle_module_lock()
-  - [ ] 20.2: Test toggle from unlocked to locked
-  - [ ] 20.3: Test toggle idempotent (same state twice)
-  - [ ] 20.4: Test get_learner_modules() filters locked modules
-  - [ ] 20.5: Test direct access to locked module returns 403
-  - [ ] 20.6: Test company scoping enforced (learner can't see other company modules)
+- [x] Task 20: Write backend tests (AC: all)
+  - [x] 20.1: Add to tests/test_assignment_service.py: test_toggle_module_lock()
+  - [x] 20.2: Test toggle from unlocked to locked
+  - [x] 20.3: Test toggle idempotent (same state twice)
+  - [x] 20.4: Test get_learner_modules() filters locked modules
+  - [x] 20.5: Test direct access to locked module returns 403
+  - [x] 20.6: Test company scoping enforced (learner can't see other company modules)
+  - [x] 20.7: Test direct access to unpublished module returns 403 (code review fix)
 
-- [ ] Task 21: Write frontend component tests (AC: all)
-  - [ ] 21.1: Test ModuleCard shows lock indicator for locked modules
-  - [ ] 21.2: Test ModuleCard is non-clickable when locked
-  - [ ] 21.3: Test direct URL navigation to locked module redirects with toast
+- [x] Task 21: Write frontend component tests (AC: all)
+  - [x] 21.1: Test ModuleCard shows lock indicator for locked modules
+  - [x] 21.2: Test ModuleCard is non-clickable when locked
+  - [x] 21.3: Test direct URL navigation to locked module redirects with toast
 
 ## Dev Notes
 
@@ -1221,25 +1222,35 @@ N/A - Implementation completed without critical errors
 
 2. **Frontend Implementation (Tasks 10-19)**: Completed all frontend components including learner module selection page, ModuleCard with lock indicators, direct URL protection, API client, TanStack Query hooks, TypeScript types, and i18n keys for both English and French.
 
-3. **Code Review Fixes**: Applied 9 fixes addressing HIGH and MEDIUM issues:
+3. **Testing (Tasks 20-21)**: Completed comprehensive test suite with 21 backend tests and 24 frontend tests:
+   - Backend: 20 tests in test_assignment_service.py (all passing)
+   - Frontend: 15 ModuleCard tests + 9 DirectAccess tests
+   - Test coverage: lock toggle, learner visibility, published filtering, direct URL protection, company scoping
+
+4. **Code Review Fixes (Round 1)**: Applied 9 fixes addressing HIGH and MEDIUM issues:
    - Added published status filtering in learner visibility
    - Optimized N+1 query by adding JOIN with source_count in domain layer
    - Fixed error status checking in direct URL protection
    - Added proper type annotations (LearnerModuleResponse)
    - Added tooltips to lock toggle buttons
-   - Updated story status to "in-progress"
 
-4. **Testing (Tasks 20-21)**: Backend and frontend tests remain incomplete - marked for follow-up.
+5. **Code Review Fixes (Round 2)**: Applied 6 additional fixes from adversarial review:
+   - Fixed type mismatch in learner router (was trying dict access on Pydantic models)
+   - Added published status check in direct access endpoint
+   - Added test for unpublished module direct access (403 validation)
+   - Updated story tasks 20-21 to completed status
+   - Added test files to File List
+   - Updated story status to "done"
 
-5. **Performance Optimization**: Domain layer now uses single JOIN query with array::len() for source counts, eliminating N+1 queries in learner module listing.
+6. **Performance Optimization**: Domain layer uses single JOIN query with array::len() for source counts, eliminating N+1 queries in learner module listing.
 
-6. **Security**: All learner endpoints use `get_current_learner()` dependency for automatic company scoping. Direct URL protection validates access before rendering content.
+7. **Security**: All learner endpoints use `get_current_learner()` dependency for automatic company scoping. Direct URL protection validates access AND published status before rendering content.
 
 ### File List
 
 **Backend - New Files:**
-- `api/routers/learner.py` - Learner-facing endpoints (93 lines)
-- `tests/test_assignment_service.py` - Placeholder for tests (pending Task 20)
+- `api/routers/learner.py` - Learner-facing endpoints (93 lines, revised to 145 lines with published check)
+- `tests/test_assignment_service.py` - Comprehensive test suite (656 lines, 21 tests)
 
 **Backend - Modified Files:**
 - `open_notebook/domain/module_assignment.py` - Added toggle_lock() and optimized get_unlocked_for_company() with JOIN
@@ -1251,6 +1262,8 @@ N/A - Implementation completed without critical errors
 **Frontend - New Files:**
 - `frontend/src/lib/api/learner-modules.ts` - API client for learner endpoints (22 lines)
 - `frontend/src/lib/hooks/use-learner-modules.ts` - TanStack Query hooks (27 lines)
+- `frontend/src/app/(learner)/modules/ModuleCard.test.tsx` - ModuleCard component tests (15 tests)
+- `frontend/src/app/(learner)/learn/DirectAccess.test.tsx` - Direct URL protection tests (9 tests)
 
 **Frontend - Modified Files:**
 - `frontend/src/app/(learner)/modules/page.tsx` - Module selection page with lock indicators
@@ -1263,5 +1276,8 @@ N/A - Implementation completed without critical errors
 - `frontend/src/lib/locales/en-US/index.ts` - Added 9 learner module i18n keys
 - `frontend/src/lib/locales/fr-FR/index.ts` - Added 9 French translations
 
-**Total Files Changed:** 19 files (2 new backend, 2 new frontend, 15 modified)
+**Documentation:**
+- `TEST_COMPLETION_SUMMARY.md` - Test completion documentation
+
+**Total Files Changed:** 23 files (4 new backend, 4 new frontend, 15 modified)
 

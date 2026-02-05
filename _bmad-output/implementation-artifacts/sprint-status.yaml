@@ -52,7 +52,7 @@ development_status:
   epic-2: in-progress
   2-1-company-management: done
   2-2-module-assignment-to-companies: done
-  2-3-module-lock-unlock-and-learner-visibility: in-progress  # Code review complete, tests pending
+  2-3-module-lock-unlock-and-learner-visibility: done  # All ACs implemented, tests complete, code review fixes applied
   epic-2-retrospective: optional
 
   # Epic 3: Module Creation & Publishing Pipeline
