@@ -25,7 +25,15 @@ const STEPS = [
   { id: 'publish', label: 'stepPublish' },
 ] as const;
 
-export function ModuleCreationStepper() {
+interface ModuleCreationStepperProps {
+  /**
+   * Optional validation function to check if the current step can proceed to next
+   * Returns true if step is valid and can advance, false otherwise
+   */
+  canProceed?: boolean;
+}
+
+export function ModuleCreationStepper({ canProceed = true }: ModuleCreationStepperProps) {
   const { t } = useTranslation();
   const { activeStep, setActiveStep } = useModuleCreationStore();
 
@@ -136,7 +144,9 @@ export function ModuleCreationStepper() {
           )}
 
           {currentStepIndex < STEPS.length - 1 && (
-            <Button onClick={handleNext}>{t.modules.nextStep}</Button>
+            <Button onClick={handleNext} disabled={!canProceed}>
+              {t.modules.nextStep}
+            </Button>
           )}
 
           {/* Publish button will be implemented in Story 3.5 */}

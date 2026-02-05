@@ -18,6 +18,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { DocumentUploader } from '@/components/admin/DocumentUploader';
 import { ModuleCreationStepper } from '@/components/admin/ModuleCreationStepper';
+import { ArtifactGenerationPanel } from '@/components/admin/ArtifactGenerationPanel';
+import { useModuleCreationStore } from '@/lib/stores/module-creation-store';
+import { useArtifacts } from '@/lib/hooks/use-artifacts';
 
 export default function ModulePage() {
   const { t } = useTranslation();
@@ -25,6 +28,13 @@ export default function ModulePage() {
   const moduleId = params.id as string;
 
   const { data: module, isLoading, error } = useModule(moduleId);
+  const { activeStep, setActiveStep } = useModuleCreationStore();
+  const { data: artifacts } = useArtifacts(moduleId);
+
+  // Step validation: For 'generate' step, require at least one completed artifact
+  const canProceedFromGenerate =
+    activeStep !== 'generate' ||
+    (artifacts && artifacts.some((artifact) => artifact.status === 'completed'));
 
   if (error) {
     return (
@@ -92,18 +102,27 @@ export default function ModulePage() {
       </div>
 
       {/* Pipeline Stepper */}
-      <ModuleCreationStepper />
+      <ModuleCreationStepper canProceed={canProceedFromGenerate} />
 
-      {/* Main Content - Document Upload */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{t.modules.uploadDocuments}</CardTitle>
-          <CardDescription>{t.modules.uploadDocumentsDesc}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <DocumentUploader moduleId={moduleId} />
-        </CardContent>
-      </Card>
+      {/* Main Content - Step-based rendering */}
+      {activeStep === 'upload' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t.modules.uploadDocuments}</CardTitle>
+            <CardDescription>{t.modules.uploadDocumentsDesc}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DocumentUploader moduleId={moduleId} />
+          </CardContent>
+        </Card>
+      )}
+
+      {activeStep === 'generate' && (
+        <ArtifactGenerationPanel
+          moduleId={moduleId}
+          onComplete={() => setActiveStep('configure')}
+        />
+      )}
 
       {/* Module Stats */}
       <div className="grid gap-4 md:grid-cols-3">

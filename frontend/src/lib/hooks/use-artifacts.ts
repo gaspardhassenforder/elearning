@@ -1,5 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { artifactsApi, ArtifactResponse } from '@/lib/api/artifacts'
+import {
+  artifactsApi,
+  ArtifactResponse,
+  BatchGenerationResponse,
+  ArtifactPreview
+} from '@/lib/api/artifacts'
 import { quizzesApi, QuizGenerateRequest } from '@/lib/api/quizzes'
 import { QUERY_KEYS } from '@/lib/api/query-client'
 import { useToast } from './use-toast'
@@ -71,6 +76,102 @@ export function useDeleteArtifact() {
         title: t.common.success,
         description: t.artifacts?.deleteSuccess || 'Artifact deleted successfully',
       })
+    },
+    onError: (error: unknown) => {
+      const errorKey = getApiErrorKey(error)
+      toast({
+        title: t.common.error,
+        description: errorKey && t.errors?.[errorKey] ? t.errors[errorKey] : t.common.error,
+        variant: 'destructive',
+      })
+    },
+  })
+}
+
+/**
+ * Hook to generate all artifacts for a notebook (Story 3.2, Task 4)
+ */
+export function useGenerateAllArtifacts(notebookId: string) {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  const { t } = useTranslation()
+
+  return useMutation({
+    mutationFn: () => artifactsApi.generateAll(notebookId),
+    onSuccess: (data: BatchGenerationResponse) => {
+      // Invalidate artifacts queries to pick up new artifacts
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.artifacts(notebookId) })
+
+      // Count successful/processing artifacts
+      const results = [
+        data.quiz.status === 'completed' || data.quiz.status === 'processing',
+        data.summary.status === 'completed' || data.summary.status === 'processing',
+        data.podcast.status === 'processing',
+      ].filter(Boolean).length
+
+      toast({
+        title: t.common.success,
+        description: t.artifacts?.generateAllSuccess || `Artifact generation started (${results} artifacts)`,
+      })
+    },
+    onError: (error: unknown) => {
+      const errorKey = getApiErrorKey(error)
+      toast({
+        title: t.common.error,
+        description: errorKey && t.errors?.[errorKey] ? t.errors[errorKey] : t.common.error,
+        variant: 'destructive',
+      })
+    },
+  })
+}
+
+/**
+ * Hook to get artifact preview with type-specific data (Story 3.2, Task 5)
+ */
+export function useArtifactPreview(artifactId: string | undefined) {
+  return useQuery<ArtifactPreview>({
+    queryKey: ['artifacts', 'preview', artifactId],
+    queryFn: () => artifactsApi.getPreview(artifactId!),
+    enabled: !!artifactId,
+    staleTime: 60 * 1000, // 1 minute - previews don't change often
+    retry: 2,
+  })
+}
+
+/**
+ * Hook to regenerate a single artifact (Story 3.2, Task 5)
+ */
+export function useRegenerateArtifact() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  const { t } = useTranslation()
+
+  return useMutation({
+    mutationFn: (artifactId: string) => artifactsApi.regenerate(artifactId),
+    onSuccess: (data, artifactId) => {
+      // Invalidate the specific artifact preview
+      queryClient.invalidateQueries({ queryKey: ['artifacts', 'preview', artifactId] })
+
+      // Invalidate all artifact lists
+      queryClient.invalidateQueries({ queryKey: ['artifacts'] })
+
+      if (data.status === 'completed') {
+        toast({
+          title: t.common.success,
+          description: t.artifacts?.regenerateSuccess || 'Artifact regenerated successfully',
+        })
+      } else if (data.status === 'processing') {
+        toast({
+          title: t.common.success,
+          description: t.artifacts?.regenerateStarted || 'Artifact regeneration started',
+        })
+      } else if (data.status === 'error') {
+        toast({
+          title: t.common.error,
+          description: data.error || 'Regeneration failed',
+          variant: 'destructive',
+        })
+      }
     },
     onError: (error: unknown) => {
       const errorKey = getApiErrorKey(error)
