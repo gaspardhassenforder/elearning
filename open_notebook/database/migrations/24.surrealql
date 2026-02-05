@@ -1,0 +1,12 @@
+-- Migration 24: Create module_prompt table
+-- Story 3.4: AI Teacher Prompt Configuration
+
+DEFINE TABLE module_prompt SCHEMAFULL;
+
+DEFINE FIELD notebook_id ON module_prompt TYPE record<notebook>;
+DEFINE FIELD system_prompt ON module_prompt TYPE option<string>;
+DEFINE FIELD updated_at ON module_prompt TYPE datetime DEFAULT time::now();
+DEFINE FIELD updated_by ON module_prompt TYPE record<user>;
+
+-- Ensure 1:1 relationship - only one prompt per notebook
+DEFINE INDEX idx_module_prompt_notebook_id ON module_prompt FIELDS notebook_id UNIQUE;

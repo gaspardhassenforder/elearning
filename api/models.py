@@ -765,3 +765,67 @@ class RegenerateArtifactResponse(BaseModel):
     command_id: Optional[str] = Field(
         None, description="Command ID for async operations"
     )
+
+
+# Learning Objectives API models (Story 3.3)
+class LearningObjectiveCreate(BaseModel):
+    """Create a new learning objective."""
+
+    text: str = Field(..., description="Objective text (measurable, action-verb based)")
+    order: int = Field(0, description="Display order (0-indexed)")
+
+
+class LearningObjectiveUpdate(BaseModel):
+    """Update an existing learning objective."""
+
+    text: Optional[str] = Field(None, description="New objective text")
+
+
+class LearningObjectiveResponse(BaseModel):
+    """Learning objective response."""
+
+    id: str
+    notebook_id: str
+    text: str
+    order: int
+    auto_generated: bool
+    created: Optional[str] = None
+    updated: Optional[str] = None
+
+
+class LearningObjectiveReorder(BaseModel):
+    """Reorder learning objectives."""
+
+    objectives: List[Dict[str, int]] = Field(
+        ..., description="List of {id, order} dicts for reordering"
+    )
+
+
+class BatchGenerationResponse(BaseModel):
+    """Response from batch generation operation."""
+
+    status: Literal["pending", "analyzing", "generating", "saving", "completed", "failed"]
+    objective_ids: Optional[List[str]] = Field(
+        None, description="IDs of generated objectives if completed"
+    )
+    error: Optional[str] = Field(None, description="Error message if failed")
+
+
+# Module Prompt API models (Story 3.4)
+class ModulePromptUpdate(BaseModel):
+    """Update or create module prompt."""
+
+    system_prompt: Optional[str] = Field(
+        None,
+        description="Jinja2 template for per-module AI teacher customization (None to clear)"
+    )
+
+
+class ModulePromptResponse(BaseModel):
+    """Module prompt response."""
+
+    id: Optional[str] = None
+    notebook_id: str
+    system_prompt: Optional[str] = None
+    updated_by: str
+    updated_at: Optional[str] = None
