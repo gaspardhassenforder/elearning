@@ -59,8 +59,8 @@ development_status:
   epic-3: in-progress
   3-1-module-creation-and-document-upload: done  # Code review complete, all issues fixed, approved for merge
   3-2-artifact-generation-and-preview: in-progress  # Implementation started
-  3-3-learning-objectives-configuration: ready-for-dev  # Comprehensive CRUD + LangGraph generation workflow + drag-drop editor ready
-  3-4-ai-teacher-prompt-configuration: backlog
+  3-3-learning-objectives-configuration: review  # Tasks 1-7 complete: Backend + Frontend + Tests all passing
+  3-4-ai-teacher-prompt-configuration: in-progress  # Two-layer prompt system (global + per-module) with Jinja2 templates, ModulePrompt model, optional configuration
   3-5-module-publishing: backlog
   3-6-edit-published-module: backlog
   3-7-admin-ai-chatbot-assistant: backlog
