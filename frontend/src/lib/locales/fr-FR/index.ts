@@ -1175,6 +1175,14 @@ export const frFR = {
     stepConfigure: "Configurer",
     stepPublish: "Publier",
     pipelineProgress: "Étape {current} sur {total}",
+    // Edit published module (Story 3.6)
+    editModule: "Modifier le module",
+    unpublishConfirmTitle: "Dépublier le module pour le modifier ?",
+    unpublishConfirmMessage: "Dépublier ce module le remettra en mode brouillon. Les apprenants ne verront plus ce module jusqu'à ce que vous le republiiez.",
+    unpublishConfirmWarning: "Tous les apprenants utilisant actuellement ce module perdront immédiatement l'accès.",
+    unpublishButton: "Dépublier et modifier",
+    moduleUnpublished: "Module dépublié avec succès",
+    unpublishError: "Échec de la dépublication du module",
   },
   assignments: {
     title: "Affectations des modules",

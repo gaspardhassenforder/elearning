@@ -132,3 +132,24 @@ export function useModuleDocuments(moduleId: string, options?: { pollingInterval
     },
   });
 }
+
+/**
+ * Hook to unpublish a module (Story 3.6, Task 6)
+ * Allows admin to edit a published module by reverting it to draft status
+ */
+export function useUnpublishModule() {
+  const queryClient = useQueryClient();
+  const { t } = useTranslation();
+
+  return useMutation({
+    mutationFn: (id: string) => modulesApi.unpublish(id),
+    onSuccess: (data, id) => {
+      queryClient.invalidateQueries({ queryKey: moduleKeys.detail(id) });
+      queryClient.invalidateQueries({ queryKey: moduleKeys.lists() });
+      toast.success(t.modules.moduleUnpublished);
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.detail || t.modules.unpublishError);
+    },
+  });
+}

@@ -22,10 +22,12 @@ import { ArtifactGenerationPanel } from '@/components/admin/ArtifactGenerationPa
 import { LearningObjectivesEditor } from '@/components/admin/LearningObjectivesEditor';
 import { ModulePromptEditor } from '@/components/admin/ModulePromptEditor';
 import { AdminAssistantChat } from '@/components/admin/AdminAssistantChat';
+import { UnpublishConfirmDialog } from '@/components/admin/UnpublishConfirmDialog';
 import { useModuleCreationStore } from '@/lib/stores/module-creation-store';
 import { useArtifacts } from '@/lib/hooks/use-artifacts';
 import { useLearningObjectives } from '@/lib/hooks/use-learning-objectives';
 import { useState } from 'react';
+import { Edit } from 'lucide-react';
 
 export default function ModulePage() {
   const { t } = useTranslation();
@@ -39,6 +41,9 @@ export default function ModulePage() {
 
   // Configure step has two sub-pages: objectives and prompt
   const [configureSubStep, setConfigureSubStep] = useState<'objectives' | 'prompt'>('objectives');
+
+  // Unpublish confirmation dialog (Story 3.6, Task 6)
+  const [showUnpublishDialog, setShowUnpublishDialog] = useState(false);
 
   // Step validation logic
   const canProceedFromGenerate =
@@ -110,6 +115,18 @@ export default function ModulePage() {
           <h1 className="text-3xl font-bold tracking-tight">{module.name}</h1>
           {!module.published && (
             <Badge variant="secondary">{t.assignments.draft}</Badge>
+          )}
+          {/* Edit button for published modules (Story 3.6, Task 6) */}
+          {module.published && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowUnpublishDialog(true)}
+              className="ml-auto"
+            >
+              <Edit className="mr-2 h-4 w-4" />
+              {t.modules.editModule}
+            </Button>
           )}
         </div>
         {module.description && (
@@ -227,6 +244,14 @@ export default function ModulePage() {
 
       {/* Admin Assistant Chat - Floating Button Available Across All Steps */}
       <AdminAssistantChat moduleId={moduleId} />
+
+      {/* Unpublish Confirmation Dialog (Story 3.6, Task 6) */}
+      <UnpublishConfirmDialog
+        open={showUnpublishDialog}
+        onOpenChange={setShowUnpublishDialog}
+        moduleId={moduleId}
+        moduleName={module.name}
+      />
     </div>
   );
 }

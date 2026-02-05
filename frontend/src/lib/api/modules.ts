@@ -111,4 +111,13 @@ export const modulesApi = {
     );
     return response.data;
   },
+
+  /**
+   * Unpublish a module (Story 3.6, Task 6)
+   * Reverts published module to draft status for editing
+   */
+  async unpublish(id: string): Promise<Module> {
+    const response = await apiClient.post<Module>(`/notebooks/${id}/unpublish`);
+    return response.data;
+  },
 };

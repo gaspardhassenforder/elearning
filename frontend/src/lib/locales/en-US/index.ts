@@ -1175,6 +1175,14 @@ export const enUS = {
     stepConfigure: "Configure",
     stepPublish: "Publish",
     pipelineProgress: "Step {current} of {total}",
+    // Edit published module (Story 3.6)
+    editModule: "Edit Module",
+    unpublishConfirmTitle: "Unpublish Module to Edit?",
+    unpublishConfirmMessage: "Unpublishing this module will revert it to draft status. Learners will no longer see this module until you re-publish it.",
+    unpublishConfirmWarning: "Any learners currently using this module will lose access immediately.",
+    unpublishButton: "Unpublish & Edit",
+    moduleUnpublished: "Module unpublished successfully",
+    unpublishError: "Failed to unpublish module",
   },
   assignments: {
     title: "Module Assignments",
