@@ -37,64 +37,65 @@ async def validate_learner_access_to_notebook(
         HTTPException 403: Access denied (not assigned, locked, or unpublished)
         HTTPException 404: Notebook not found
     """
-    try:
-        notebook = await Notebook.get(notebook_id)
-    except Exception as e:
-        logger.error(f"Error fetching notebook {notebook_id}: {e}")
-        raise HTTPException(status_code=404, detail="Notebook not found")
+    from open_notebook.database.repository import repo_query
 
-    if not notebook:
-        logger.error(f"Notebook {notebook_id} not found")
-        raise HTTPException(status_code=404, detail="Notebook not found")
+    # Single query with JOIN to check all conditions at once (avoids N+1)
+    # This checks: notebook exists, assignment exists, published status, locked status
+    result = await repo_query(
+        """
+        SELECT notebook.*, assignment.is_locked
+        FROM notebook
+        LEFT JOIN module_assignment AS assignment
+        ON assignment.notebook_id = notebook.id
+        WHERE notebook.id = $notebook_id
+        AND assignment.company_id = $company_id
+        LIMIT 1
+        """,
+        {"notebook_id": notebook_id, "company_id": learner_context.company_id},
+    )
 
-    # Check published status (learners cannot see unpublished modules)
-    if not getattr(notebook, "published", True):
+    if not result:
+        # Either notebook doesn't exist OR not assigned to company
+        # Use consistent 403 to avoid leaking existence
         logger.warning(
-            f"Learner {learner_context.user.id} attempted to access unpublished notebook {notebook_id}"
+            f"Learner {learner_context.user.id} attempted to access non-existent or unassigned notebook {notebook_id}"
         )
-        # Consistent 403 - don't leak existence of unpublished modules
         raise HTTPException(
             status_code=403, detail="You do not have access to this module"
         )
 
-    # Check company assignment (from Story 2.3)
-    # Query module_assignment table to check if notebook is assigned to learner's company
-    from open_notebook.database.repository import repo_query
+    notebook_data = result[0]
 
-    assignment_query = await repo_query(
-        """
-        SELECT * FROM module_assignment
-        WHERE company_id = $company_id AND notebook_id = $notebook_id
-        LIMIT 1
-        """,
-        {"company_id": learner_context.company_id, "notebook_id": notebook_id},
-    )
-
-    if not assignment_query:
+    # Check published status (learners cannot see unpublished modules)
+    if not notebook_data.get("published", True):
         logger.warning(
-            f"Learner {learner_context.user.id} attempted to access unassigned notebook {notebook_id}"
+            f"Learner {learner_context.user.id} attempted to access unpublished notebook {notebook_id}"
         )
-        # Consistent 403 - don't leak existence of other companies' modules
         raise HTTPException(
             status_code=403, detail="You do not have access to this module"
         )
 
     # Check locked status (Story 2.3)
-    assignment = assignment_query[0]
-    if assignment.get("is_locked", False):
+    if notebook_data.get("is_locked", False):
         logger.warning(
             f"Learner {learner_context.user.id} attempted to access locked notebook {notebook_id}"
         )
-        # Consistent 403 - locked modules are inaccessible
         raise HTTPException(
             status_code=403,
             detail="This module is currently locked and not available",
         )
 
-    logger.info(
-        f"Learner {learner_context.user.id} validated access to notebook {notebook_id}"
-    )
-    return notebook
+    # Fetch full Notebook object (already validated via JOIN above)
+    # Note: Future optimization (Story 4.8+) could cache this per session
+    try:
+        notebook = await Notebook.get(notebook_id)
+        logger.info(
+            f"Learner {learner_context.user.id} validated access to notebook {notebook_id}"
+        )
+        return notebook
+    except Exception as e:
+        logger.error(f"Error fetching notebook {notebook_id} after validation: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 async def prepare_chat_context(
@@ -157,6 +158,10 @@ async def prepare_chat_context(
         )
     except Exception as e:
         logger.error(f"Failed to assemble system prompt for notebook {notebook_id}: {e}")
-        raise
+        # Generic error message - don't leak internal details
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error. Please try again later."
+        )
 
     return system_prompt, learner_profile

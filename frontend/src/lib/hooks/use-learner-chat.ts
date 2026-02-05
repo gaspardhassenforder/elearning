@@ -13,6 +13,7 @@ import { useToast } from './use-toast'
 interface UseLearnerChatResult {
   messages: LearnerChatMessage[]
   isLoading: boolean
+  isStreaming: boolean
   error: Error | null
   sendMessage: (content: string) => Promise<void>
   clearMessages: () => void
@@ -118,6 +119,7 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
   return {
     messages,
     isLoading: isLoading || isStreaming,
+    isStreaming,
     error: error as Error | null,
     sendMessage,
     clearMessages,

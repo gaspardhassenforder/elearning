@@ -199,10 +199,11 @@ async def stream_learner_chat(
 
         except Exception as e:
             # Stream error event to frontend
-            logger.error(f"Error during SSE streaming: {e}")
+            # Log full error details but don't leak to client
+            logger.error(f"Error during SSE streaming for notebook {notebook_id}: {e}", exc_info=True)
             error_event = {
-                "error": "Streaming error occurred",
-                "detail": str(e),
+                "error": "An error occurred while streaming the response",
+                "detail": "Please try again. If the problem persists, contact support.",
             }
             yield f"event: error\ndata: {json.dumps(error_event)}\n\n"
 

@@ -33,6 +33,7 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
 
   const {
     isLoading,
+    isStreaming,
     error,
     sendMessage,
     messages,
@@ -109,6 +110,12 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
                         message.role === 'assistant' ? 'text-foreground/90' : ''
                       }`}>
                         {message.content}
+                        {/* Show streaming cursor on last assistant message during streaming */}
+                        {message.role === 'assistant' &&
+                         index === messages.length - 1 &&
+                         isStreaming && (
+                          <span className="inline-block w-1.5 h-4 ml-1 bg-primary animate-pulse" />
+                        )}
                       </p>
                     </div>
                   </div>

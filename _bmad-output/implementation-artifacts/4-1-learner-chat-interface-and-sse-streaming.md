@@ -896,6 +896,10 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 
 3. Chat Panel:
    - SSE streaming with token-by-token rendering
+   - **Custom chat rendering** (decided not to use @assistant-ui Thread component)
+     - Reason: Simpler implementation with direct control over message rendering
+     - SSE protocol still assistant-ui compatible (future migration path if needed)
+     - @assistant-ui/react library installed but not actively used in v1
    - Proactive AI greeting (no empty state)
    - Flowing AI messages, subtle user backgrounds
    - Message input with form validation
