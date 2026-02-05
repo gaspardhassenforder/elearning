@@ -34,4 +34,12 @@ export const QUERY_KEYS = {
   artifacts: (notebookId: string) => ['artifacts', notebookId] as const,
   quiz: (quizId: string) => ['quiz', quizId] as const,
   quizzes: (notebookId: string) => ['quizzes', notebookId] as const,
+  users: ['users'] as const,
+  user: (id: string) => ['users', id] as const,
+  companies: ['companies'] as const,
+  company: (id: string) => ['companies', id] as const,
+  assignments: ['assignments'] as const,
+  assignmentMatrix: ['assignments', 'matrix'] as const,
+  learnerModules: ['learner-modules'] as const,
+  learnerModule: (notebookId: string) => ['learner-modules', notebookId] as const,
 }

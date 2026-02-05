@@ -3,6 +3,217 @@ from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
+# Module Assignment models
+class ModuleAssignmentCreate(BaseModel):
+    """Create a new module assignment."""
+
+    company_id: str = Field(..., description="Company ID to assign module to")
+    notebook_id: str = Field(..., description="Notebook/module ID to assign")
+
+
+class ModuleAssignmentResponse(BaseModel):
+    """Module assignment response with optional warning."""
+
+    id: str
+    company_id: str
+    notebook_id: str
+    is_locked: bool = False
+    assigned_at: Optional[str] = None
+    assigned_by: Optional[str] = None
+    warning: Optional[str] = None  # Warning message for unpublished modules
+
+
+class AssignmentToggleRequest(BaseModel):
+    """Toggle assignment request."""
+
+    company_id: str = Field(..., description="Company ID")
+    notebook_id: str = Field(..., description="Notebook/module ID")
+
+
+class AssignmentToggleResponse(BaseModel):
+    """Toggle assignment response."""
+
+    action: str  # "assigned" or "unassigned"
+    company_id: str
+    notebook_id: str
+    assignment_id: Optional[str] = None  # Present when action is "assigned"
+    warning: Optional[str] = None  # Warning for unpublished modules
+
+
+class AssignmentMatrixCell(BaseModel):
+    """Single cell in the assignment matrix."""
+
+    is_assigned: bool
+    is_locked: bool = False
+    assignment_id: Optional[str] = None
+
+
+class ModuleAssignmentLockRequest(BaseModel):
+    """Request body for toggling module lock status."""
+
+    is_locked: bool = Field(
+        ..., description="Whether module should be locked (True) or unlocked (False)"
+    )
+
+
+class LearnerModuleResponse(BaseModel):
+    """Module representation for learner view (excludes admin fields)."""
+
+    id: str
+    name: str
+    description: Optional[str] = None
+    is_locked: bool
+    source_count: int
+    assigned_at: str
+    # DO NOT include assigned_by — learners don't see admin info
+
+
+class CompanySummary(BaseModel):
+    """Company summary for matrix view."""
+
+    id: str
+    name: str
+    slug: str
+
+
+class NotebookSummary(BaseModel):
+    """Notebook summary for matrix view."""
+
+    id: str
+    name: str
+    published: bool = True
+
+
+class AssignmentMatrixResponse(BaseModel):
+    """Assignment matrix for admin UI."""
+
+    companies: List[CompanySummary]
+    notebooks: List[NotebookSummary]
+    assignments: Dict[str, Dict[str, AssignmentMatrixCell]]  # {company_id: {notebook_id: cell}}
+
+
+# Auth models
+class UserCreate(BaseModel):
+    username: str = Field(..., min_length=3, description="Username (min 3 characters)")
+    email: str = Field(..., description="Email address")
+    password: str = Field(..., min_length=8, description="Password (min 8 characters)")
+
+
+class UserLogin(BaseModel):
+    username: str = Field(..., description="Username")
+    password: str = Field(..., description="Password")
+
+
+class UserResponse(BaseModel):
+    id: str
+    username: str
+    email: str
+    role: str
+    company_id: Optional[str] = None
+    onboarding_completed: bool = False
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class AuthStatusResponse(BaseModel):
+    auth_enabled: bool
+    jwt_enabled: bool
+
+
+# Admin user management models
+class AdminUserCreate(BaseModel):
+    """Admin creates a new user with role and optional company."""
+
+    username: str = Field(..., min_length=3, description="Username (min 3 characters)")
+    email: str = Field(..., description="Email address")
+    password: str = Field(..., min_length=8, description="Password (min 8 characters)")
+    role: Literal["admin", "learner"] = Field(
+        "learner", description="User role (admin or learner)"
+    )
+    company_id: Optional[str] = Field(None, description="Company ID for learners")
+
+
+class UserUpdate(BaseModel):
+    """Update user fields (admin only)."""
+
+    username: Optional[str] = Field(None, min_length=3, description="Username")
+    email: Optional[str] = Field(None, description="Email address")
+    password: Optional[str] = Field(None, min_length=8, description="New password")
+    role: Optional[Literal["admin", "learner"]] = Field(None, description="User role")
+    company_id: Optional[str] = Field(None, description="Company ID")
+    onboarding_completed: Optional[bool] = Field(
+        None, description="Onboarding completion status"
+    )
+
+
+class UserListResponse(BaseModel):
+    """User with company name for list views."""
+
+    id: str
+    username: str
+    email: str
+    role: str
+    company_id: Optional[str] = None
+    company_name: Optional[str] = None
+    onboarding_completed: bool = False
+    created: str
+    updated: str
+
+
+# Company models
+class CompanyCreate(BaseModel):
+    """Create a new company."""
+
+    name: str = Field(..., min_length=1, description="Company name")
+    slug: str = Field(..., min_length=1, description="Unique slug for the company")
+    description: Optional[str] = Field(None, description="Company description")
+
+
+class CompanyUpdate(BaseModel):
+    """Update company fields."""
+
+    name: Optional[str] = Field(None, min_length=1, description="Company name")
+    slug: Optional[str] = Field(None, min_length=1, description="Unique slug")
+    description: Optional[str] = Field(None, description="Company description")
+
+
+class CompanyResponse(BaseModel):
+    """Company response with user and assignment counts."""
+
+    id: str
+    name: str
+    slug: str
+    description: Optional[str] = None
+    user_count: int = 0  # Number of users/learners assigned to this company
+    assignment_count: int = 0  # Number of module assignments for this company
+    created: str
+    updated: str
+
+
+# Onboarding models
+class OnboardingSubmit(BaseModel):
+    """Learner onboarding questionnaire submission."""
+
+    ai_familiarity: Literal[
+        "never_used", "used_occasionally", "use_regularly", "power_user"
+    ] = Field(..., description="Level of AI familiarity")
+    job_type: str = Field(..., min_length=1, description="Job title or role")
+    job_description: str = Field(
+        ..., min_length=10, description="Brief description of job responsibilities"
+    )
+
+
+class OnboardingResponse(BaseModel):
+    """Response after completing onboarding."""
+
+    success: bool
+    message: str
+    profile: Dict[str, Any]
+
+
 # Notebook models
 class NotebookCreate(BaseModel):
     name: str = Field(..., description="Name of the notebook")

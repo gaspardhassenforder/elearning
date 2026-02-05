@@ -1,0 +1,104 @@
+# generated: 2026-02-04
+# project: open-notebook
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog -> in-progress: Automatically when first story is created (via create-story)
+#   - in-progress -> done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-02-04
+project: open-notebook
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+  # Epic 1: Authentication & User Identity
+  epic-1: in-progress
+  1-1-user-registration-and-login-backend: review
+  1-2-role-based-access-control-and-route-protection: in-progress
+  1-3-admin-creates-learner-accounts: ready-for-dev
+  1-4-learner-onboarding-questionnaire: ready-for-dev
+  epic-1-retrospective: optional
+
+  # Epic 2: Company Management & Module Assignment
+  epic-2: in-progress
+  2-1-company-management: done
+  2-2-module-assignment-to-companies: done
+  2-3-module-lock-unlock-and-learner-visibility: in-progress  # Code review complete, tests pending
+  epic-2-retrospective: optional
+
+  # Epic 3: Module Creation & Publishing Pipeline
+  epic-3: backlog
+  3-1-module-creation-and-document-upload: backlog
+  3-2-artifact-generation-and-preview: backlog
+  3-3-learning-objectives-configuration: backlog
+  3-4-ai-teacher-prompt-configuration: backlog
+  3-5-module-publishing: backlog
+  3-6-edit-published-module: backlog
+  3-7-admin-ai-chatbot-assistant: backlog
+  epic-3-retrospective: optional
+
+  # Epic 4: Learner AI Chat Experience
+  epic-4: backlog
+  4-1-learner-chat-interface-and-sse-streaming: backlog
+  4-2-two-layer-prompt-system-and-proactive-ai-teacher: backlog
+  4-3-inline-document-snippets-in-chat: backlog
+  4-4-learning-objectives-assessment-and-progress-tracking: backlog
+  4-5-adaptive-teaching-and-fast-track-for-advanced-learners: backlog
+  4-6-ai-surfaces-artifacts-in-conversation: backlog
+  4-7-async-task-handling-in-chat: backlog
+  4-8-persistent-chat-history: backlog
+  epic-4-retrospective: optional
+
+  # Epic 5: Content Browsing & Learning Progress
+  epic-5: backlog
+  5-1-sources-panel-with-document-browsing: backlog
+  5-2-artifacts-browsing-in-side-panel: backlog
+  5-3-learning-progress-display: backlog
+  epic-5-retrospective: optional
+
+  # Epic 6: Platform Navigation & Voice Input
+  epic-6: backlog
+  6-1-platform-wide-ai-navigation-assistant: backlog
+  6-2-voice-to-text-input: backlog
+  epic-6-retrospective: optional
+
+  # Epic 7: Error Handling, Observability & Data Privacy
+  epic-7: backlog
+  7-1-graceful-error-handling-and-user-friendly-messages: backlog
+  7-2-structured-contextual-error-logging: backlog
+  7-3-admin-error-notifications: backlog
+  7-4-langsmith-llm-tracing-integration: backlog
+  7-5-per-company-data-isolation-audit: backlog
+  7-6-user-and-company-data-deletion: backlog
+  7-7-token-usage-tracking: backlog
+  7-8-learner-transparency-details-view: backlog
+  epic-7-retrospective: optional

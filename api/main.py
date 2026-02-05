@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -11,18 +12,20 @@ from fastapi.responses import JSONResponse
 from loguru import logger
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from api.auth import PasswordAuthMiddleware
 from api.routers import (
     artifacts,
     auth,
     chat,
+    companies,
     config,
     context,
     embedding,
     embedding_rebuild,
     episode_profiles,
     insights,
+    learner,
     models,
+    module_assignments,
     notebooks,
     notes,
     podcasts,
@@ -33,6 +36,7 @@ from api.routers import (
     sources,
     speaker_profiles,
     transformations,
+    users,
 )
 from api.routers import commands as commands_router
 from open_notebook.database.async_migrate import AsyncMigrationManager
@@ -42,6 +46,36 @@ try:
     logger.info("Commands imported in API process")
 except Exception as e:
     logger.error(f"Failed to import commands in API process: {e}")
+
+
+async def seed_admin_user():
+    """Create default admin user if no users exist."""
+    from api.auth import hash_password, is_jwt_enabled
+    from open_notebook.domain.user import User
+
+    if not is_jwt_enabled():
+        logger.info("JWT not enabled, skipping admin user seeding")
+        return
+
+    # Check if any users exist
+    existing_users = await User.get_all()
+    if existing_users:
+        logger.info(f"Users already exist ({len(existing_users)}), skipping admin seeding")
+        return
+
+    # Create default admin user
+    admin_username = os.environ.get("DEFAULT_ADMIN_USERNAME", "admin")
+    admin_password = os.environ.get("DEFAULT_ADMIN_PASSWORD", "changeme")
+    admin_email = os.environ.get("DEFAULT_ADMIN_EMAIL", "admin@localhost")
+
+    admin = User(
+        username=admin_username,
+        email=admin_email,
+        password_hash=hash_password(admin_password),
+        role="admin",
+    )
+    await admin.save()
+    logger.success(f"Default admin user created: {admin_username}")
 
 
 @asynccontextmanager
@@ -75,6 +109,13 @@ async def lifespan(app: FastAPI):
         # Fail fast - don't start the API with an outdated database schema
         raise RuntimeError(f"Failed to run database migrations: {str(e)}") from e
 
+    # Seed default admin user if no users exist
+    try:
+        await seed_admin_user()
+    except Exception as e:
+        logger.error(f"Failed to seed admin user: {str(e)}")
+        # Non-fatal - continue startup even if seeding fails
+
     logger.success("API initialization completed successfully")
 
     # Yield control to the application
@@ -91,22 +132,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Add password authentication middleware first
-# Exclude /api/auth/status and /api/config from authentication
-app.add_middleware(
-    PasswordAuthMiddleware,
-    excluded_paths=[
-        "/",
-        "/health",
-        "/docs",
-        "/openapi.json",
-        "/redoc",
-        "/api/auth/status",
-        "/api/config",
-    ],
-)
+# Auth is now per-endpoint via Depends(get_current_user), not global middleware.
+# Public endpoints: /auth/login, /auth/register, /auth/status, /health, /docs, /openapi.json, /redoc
 
-# Add CORS middleware last (so it processes first)
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # In production, replace with specific origins
@@ -167,6 +196,10 @@ app.include_router(chat.router, prefix="/api", tags=["chat"])
 app.include_router(source_chat.router, prefix="/api", tags=["source-chat"])
 app.include_router(quizzes.router, prefix="/api", tags=["quizzes"])
 app.include_router(artifacts.router, prefix="/api", tags=["artifacts"])
+app.include_router(users.router, prefix="/api", tags=["users"])
+app.include_router(companies.router, prefix="/api", tags=["companies"])
+app.include_router(module_assignments.router, prefix="/api", tags=["module-assignments"])
+app.include_router(learner.router, prefix="/api", tags=["learner"])
 
 
 @app.get("/")

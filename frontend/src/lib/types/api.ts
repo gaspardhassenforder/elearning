@@ -224,3 +224,129 @@ export interface BuildContextResponse {
   token_count: number
   char_count: number
 }
+
+// User management types
+export interface UserListResponse {
+  id: string
+  username: string
+  email: string
+  role: 'admin' | 'learner'
+  company_id: string | null
+  company_name: string | null
+  onboarding_completed: boolean
+  created: string
+  updated: string
+}
+
+export interface CreateUserRequest {
+  username: string
+  email: string
+  password: string
+  role: 'admin' | 'learner'
+  company_id?: string
+}
+
+export interface UpdateUserRequest {
+  username?: string
+  email?: string
+  password?: string
+  role?: 'admin' | 'learner'
+  company_id?: string | null
+  onboarding_completed?: boolean
+}
+
+// Company management types
+export interface CompanyResponse {
+  id: string
+  name: string
+  slug: string
+  description: string | null
+  user_count: number
+  assignment_count: number
+  created: string
+  updated: string
+}
+
+export interface CreateCompanyRequest {
+  name: string
+  slug: string
+  description?: string
+}
+
+export interface UpdateCompanyRequest {
+  name?: string
+  slug?: string
+  description?: string
+}
+
+// Onboarding types
+export type AIFamiliarity = 'never_used' | 'used_occasionally' | 'use_regularly' | 'power_user'
+
+export interface OnboardingSubmit {
+  ai_familiarity: AIFamiliarity
+  job_type: string
+  job_description: string
+}
+
+export interface OnboardingResponse {
+  success: boolean
+  message: string
+  profile: {
+    ai_familiarity: AIFamiliarity
+    job_type: string
+    job_description: string
+  }
+}
+
+// Module Assignment types
+export interface ModuleAssignmentResponse {
+  id: string
+  company_id: string
+  notebook_id: string
+  is_locked: boolean
+  assigned_at: string | null
+  assigned_by: string | null
+  warning: string | null
+}
+
+export interface AssignmentToggleResponse {
+  action: 'assigned' | 'unassigned'
+  company_id: string
+  notebook_id: string
+  assignment_id?: string
+  warning?: string
+}
+
+export interface AssignmentMatrixCell {
+  is_assigned: boolean
+  is_locked: boolean
+  assignment_id: string | null
+}
+
+export interface CompanySummary {
+  id: string
+  name: string
+  slug: string
+}
+
+export interface NotebookSummary {
+  id: string
+  name: string
+  published: boolean
+}
+
+export interface AssignmentMatrixResponse {
+  companies: CompanySummary[]
+  notebooks: NotebookSummary[]
+  assignments: Record<string, Record<string, AssignmentMatrixCell>>
+}
+
+// Learner module types (Story 2.3: Module Lock/Unlock)
+export interface LearnerModule {
+  id: string
+  name: string
+  description: string | null
+  is_locked: boolean
+  source_count: number
+  assigned_at: string
+}
