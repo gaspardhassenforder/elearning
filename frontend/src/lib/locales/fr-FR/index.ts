@@ -1285,12 +1285,21 @@ export const frFR = {
     fixErrorsHint: "Corrigez les erreurs ci-dessus avant de publier",
     unpublishSuccess: "Module dépublié avec succès",
     unpublishError: "Échec de la dépublication du module",
+    // Story 3.6, Task 11: Mode édition re-publication
+    titleEdit: "Republier le module",
+    descriptionEdit: "Examiner les modifications et republier pour les rendre visibles aux apprenants",
+    publishChanges: "Publier les modifications",
+    successMessageEdit: "Module mis à jour et publié",
   },
   learner: {
     // Story 4.1: Interface de chat apprenant et streaming SSE
     moduleNotAccessible: "Vous n'avez pas accès à ce module",
     moduleNotFound: "Module introuvable",
     moduleNotFoundDesc: "Le module que vous recherchez n'existe pas ou a été supprimé.",
+    // Story 4.3: Extrait de document intégré dans le chat
+    openInSources: "Ouvrir dans les sources",
+    documentSnippet: "Extrait du document",
+    referencedDocument: "Document référencé",
     chat: {
       title: "Enseignant IA",
       placeholder: "Posez une question ou partagez vos réflexions...",

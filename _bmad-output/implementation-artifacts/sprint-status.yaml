@@ -70,7 +70,7 @@ development_status:
   epic-4: in-progress
   4-1-learner-chat-interface-and-sse-streaming: done  # Code review complete: All 4 ACs met, 13 issues found (5 HIGH + 5 MEDIUM + 3 LOW), all HIGH + MEDIUM fixed, 8 backend tests added, streaming cursor + auto-scroll + type safety + security hardening
   4-2-two-layer-prompt-system-and-proactive-ai-teacher: review  # All 8 tasks complete: Enhanced teacher prompt, proactive greeting, prompt assembly, Socratic methods, grounding, progression, frontend display, tests
-  4-3-inline-document-snippets-in-chat: backlog  # Story file exists but not ready for dev
+  4-3-inline-document-snippets-in-chat: in-progress  # Comprehensive story created: surface_document tool, DocumentSnippetCard, reactive panel scroll, highlight animation, assistant-ui custom parts
   4-4-learning-objectives-assessment-and-progress-tracking: backlog
   4-5-adaptive-teaching-and-fast-track-for-advanced-learners: backlog
   4-6-ai-surfaces-artifacts-in-conversation: backlog

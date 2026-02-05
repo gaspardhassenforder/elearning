@@ -10,7 +10,7 @@ from datetime import datetime
 import pytest
 
 from open_notebook.graphs.prompt import PatternChainState, graph
-from open_notebook.graphs.tools import get_current_timestamp
+from open_notebook.graphs.tools import get_current_timestamp, surface_document
 from open_notebook.graphs.transformation import (
     TransformationState,
     run_transformation,
@@ -64,6 +64,106 @@ class TestGraphTools:
         # Check it has tool attributes
         assert hasattr(get_current_timestamp, "name")
         assert hasattr(get_current_timestamp, "description")
+
+    @pytest.mark.asyncio
+    async def test_surface_document_is_tool(self):
+        """Test that surface_document is properly decorated as a tool."""
+        # Check it has tool attributes
+        assert hasattr(surface_document, "name")
+        assert hasattr(surface_document, "description")
+        assert surface_document.name == "surface_document"
+
+    @pytest.mark.asyncio
+    async def test_surface_document_with_valid_source(self):
+        """Test surface_document with valid source returns structured data."""
+        from unittest.mock import AsyncMock, patch
+        from datetime import datetime
+        from open_notebook.domain.notebook import Source, Asset
+
+        # Mock source data
+        mock_source = Source(
+            id="source:test123",
+            notebook_id="notebook:nb1",
+            title="Test Document",
+            asset=Asset(file_path="/path/to/document.pdf"),
+            created=datetime(2024, 1, 1, 12, 0, 0),
+        )
+
+        with patch("open_notebook.domain.notebook.Source.get", new=AsyncMock(return_value=mock_source)):
+            result = await surface_document.ainvoke({
+                "source_id": "source:test123",
+                "excerpt_text": "This is a test excerpt from the document.",
+                "relevance_reason": "Explains the core concept"
+            })
+
+        # Verify structure
+        assert isinstance(result, dict)
+        assert result["source_id"] == "source:test123"
+        assert result["title"] == "Test Document"
+        assert result["source_type"] == "pdf"
+        assert result["excerpt"] == "This is a test excerpt from the document."
+        assert result["relevance"] == "Explains the core concept"
+        assert "metadata" in result
+
+    @pytest.mark.asyncio
+    async def test_surface_document_truncates_long_excerpt(self):
+        """Test surface_document truncates excerpts longer than 200 chars."""
+        from unittest.mock import AsyncMock, patch
+        from open_notebook.domain.notebook import Source, Asset
+
+        mock_source = Source(
+            id="source:test123",
+            notebook_id="notebook:nb1",
+            title="Test Document",
+            asset=Asset(file_path="/path/to/document.pdf"),
+        )
+
+        long_excerpt = "A" * 250  # 250 characters
+
+        with patch("open_notebook.domain.notebook.Source.get", new=AsyncMock(return_value=mock_source)):
+            result = await surface_document.ainvoke({
+                "source_id": "source:test123",
+                "excerpt_text": long_excerpt,
+                "relevance_reason": "Test truncation"
+            })
+
+        # Should be truncated to 200 chars (197 + "...")
+        assert len(result["excerpt"]) == 200
+        assert result["excerpt"].endswith("...")
+
+    @pytest.mark.asyncio
+    async def test_surface_document_with_nonexistent_source(self):
+        """Test surface_document with nonexistent source returns error."""
+        from unittest.mock import AsyncMock, patch
+
+        with patch("open_notebook.domain.notebook.Source.get", new=AsyncMock(return_value=None)):
+            result = await surface_document.ainvoke({
+                "source_id": "source:nonexistent",
+                "excerpt_text": "Test",
+                "relevance_reason": "Test"
+            })
+
+        # Should return error structure
+        assert "error" in result
+        assert result["error"] == "Source not found"
+        assert result["source_id"] == "source:nonexistent"
+
+    @pytest.mark.asyncio
+    async def test_surface_document_handles_exceptions(self):
+        """Test surface_document gracefully handles exceptions."""
+        from unittest.mock import AsyncMock, patch
+
+        with patch("open_notebook.domain.notebook.Source.get", new=AsyncMock(side_effect=Exception("Database error"))):
+            result = await surface_document.ainvoke({
+                "source_id": "source:test123",
+                "excerpt_text": "Test",
+                "relevance_reason": "Test"
+            })
+
+        # Should return error structure
+        assert "error" in result
+        assert "Failed to surface document" in result["error"]
+        assert result["source_id"] == "source:test123"
 
 
 # ============================================================================

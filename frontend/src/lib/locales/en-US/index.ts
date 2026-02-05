@@ -1290,12 +1290,21 @@ export const enUS = {
     fixErrorsHint: "Fix the errors above before publishing",
     unpublishSuccess: "Module unpublished successfully",
     unpublishError: "Failed to unpublish module",
+    // Story 3.6, Task 11: Edit mode re-publish
+    titleEdit: "Re-Publish Module",
+    descriptionEdit: "Review changes and re-publish to make them visible to learners",
+    publishChanges: "Publish Changes",
+    successMessageEdit: "Module updated and published",
   },
   learner: {
     // Story 4.1: Learner Chat Interface & SSE Streaming
     moduleNotAccessible: "You do not have access to this module",
     moduleNotFound: "Module not found",
     moduleNotFoundDesc: "The module you are looking for does not exist or has been removed.",
+    // Story 4.3: Document snippet inline in chat
+    openInSources: "Open in sources",
+    documentSnippet: "Document Snippet",
+    referencedDocument: "Referenced Document",
     chat: {
       title: "AI Teacher",
       placeholder: "Ask a question or share your thoughts...",

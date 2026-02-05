@@ -13,6 +13,7 @@ from typing_extensions import TypedDict
 from open_notebook.ai.provision import provision_langchain_model
 from open_notebook.config import LANGGRAPH_CHECKPOINT_FILE
 from open_notebook.domain.notebook import Notebook
+from open_notebook.graphs.tools import surface_document
 from open_notebook.utils import clean_thinking_content
 
 
@@ -62,6 +63,9 @@ def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future = executor.submit(run_in_new_loop)
             model = future.result()
+
+        # Story 4.3: Bind surface_document tool to the model
+        model_with_tools = model.bind_tools([surface_document])
     except RuntimeError:
         # No event loop running, safe to use asyncio.run()
         model = asyncio.run(
@@ -73,7 +77,11 @@ def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict
             )
         )
 
-    ai_message = model.invoke(payload)
+        # Story 4.3: Bind surface_document tool to the model
+        # This allows the AI to reference source documents inline in chat
+        model_with_tools = model.bind_tools([surface_document])
+
+    ai_message = model_with_tools.invoke(payload)
 
     # Extract text content from potentially structured response
     content = ai_message.content
