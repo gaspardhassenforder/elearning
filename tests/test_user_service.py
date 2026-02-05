@@ -16,7 +16,6 @@ from api.user_service import (
     update_user,
     delete_user,
     get_user_by_id,
-    get_user_with_company_name,
 )
 
 
@@ -137,22 +136,41 @@ class TestListUsers:
 
     @pytest.mark.asyncio
     async def test_list_users_success(self):
-        """List users should return all users."""
-        mock_user1 = MagicMock()
-        mock_user1.id = "user:1"
-        mock_user1.username = "user1"
+        """List users should return all users with company names using JOIN query."""
+        # Mock repo_query to return user data with company names (simulates JOIN)
+        mock_query_result = [
+            {
+                "id": "user:1",
+                "username": "user1",
+                "email": "user1@example.com",
+                "role": "learner",
+                "company_id": "company:abc",
+                "company_name": "Company ABC",
+                "onboarding_completed": True,
+                "created": "2024-01-01",
+                "updated": "2024-01-02",
+            },
+            {
+                "id": "user:2",
+                "username": "user2",
+                "email": "user2@example.com",
+                "role": "admin",
+                "company_id": None,
+                "company_name": None,
+                "onboarding_completed": False,
+                "created": "2024-01-03",
+                "updated": "2024-01-04",
+            },
+        ]
 
-        mock_user2 = MagicMock()
-        mock_user2.id = "user:2"
-        mock_user2.username = "user2"
-
-        with patch("api.user_service.User") as MockUser:
-            MockUser.get_all = AsyncMock(return_value=[mock_user1, mock_user2])
-
+        with patch("open_notebook.database.repository.repo_query", new=AsyncMock(return_value=mock_query_result)):
             users = await list_users()
 
             assert len(users) == 2
             assert users[0].username == "user1"
+            assert users[0].company_name == "Company ABC"
+            assert users[1].username == "user2"
+            assert users[1].company_name is None
             assert users[1].username == "user2"
 
 
@@ -245,50 +263,6 @@ class TestDeleteUser:
             result = await delete_user("user:nonexistent")
             assert result is False
 
-
-class TestGetUserWithCompanyName:
-    """Test getting user with company name."""
-
-    @pytest.mark.asyncio
-    async def test_get_user_with_company_name_success(self):
-        """Should return user data with company name."""
-        mock_user = MagicMock()
-        mock_user.id = "user:test123"
-        mock_user.username = "testuser"
-        mock_user.email = "test@example.com"
-        mock_user.role = "learner"
-        mock_user.company_id = "company:abc"
-        mock_user.onboarding_completed = False
-        mock_user.created = "2024-01-01"
-        mock_user.updated = "2024-01-02"
-
-        mock_company = MagicMock()
-        mock_company.name = "Test Company"
-
-        with patch("open_notebook.domain.company.Company") as MockCompany:
-            MockCompany.get = AsyncMock(return_value=mock_company)
-
-            result = await get_user_with_company_name(mock_user)
-
-            assert result["id"] == "user:test123"
-            assert result["username"] == "testuser"
-            assert result["company_name"] == "Test Company"
-
-    @pytest.mark.asyncio
-    async def test_get_user_with_company_name_no_company(self):
-        """Should return user data with None company name if no company."""
-        mock_user = MagicMock()
-        mock_user.id = "user:test123"
-        mock_user.username = "testuser"
-        mock_user.email = "test@example.com"
-        mock_user.role = "admin"
-        mock_user.company_id = None
-        mock_user.onboarding_completed = True
-        mock_user.created = "2024-01-01"
-        mock_user.updated = "2024-01-02"
-
-        result = await get_user_with_company_name(mock_user)
-
-        assert result["id"] == "user:test123"
-        assert result["username"] == "testuser"
-        assert result["company_name"] is None
+# REMOVED: TestGetUserWithCompanyName class
+# Function get_user_with_company_name() was removed to fix N+1 query problem.
+# Functionality now integrated into list_users() with JOIN query.
