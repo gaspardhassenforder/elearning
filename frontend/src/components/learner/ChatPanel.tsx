@@ -143,8 +143,9 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
                       {/* Story 4.3: Render document snippet cards for tool calls */}
                       {message.role === 'assistant' && message.toolCalls && message.toolCalls.length > 0 && (
                         <div className="mt-2 space-y-2">
+                          {/* Successful document snippets */}
                           {message.toolCalls
-                            .filter((tc) => tc.toolName === 'surface_document' && tc.result)
+                            .filter((tc) => tc.toolName === 'surface_document' && tc.result && !tc.result.error)
                             .map((tc, tcIndex) => (
                               <DocumentSnippetCard
                                 key={`${index}-${tcIndex}`}
@@ -154,6 +155,18 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
                                 sourceType={tc.result!.source_type}
                                 relevance={tc.result!.relevance}
                               />
+                            ))}
+
+                          {/* Error messages for failed tool calls */}
+                          {message.toolCalls
+                            .filter((tc) => tc.result?.error)
+                            .map((tc, tcIndex) => (
+                              <div
+                                key={`error-${index}-${tcIndex}`}
+                                className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded px-2 py-1"
+                              >
+                                ⚠️ {tc.result!.error}
+                              </div>
                             ))}
                         </div>
                       )}

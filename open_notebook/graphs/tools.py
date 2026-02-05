@@ -30,6 +30,15 @@ async def surface_document(source_id: str, excerpt_text: str, relevance_reason: 
 
     Returns:
         dict: Structured document snippet data with source metadata
+
+    Security Note:
+        Currently relies on API-layer access control to ensure learners only access
+        sources from their assigned notebooks. The learner chat endpoint validates
+        notebook assignment before invoking this tool.
+
+        TODO (Story 7.5): Add defense-in-depth validation to verify source belongs to
+        the notebook in the current chat session. Requires passing notebook_id via
+        RunnableConfig or adding graph edge validation query.
     """
     from open_notebook.domain.notebook import Source
 

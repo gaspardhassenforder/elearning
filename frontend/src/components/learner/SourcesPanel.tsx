@@ -39,6 +39,10 @@ export function SourcesPanel({ notebookId }: SourcesPanelProps) {
   const documentRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const [highlightedSourceId, setHighlightedSourceId] = useState<string | null>(null)
 
+  // Story 4.3: Track timeouts for cleanup on unmount
+  const scrollTimeoutRef = useRef<NodeJS.Timeout>()
+  const highlightTimeoutRef = useRef<NodeJS.Timeout>()
+
   // Story 4.3: Listen to scroll target from store
   const scrollToSourceId = useLearnerStore((state) => state.scrollToSourceId)
   const setScrollToSourceId = useLearnerStore((state) => state.setScrollToSourceId)
@@ -71,12 +75,23 @@ export function SourcesPanel({ notebookId }: SourcesPanelProps) {
     return () => container.removeEventListener('scroll', handleScroll)
   }, [handleScroll])
 
+  // Story 4.3: Cleanup timeouts on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current)
+      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current)
+    }
+  }, [])
+
   // Story 4.3: Scroll to document when scrollToSourceId changes
   useEffect(() => {
     if (!scrollToSourceId) return
 
+    // Clear any pending scroll timeout
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current)
+
     // Wait for panel expansion animation if needed (200ms)
-    setTimeout(() => {
+    scrollTimeoutRef.current = setTimeout(() => {
       const targetElement = documentRefs.current.get(scrollToSourceId)
 
       if (targetElement && scrollContainerRef.current) {
@@ -89,8 +104,11 @@ export function SourcesPanel({ notebookId }: SourcesPanelProps) {
         // Add highlight animation
         setHighlightedSourceId(scrollToSourceId)
 
+        // Clear any pending highlight timeout
+        if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current)
+
         // Remove highlight after 3 seconds
-        setTimeout(() => {
+        highlightTimeoutRef.current = setTimeout(() => {
           setHighlightedSourceId(null)
         }, 3000)
       }

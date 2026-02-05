@@ -854,19 +854,36 @@ claude-sonnet-4-5-20250929
   - Cards appear inline after assistant message text
 - Sprint status updated: in-progress → review
 
+**Code Review Fixes Applied:**
+- Security: Added TODO comment for company scoping validation in surface_document tool (defense-in-depth for Epic 7.5)
+- Tests: Created DocumentSnippetCard.test.tsx with 10 comprehensive test cases covering rendering, truncation, click handlers, and edge cases
+- Error Handling: Updated ChatPanel to filter out tool result errors and display warning messages to user
+- Memory Leak: Fixed SourcesPanel highlight animation timeout cleanup using refs to prevent setState on unmounted component
+- Repository Hygiene: Deleted .bak files and added *.bak to .gitignore
+
+**Issues Resolved:**
+- Issue #1 (HIGH): Uncommitted admin changes - Identified as separate work stream (Story 3.3/4.2 fixes)
+- Issue #2 (MEDIUM): .bak files - Fixed
+- Issue #3 (HIGH): Company scoping - Added security note and TODO for Epic 7.5
+- Issue #4 (HIGH): Missing frontend tests - Fixed with comprehensive test suite
+- Issue #5 (MEDIUM): Tool error handling - Fixed in ChatPanel
+- Issue #6 (MEDIUM): Reactive scroll logic - FALSE POSITIVE, already correctly implemented
+- Issue #8 (MEDIUM): Highlight timeout cleanup - Fixed with useRef pattern
+
 ### File List
 
 **Created:**
-- N/A
+- `frontend/src/components/learner/__tests__/DocumentSnippetCard.test.tsx` - NEW (10 test cases)
 
 **Modified:**
-- `open_notebook/graphs/tools.py` - Added surface_document async tool (60 lines)
+- `open_notebook/graphs/tools.py` - Added surface_document async tool + security note (70 lines)
 - `open_notebook/graphs/chat.py` - Integrated surface_document tool via bind_tools
 - `tests/test_graphs.py` - Added 5 test cases for surface_document tool
 - `frontend/src/components/learner/DocumentSnippetCard.tsx` - NEW (80 lines)
-- `frontend/src/components/learner/SourcesPanel.tsx` - Added scroll-to and highlight logic
+- `frontend/src/components/learner/SourcesPanel.tsx` - Added scroll-to, highlight logic + timeout cleanup
+- `.gitignore` - Added *.bak pattern to ignore backup files
 - `frontend/src/components/learner/DocumentCard.tsx` - Ref forwarding + highlight animation
-- `frontend/src/components/learner/ChatPanel.tsx` - Render DocumentSnippetCard for tool calls
+- `frontend/src/components/learner/ChatPanel.tsx` - Render DocumentSnippetCard + error handling for tool failures
 - `frontend/src/lib/stores/learner-store.ts` - Added scroll state and expandAndScrollToSource
 - `frontend/src/lib/api/learner-chat.ts` - Extended SSE parser for tool call tracking
 - `frontend/src/lib/hooks/use-learner-chat.ts` - Reactive scroll on message completion
