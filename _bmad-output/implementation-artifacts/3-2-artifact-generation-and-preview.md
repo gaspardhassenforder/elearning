@@ -49,25 +49,25 @@ So that learners have rich learning materials alongside the source documents.
   - [x] Support partial regeneration (single artifact type)
   - [x] Return new artifact with processing status
 
-- [ ] Task 4: Frontend - Artifact Generation UI (AC: 1)
-  - [ ] Create ArtifactGenerationPanel component
-  - [ ] Add "Generate All" button with confirmation
-  - [ ] Show generation status per artifact type with progress indicators
-  - [ ] Display errors inline with retry option
-  - [ ] Integrate AsyncStatusBar for podcast generation
+- [x] Task 4: Frontend - Artifact Generation UI (AC: 1)
+  - [x] Create ArtifactGenerationPanel component
+  - [x] Add "Generate All" button with confirmation
+  - [x] Show generation status per artifact type with progress indicators
+  - [x] Display errors inline with retry option
+  - [x] Integrate AsyncStatusBar for podcast generation
 
-- [ ] Task 5: Frontend - Artifact Preview Components (AC: 2)
-  - [ ] Create QuizPreview component (MCQ questions display)
-  - [ ] Create PodcastPreview component (audio player + transcript)
-  - [ ] Create SummaryPreview component (markdown renderer)
-  - [ ] Create TransformationPreview component (side-by-side comparison)
-  - [ ] Add preview modal/drawer with type-specific rendering
+- [x] Task 5: Frontend - Artifact Preview Components (AC: 2)
+  - [x] Create QuizPreview component (MCQ questions display)
+  - [x] Create PodcastPreview component (audio player + transcript)
+  - [x] Create SummaryPreview component (markdown renderer)
+  - [x] Create TransformationPreview component (side-by-side comparison)
+  - [x] Add preview modal/drawer with type-specific rendering
 
-- [ ] Task 6: Frontend - Pipeline Integration (AC: 4)
-  - [ ] Update ModuleCreationStepper for Generate step
-  - [ ] Add step validation (at least one artifact generated)
-  - [ ] Enable Next button when artifacts complete
-  - [ ] Add i18n keys for generation UI (en-US + fr-FR)
+- [x] Task 6: Frontend - Pipeline Integration (AC: 4)
+  - [x] Update ModuleCreationStepper for Generate step
+  - [x] Add step validation (at least one artifact generated)
+  - [x] Enable Next button when artifacts complete
+  - [x] Add i18n keys for generation UI (en-US + fr-FR)
 
 - [ ] Task 7: Testing (All ACs)
   - [ ] Unit tests for batch generation orchestration
@@ -768,7 +768,7 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 - Testing requirements and coverage targets
 - Integration with Story 3.1's pipeline stepper
 
-**Story Status:** IN PROGRESS (Backend Tasks 1-3 Complete)
+**Story Status:** IN PROGRESS (Tasks 1-6 Complete, Task 7 Pending)
 
 **Implementation Progress (2026-02-05):**
 - ✅ Task 1: Backend - Batch Artifact Generation Endpoint (COMPLETE)
@@ -795,11 +795,35 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 
 **Backend Implementation Complete (24/24 tests passing)**
 
+- ✅ Task 4: Frontend - Artifact Generation UI (COMPLETE)
+  - Created ArtifactGenerationPanel component with batch generation controls
+  - Added "Generate All" button with confirmation dialog
+  - Implemented per-artifact status tracking (quiz, podcast, summary)
+  - Added polling with conditional 2s refetch when artifacts are processing
+  - Integrated AsyncStatusBar for long-running podcast generation
+  - Error handling with inline error display and retry functionality
+
+- ✅ Task 5: Frontend - Artifact Preview Components (COMPLETE)
+  - Created QuizPreview component with MCQ questions and correct answer highlighting
+  - Created PodcastPreview component with audio player and transcript display
+  - Created SummaryPreview component with markdown rendering
+  - Created TransformationPreview component for before/after comparisons
+  - Created ArtifactPreviewModal with type-specific rendering
+  - Added regeneration functionality with confirmation dialog
+  - All components integrated with i18n (en-US and fr-FR)
+
+- ✅ Task 6: Frontend - Pipeline Integration (COMPLETE)
+  - Integrated ArtifactGenerationPanel with module page
+  - Added conditional rendering based on activeStep === 'generate'
+  - Implemented step validation requiring at least one completed artifact
+  - Made Next button conditional on artifact completion status
+  - Wired automatic step advancement via onComplete callback
+  - Updated ModuleCreationStepper to accept canProceed prop
+
+**Frontend Implementation Complete (13 files created/modified)**
+
 **Next Steps:**
-- Task 4: Frontend - Artifact Generation UI (React components)
-- Task 5: Frontend - Artifact Preview Components
-- Task 6: Frontend - Pipeline Integration
-- Task 7: Additional Integration Tests
+- Task 7: Additional Integration Tests (frontend component tests)
 
 ### File List
 
