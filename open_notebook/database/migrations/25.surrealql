@@ -1,0 +1,12 @@
+-- Migration 25: Company table
+-- Creates company grouping for learner organization
+
+DEFINE TABLE company SCHEMAFULL;
+
+DEFINE FIELD name ON company TYPE string;
+DEFINE FIELD slug ON company TYPE string;
+DEFINE FIELD created ON company TYPE datetime DEFAULT time::now();
+DEFINE FIELD updated ON company TYPE datetime DEFAULT time::now();
+
+DEFINE INDEX idx_company_slug ON company FIELDS slug UNIQUE;
+DEFINE INDEX idx_company_name ON company FIELDS name;

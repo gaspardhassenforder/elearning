@@ -1,0 +1,3 @@
+-- Migration 25 Down: Remove company table
+
+REMOVE TABLE company;

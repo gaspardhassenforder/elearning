@@ -168,8 +168,7 @@ class CompanyCreate(BaseModel):
     """Create a new company."""
 
     name: str = Field(..., min_length=1, description="Company name")
-    slug: str = Field(..., min_length=1, description="Unique slug for the company")
-    description: Optional[str] = Field(None, description="Company description")
+    slug: Optional[str] = Field(None, min_length=1, description="Unique slug (auto-generated if omitted)")
 
 
 class CompanyUpdate(BaseModel):
@@ -177,7 +176,6 @@ class CompanyUpdate(BaseModel):
 
     name: Optional[str] = Field(None, min_length=1, description="Company name")
     slug: Optional[str] = Field(None, min_length=1, description="Unique slug")
-    description: Optional[str] = Field(None, description="Company description")
 
 
 class CompanyResponse(BaseModel):
@@ -186,7 +184,6 @@ class CompanyResponse(BaseModel):
     id: str
     name: str
     slug: str
-    description: Optional[str] = None
     user_count: int = 0  # Number of users/learners assigned to this company
     assignment_count: int = 0  # Number of module assignments for this company
     created: str
