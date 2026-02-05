@@ -181,3 +181,52 @@ async def test_greeting_generation_fallback_on_llm_failure():
     assert "Engineer" in greeting
     assert "Test Module" in greeting
     assert len(greeting) > 0  # Not empty
+
+
+@pytest.mark.asyncio
+async def test_greeting_template_file_exists():
+    """Test that greeting_template.j2 file exists and is readable."""
+    from pathlib import Path
+
+    template_path = Path("prompts/greeting_template.j2")
+    assert template_path.exists(), f"Greeting template not found at {template_path}"
+    assert template_path.is_file(), f"Greeting template path is not a file: {template_path}"
+
+    # Verify file is readable
+    with open(template_path, 'r') as f:
+        content = f.read()
+        assert len(content) > 0, "Greeting template is empty"
+        assert "learner_profile" in content, "Template missing learner_profile variable"
+
+
+@pytest.mark.asyncio
+async def test_greeting_handles_missing_profile_fields():
+    """Test greeting generation with minimal learner profile."""
+    # Arrange - minimal profile (missing job_description)
+    learner_profile = {
+        "role": "Student",
+        "ai_familiarity": "beginner"
+        # job_description intentionally missing
+    }
+    mock_notebook = MagicMock()
+    mock_notebook.title = "Intro Course"
+
+    with patch('api.learner_chat_service.LearningObjective.list_by_notebook') as mock_objectives:
+        mock_objectives.return_value = [MagicMock(text="Learn basics")]
+
+        with patch('api.learner_chat_service.provision_langchain_model') as mock_model:
+            mock_llm = AsyncMock()
+            mock_llm.ainvoke = AsyncMock(return_value=MagicMock(content="What interests you?"))
+            mock_model.return_value = mock_llm
+
+            # Act
+            greeting = await generate_proactive_greeting(
+                notebook_id="notebook:test",
+                learner_profile=learner_profile,
+                notebook=mock_notebook
+            )
+
+    # Assert - Should not crash, should still personalize
+    assert "Student" in greeting
+    assert "Intro Course" in greeting
+    assert len(greeting) > 0

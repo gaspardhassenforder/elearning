@@ -246,8 +246,14 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
           }
         } catch (err) {
           console.error('Failed to fetch greeting:', err)
-          // If greeting fails, just show empty state (UI will handle)
+          // If greeting fails, show empty state and notify user
           setMessages([])
+
+          toast({
+            title: 'Could not generate greeting',
+            description: 'You can still start the conversation by sending a message.',
+            variant: 'default',  // Non-destructive - not critical failure
+          })
         } finally {
           setIsStreaming(false)
         }
