@@ -81,12 +81,12 @@ So that I can keep learning content current without disrupting active learners.
   - [x] Show "Save Changes" instead of "Create" in stepper
   - [x] Handle edit mode state in module-creation-store
 
-- [ ] Task 8: Frontend Source Add/Remove in Edit Mode (AC: 2)
-  - [ ] Show existing sources with remove buttons
-  - [ ] Allow new document uploads
-  - [ ] Handle source deletion with confirmation
-  - [ ] Show visual feedback during source processing
-  - [ ] Update source count in real-time
+- [x] Task 8: Frontend Source Add/Remove in Edit Mode (AC: 2)
+  - [x] Show existing sources with remove buttons
+  - [x] Allow new document uploads
+  - [x] Handle source deletion with confirmation
+  - [x] Show visual feedback during source processing
+  - [x] Update source count in real-time
 
 - [ ] Task 9: Frontend Artifact Regeneration UI (AC: 3)
   - [ ] Show existing artifacts with "Regenerate" buttons
@@ -1189,3 +1189,44 @@ Files Modified (Task 7):
 - `frontend/src/app/(dashboard)/modules/[id]/page.tsx` - Edit mode badge indicator
 - `frontend/src/lib/locales/en-US/index.ts` - Added 3 i18n keys
 - `frontend/src/lib/locales/fr-FR/index.ts` - Added 3 French translations
+
+**Task 8: Frontend Source Add/Remove in Edit Mode COMPLETE (2026-02-05)**
+- ✅ Created RemoveDocumentDialog component (AlertDialog pattern)
+  - Confirmation with warning about immediate removal
+  - AlertTriangle icon for destructive action emphasis
+  - Shows document title being removed
+  - Loading state during removal operation
+- ✅ Added removeDocument() method to modulesApi
+  - DELETE /notebooks/{moduleId}/sources/{sourceId}
+  - Uses existing backend endpoint from Story 3.1
+- ✅ Added useRemoveDocument() hook
+  - TanStack Query mutation with cache invalidation
+  - Invalidates both documents list and module detail
+  - Toast feedback for success/error states
+- ✅ Updated DocumentUploader component:
+  - Shows Trash2 icon remove buttons when isEditMode=true
+  - Remove buttons only on completed documents
+  - Opens confirmation dialog before removal
+  - Destructive color (red) for remove icon
+- ✅ Document upload already working (from Story 3.1):
+  - Drag & drop upload zone functional
+  - Status tracking with 2-second polling
+  - Progress bars during upload
+  - Error handling with retry button
+  - Real-time source count updates via polling
+- ✅ Added 7 i18n keys (en-US + fr-FR):
+  - modules.removeDocument
+  - modules.removeDocumentTitle
+  - modules.removeDocumentMessage
+  - modules.removeDocumentWarning
+  - modules.removeDocumentButton
+  - modules.documentRemoved
+  - modules.removeDocumentError
+
+Files Modified (Task 8):
+- `frontend/src/lib/api/modules.ts` - Added removeDocument method
+- `frontend/src/lib/hooks/use-modules.ts` - Added useRemoveDocument hook
+- `frontend/src/components/admin/RemoveDocumentDialog.tsx` - NEW (97 lines)
+- `frontend/src/components/admin/DocumentUploader.tsx` - Added remove buttons + dialog
+- `frontend/src/lib/locales/en-US/index.ts` - Added 7 i18n keys
+- `frontend/src/lib/locales/fr-FR/index.ts` - Added 7 French translations
