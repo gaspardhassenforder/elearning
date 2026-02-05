@@ -62,13 +62,13 @@ development_status:
   3-3-learning-objectives-configuration: in-progress  # Code review complete: 6 issues fixed, 2 HIGH issues remain (Story 3.4 contamination + backend tests deferred)
   3-4-ai-teacher-prompt-configuration: review  # All 8 tasks complete: Backend (Migration 24, ModulePrompt, API, prompt assembly) + Frontend (ModulePromptEditor, hooks, pipeline integration, E2E testing)
   3-5-module-publishing: ready-for-dev  # Comprehensive story created: Validation + publish endpoint, ModuleSummaryCard, PublishedBadge, NO NEW MIGRATION (published field exists)
-  3-6-edit-published-module: ready-for-dev  # Comprehensive story created: Unpublish endpoint, edit mode pipeline, progress preservation, NO NEW MIGRATION
-  3-7-admin-ai-chatbot-assistant: ready-for-dev  # Story created: Admin AI assistant for module creation help, reuses chat workflow with custom prompt
+  3-6-edit-published-module: in-progress  # Comprehensive story created: Unpublish endpoint, edit mode pipeline, progress preservation, NO NEW MIGRATION
+  3-7-admin-ai-chatbot-assistant: in-progress  # Story created: Admin AI assistant for module creation help, reuses chat workflow with custom prompt
   epic-3-retrospective: optional
 
   # Epic 4: Learner AI Chat Experience
-  epic-4: backlog
-  4-1-learner-chat-interface-and-sse-streaming: backlog
+  epic-4: in-progress
+  4-1-learner-chat-interface-and-sse-streaming: in-progress
   4-2-two-layer-prompt-system-and-proactive-ai-teacher: backlog
   4-3-inline-document-snippets-in-chat: backlog
   4-4-learning-objectives-assessment-and-progress-tracking: backlog

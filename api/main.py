@@ -13,6 +13,7 @@ from loguru import logger
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from api.routers import (
+    admin_chat,
     artifacts,
     auth,
     chat,
@@ -206,6 +207,7 @@ app.include_router(learner.router, prefix="/api", tags=["learner"])
 app.include_router(learner_chat.router, prefix="/api", tags=["learner-chat"])
 app.include_router(learning_objectives.router, prefix="/api", tags=["learning-objectives"])
 app.include_router(module_prompts.router, prefix="/api", tags=["module-prompts"])
+app.include_router(admin_chat.router, prefix="/api", tags=["admin-chat"])
 
 
 @app.get("/")
