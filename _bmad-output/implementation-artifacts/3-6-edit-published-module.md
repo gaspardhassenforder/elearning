@@ -88,12 +88,12 @@ So that I can keep learning content current without disrupting active learners.
   - [x] Show visual feedback during source processing
   - [x] Update source count in real-time
 
-- [ ] Task 9: Frontend Artifact Regeneration UI (AC: 3)
-  - [ ] Show existing artifacts with "Regenerate" buttons
-  - [ ] Handle regeneration status (pending, complete, failed)
-  - [ ] Replace artifact preview after regeneration
-  - [ ] Show confirmation before regenerating (warn about replacement)
-  - [ ] i18n keys for regeneration UI
+- [x] Task 9: Frontend Artifact Regeneration UI (AC: 3)
+  - [x] Show existing artifacts with "Regenerate" buttons
+  - [x] Handle regeneration status (pending, complete, failed)
+  - [x] Replace artifact preview after regeneration
+  - [x] Show confirmation before regenerating (warn about replacement)
+  - [x] i18n keys for regeneration UI
 
 - [ ] Task 10: Frontend Objective Updates in Edit Mode (AC: 4)
   - [ ] LearningObjectivesEditor already supports CRUD
@@ -1230,3 +1230,39 @@ Files Modified (Task 8):
 - `frontend/src/components/admin/DocumentUploader.tsx` - Added remove buttons + dialog
 - `frontend/src/lib/locales/en-US/index.ts` - Added 7 i18n keys
 - `frontend/src/lib/locales/fr-FR/index.ts` - Added 7 French translations
+
+**Task 9: Frontend Artifact Regeneration UI COMPLETE (2026-02-05)**
+- ✅ Updated ArtifactGenerationPanel for per-artifact regeneration
+  - Added "Regenerate" button with RotateCw icon
+  - Buttons only visible for completed artifacts when isEditMode=true
+  - Small button size to fit next to status indicator
+- ✅ Created regeneration confirmation dialog
+  - AlertDialog pattern with destructive warning
+  - Shows artifact type being regenerated
+  - AlertCircle icon emphasizes permanent replacement
+  - Warns that existing artifact will be permanently replaced
+- ✅ Regeneration trigger logic
+  - Uses same generateAllArtifacts endpoint
+  - Sets only selected artifact to 'generating' status
+  - Polling automatically detects completion
+  - Replaces artifact in-place when complete
+- ✅ Status tracking already working (from Story 3.2):
+  - 2-second polling via useArtifacts hook
+  - Visual indicators: pending, generating, completed, error
+  - Colored borders and icons for each state
+  - Podcast async tracking (command_id transitions)
+  - Retry functionality for failures
+- ✅ Added 7 i18n keys (en-US + fr-FR):
+  - artifacts.regenerate
+  - artifacts.regenerateConfirmTitle
+  - artifacts.regenerateConfirmDescription
+  - artifacts.regenerateWarning
+  - artifacts.regenerateButton
+  - artifacts.regenerateSuccess
+  - artifacts.regenerateError
+  - Note: Some French keys already existed from previous work
+
+Files Modified (Task 9):
+- `frontend/src/components/admin/ArtifactGenerationPanel.tsx` - Added regeneration UI
+- `frontend/src/lib/locales/en-US/index.ts` - Added 7 i18n keys
+- `frontend/src/lib/locales/fr-FR/index.ts` - Added 3 missing French keys
