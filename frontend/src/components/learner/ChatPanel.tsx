@@ -11,7 +11,7 @@
  * - Streaming cursor during generation
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { MessageSquare } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useTranslation } from '@/lib/hooks/use-translation'
@@ -25,6 +25,7 @@ interface ChatPanelProps {
 export function ChatPanel({ notebookId }: ChatPanelProps) {
   const { t } = useTranslation()
   const [mounted, setMounted] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Wait for client-side mounting (assistant-ui uses browser APIs)
   useEffect(() => {
@@ -38,6 +39,11 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
     sendMessage,
     messages,
   } = useLearnerChat(notebookId)
+
+  // Auto-scroll to bottom when messages change or streaming updates
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, isStreaming])
 
   if (!mounted) {
     return (
@@ -121,6 +127,8 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
                   </div>
                 ))
               )}
+              {/* Scroll anchor for auto-scroll */}
+              <div ref={messagesEndRef} />
             </div>
 
             {/* Message Input Area */}

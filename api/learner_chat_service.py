@@ -12,6 +12,7 @@ from loguru import logger
 
 from api.auth import LearnerContext
 from open_notebook.domain.notebook import Notebook
+from open_notebook.domain.module_assignment import ModuleAssignment
 from open_notebook.graphs.prompt import assemble_system_prompt
 
 
@@ -66,8 +67,10 @@ async def validate_learner_access_to_notebook(
 
     notebook_data = result[0]
 
-    # Check published status (learners cannot see unpublished modules)
-    if not notebook_data.get("published", True):
+    # Validate published status (learners cannot see unpublished modules)
+    # Use .get() with explicit default for backward compatibility with old data
+    published = notebook_data.get("published", True)
+    if not published:
         logger.warning(
             f"Learner {learner_context.user.id} attempted to access unpublished notebook {notebook_id}"
         )
@@ -75,8 +78,14 @@ async def validate_learner_access_to_notebook(
             status_code=403, detail="You do not have access to this module"
         )
 
-    # Check locked status (Story 2.3)
-    if notebook_data.get("is_locked", False):
+    # Validate locked status using typed check (Story 2.3)
+    # Extract is_locked from the JOIN result and validate type safety
+    is_locked = notebook_data.get("is_locked", False)
+    if not isinstance(is_locked, bool):
+        logger.warning(f"Invalid is_locked type for notebook {notebook_id}: {type(is_locked)}")
+        is_locked = bool(is_locked)  # Coerce to bool
+
+    if is_locked:
         logger.warning(
             f"Learner {learner_context.user.id} attempted to access locked notebook {notebook_id}"
         )

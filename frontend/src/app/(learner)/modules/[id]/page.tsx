@@ -14,10 +14,11 @@
  * - Proactive AI teacher greeting
  */
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from 'react-resizable-panels'
 import { ArrowLeft, BookOpen } from 'lucide-react'
+import { AxiosError } from 'axios'
 import { Button } from '@/components/ui/button'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { useTranslation } from '@/lib/hooks/use-translation'
@@ -34,6 +35,25 @@ export default function ModuleConversationPage() {
 
   const moduleId = params?.id ? decodeURIComponent(params.id as string) : ''
 
+  // Restore panel sizes from localStorage
+  const getStoredPanelSizes = (): number[] => {
+    if (typeof window === 'undefined') return [33, 67]
+    try {
+      const stored = localStorage.getItem(`learner_panel_sizes_${moduleId}`)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed) && parsed.length === 2) {
+          return parsed
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to parse stored panel sizes:', e)
+    }
+    return [33, 67] // Default sizes
+  }
+
+  const [panelSizes] = useState(getStoredPanelSizes)
+
   // Validate learner access to this module
   const { data: module, error: accessError, isLoading: accessLoading } = useLearnerModule(moduleId)
 
@@ -41,7 +61,9 @@ export default function ModuleConversationPage() {
   useEffect(() => {
     if (accessError) {
       // Check if it's an access denial (403/404) vs network error
-      const errorStatus = (accessError as any)?.response?.status
+      const isAxiosError = accessError instanceof AxiosError
+      const errorStatus = isAxiosError ? accessError.response?.status : undefined
+
       if (errorStatus === 403 || errorStatus === 404) {
         toast({
           title: t.common.error,
@@ -120,9 +142,9 @@ export default function ModuleConversationPage() {
             )
           }}
         >
-          {/* Left Panel: Sources (1/3 default) */}
+          {/* Left Panel: Sources (1/3 default, restored from localStorage) */}
           <ResizablePanel
-            defaultSize={33}
+            defaultSize={panelSizes[0]}
             minSize={20}
             maxSize={50}
             className="p-4"
@@ -133,9 +155,9 @@ export default function ModuleConversationPage() {
           {/* Resizable Divider */}
           <ResizableHandle withHandle className="bg-border hover:bg-primary/20 transition-colors" />
 
-          {/* Right Panel: Chat (2/3 default) */}
+          {/* Right Panel: Chat (2/3 default, restored from localStorage) */}
           <ResizablePanel
-            defaultSize={67}
+            defaultSize={panelSizes[1]}
             minSize={50}
             className="p-4"
           >

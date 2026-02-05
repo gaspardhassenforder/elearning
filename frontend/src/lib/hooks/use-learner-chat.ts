@@ -45,30 +45,41 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
   // Send message mutation with SSE streaming
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
-      // Add user message immediately (optimistic update)
-      const userMessage: LearnerChatMessage = {
-        role: 'user',
-        content,
-        timestamp: new Date().toISOString(),
-      }
-      setMessages((prev) => [...prev, userMessage])
-
-      // Start streaming assistant response
-      setIsStreaming(true)
-      const response = await sendLearnerChatMessage(notebookId, { message: content })
-
-      // Parse SSE stream and accumulate response
-      let assistantContent = ''
-      const assistantMessage: LearnerChatMessage = {
-        role: 'assistant',
-        content: '',
-        timestamp: new Date().toISOString(),
-      }
-
-      // Add empty assistant message that will be updated as stream arrives
-      setMessages((prev) => [...prev, assistantMessage])
+      // Track message indices for cleanup on error
+      let userMessageIndex = -1
+      let assistantMessageIndex = -1
 
       try {
+        // Add user message immediately (optimistic update)
+        const userMessage: LearnerChatMessage = {
+          role: 'user',
+          content,
+          timestamp: new Date().toISOString(),
+        }
+        setMessages((prev) => {
+          userMessageIndex = prev.length
+          return [...prev, userMessage]
+        })
+
+        // Start streaming assistant response
+        setIsStreaming(true)
+        const response = await sendLearnerChatMessage(notebookId, { message: content })
+
+        // Parse SSE stream and accumulate response
+        let assistantContent = ''
+        const assistantMessage: LearnerChatMessage = {
+          role: 'assistant',
+          content: '',
+          timestamp: new Date().toISOString(),
+        }
+
+        // Add empty assistant message that will be updated as stream arrives
+        setMessages((prev) => {
+          assistantMessageIndex = prev.length
+          return [...prev, assistantMessage]
+        })
+
+        // Stream parsing with error handling
         for await (const delta of parseLearnerChatStream(response)) {
           assistantContent += delta
 
@@ -82,18 +93,35 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
             return updated
           })
         }
+
+        return assistantContent
       } catch (streamError) {
         console.error('Stream error:', streamError)
+        // Cleanup will happen in onError
         throw streamError
       } finally {
         setIsStreaming(false)
       }
-
-      return assistantContent
     },
     onError: (error) => {
       // Remove failed messages on error
-      setMessages((prev) => prev.slice(0, -2)) // Remove user + assistant messages
+      // This handles both: request failures AND streaming failures
+      setMessages((prev) => {
+        // Remove the optimistic user message + partial/empty assistant message
+        // Check last 2 messages to ensure they're from this failed request
+        if (prev.length >= 2) {
+          const lastTwo = prev.slice(-2)
+          const isUserThenAssistant =
+            lastTwo[0]?.role === 'user' &&
+            lastTwo[1]?.role === 'assistant'
+
+          if (isUserThenAssistant) {
+            return prev.slice(0, -2)
+          }
+        }
+        // Fallback: if structure is unexpected, just remove last message
+        return prev.slice(0, -1)
+      })
       setIsStreaming(false)
 
       toast({
