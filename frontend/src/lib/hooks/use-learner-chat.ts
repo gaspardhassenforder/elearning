@@ -1,11 +1,13 @@
 /**
  * Story 4.1: Learner Chat Hook
+ * Story 4.2: Proactive Greeting Support
  *
  * Manages learner chat state and SSE streaming.
  * Uses TanStack Query for server state caching.
+ * Story 4.2: Automatically requests proactive greeting on first load.
  */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { sendLearnerChatMessage, parseLearnerChatStream, LearnerChatMessage } from '../api/learner-chat'
 import { useToast } from './use-toast'
@@ -17,6 +19,7 @@ interface UseLearnerChatResult {
   error: Error | null
   sendMessage: (content: string) => Promise<void>
   clearMessages: () => void
+  greetingRequested: boolean  // Story 4.2: Track if greeting was requested
 }
 
 /**
@@ -144,6 +147,63 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
     setMessages([])
   }, [])
 
+  // Story 4.2: Request proactive greeting on first load
+  const [greetingRequested, setGreetingRequested] = useState(false)
+  const greetingRequestedRef = useRef(false)
+
+  useEffect(() => {
+    // Only request greeting once, when messages are empty and not already requested
+    if (messages.length === 0 && !greetingRequestedRef.current && !isLoading && !error) {
+      greetingRequestedRef.current = true
+      setGreetingRequested(true)
+
+      // Request greeting-only message
+      const requestGreeting = async () => {
+        try {
+          setIsStreaming(true)
+          const response = await sendLearnerChatMessage(notebookId, {
+            message: '',
+            request_greeting_only: true,
+          })
+
+          // Parse SSE stream and accumulate greeting
+          let greetingContent = ''
+          const greetingMessage: LearnerChatMessage = {
+            role: 'assistant',
+            content: '',
+            timestamp: new Date().toISOString(),
+          }
+
+          // Add empty assistant message that will be updated as stream arrives
+          setMessages([greetingMessage])
+
+          // Stream parsing
+          for await (const delta of parseLearnerChatStream(response)) {
+            greetingContent += delta
+
+            // Update greeting message with accumulated content
+            setMessages((prev) => {
+              const updated = [...prev]
+              const lastMessage = updated[updated.length - 1]
+              if (lastMessage && lastMessage.role === 'assistant') {
+                lastMessage.content = greetingContent
+              }
+              return updated
+            })
+          }
+        } catch (err) {
+          console.error('Failed to fetch greeting:', err)
+          // If greeting fails, just show empty state (UI will handle)
+          setMessages([])
+        } finally {
+          setIsStreaming(false)
+        }
+      }
+
+      requestGreeting()
+    }
+  }, [messages.length, notebookId, isLoading, error])
+
   return {
     messages,
     isLoading: isLoading || isStreaming,
@@ -151,5 +211,6 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
     error: error as Error | null,
     sendMessage,
     clearMessages,
+    greetingRequested,
   }
 }

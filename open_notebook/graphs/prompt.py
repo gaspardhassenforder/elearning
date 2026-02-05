@@ -63,7 +63,8 @@ async def assemble_system_prompt(
     notebook_id: str,
     learner_profile: Optional[dict] = None,
     objectives_with_status: Optional[list[dict]] = None,
-    context: Optional[str] = None
+    context: Optional[str] = None,
+    current_focus_objective: Optional[str] = None  # Story 4.2: Explicit focus objective
 ) -> str:
     """Assemble final system prompt from global + per-module templates.
 
@@ -73,11 +74,17 @@ async def assemble_system_prompt(
 
     Called for each learner chat turn to ensure latest objectives status.
 
+    Story 4.2 Enhancement:
+    - Determines "current focus objective" (next incomplete objective)
+    - Injects focus objective into template for AI guidance
+    - Supports conversation state hints for teaching flow
+
     Args:
         notebook_id: Notebook/module record ID
         learner_profile: Dict with 'role', 'ai_familiarity', 'job' (optional)
         objectives_with_status: List of dicts with 'text' and 'status'
         context: Optional context string (available documents, etc.)
+        current_focus_objective: Optional explicit focus objective (auto-determined if None)
 
     Returns:
         Final assembled system prompt string
@@ -92,6 +99,22 @@ async def assemble_system_prompt(
     learner_profile = learner_profile or {}
     objectives_with_status = objectives_with_status or []
 
+    # Story 4.2: Determine current focus objective if not explicitly provided
+    if current_focus_objective is None and objectives_with_status:
+        # Find first objective that is NOT completed
+        for obj in objectives_with_status:
+            if obj.get("status") != "completed":
+                current_focus_objective = obj.get("text", "")
+                logger.info(f"Auto-selected focus objective: {current_focus_objective}")
+                break
+
+        # If all completed, focus on first objective (for review/discussion)
+        if current_focus_objective is None and objectives_with_status:
+            current_focus_objective = objectives_with_status[0].get("text", "")
+            logger.info(f"All objectives completed - focusing on first objective for review")
+
+    logger.debug(f"Current focus objective: {current_focus_objective}")
+
     # 1. Load and render global template
     global_template_path = Path("prompts/global_teacher_prompt.j2")
     if not global_template_path.exists():
@@ -104,6 +127,7 @@ async def assemble_system_prompt(
     global_context = {
         "learner_profile": learner_profile,
         "objectives": objectives_with_status,
+        "current_focus_objective": current_focus_objective,  # Story 4.2: Focus objective for AI
         "context": context
     }
 

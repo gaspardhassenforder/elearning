@@ -2,11 +2,12 @@
 
 /**
  * Story 4.1: Learner Chat Panel with assistant-ui
+ * Story 4.2: Proactive AI Teacher Greeting
  *
  * Features:
  * - SSE streaming with token-by-token rendering
  * - assistant-ui Thread component integration
- * - Proactive AI greeting (no empty state)
+ * - Proactive AI greeting (personalized on first load)
  * - Flowing AI messages, subtle user backgrounds
  * - Streaming cursor during generation
  */
@@ -80,8 +81,20 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
           <div className="h-full flex flex-col">
             {/* Chat Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {messages.length === 0 ? (
-                // Proactive AI Greeting (no empty state)
+              {messages.length === 0 && isStreaming ? (
+                // Story 4.2: Show loading indicator while fetching greeting
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <MessageSquare className="h-4 w-4 text-primary animate-pulse" />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      {t.learner.chat.greetingLoading || 'Preparing your personalized greeting...'}
+                    </p>
+                  </div>
+                </div>
+              ) : messages.length === 0 ? (
+                // Fallback empty state (shouldn't normally be seen due to auto greeting request)
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                     <MessageSquare className="h-4 w-4 text-primary" />

@@ -17,10 +17,11 @@ from pydantic import BaseModel, Field
 
 from api.auth import LearnerContext, get_current_learner
 from api.learner_chat_service import (
+    generate_proactive_greeting,
     prepare_chat_context,
     validate_learner_access_to_notebook,
 )
-from open_notebook.graphs.chat import graph as chat_graph
+from open_notebook.graphs.chat import graph as chat_graph, memory as chat_memory
 
 router = APIRouter()
 
@@ -33,7 +34,11 @@ router = APIRouter()
 class LearnerChatRequest(BaseModel):
     """Request body for learner chat message."""
 
-    message: str = Field(..., min_length=1, description="Learner's message content")
+    message: str = Field(default="", description="Learner's message content (empty for greeting-only request)")
+    request_greeting_only: bool = Field(
+        default=False,
+        description="Story 4.2: If true, only return greeting without processing message"
+    )
 
 
 class SSETextEvent(BaseModel):
@@ -104,7 +109,7 @@ async def stream_learner_chat(
     try:
         # 1. Validate learner has access to this notebook
         # (published + assigned to learner's company + not locked)
-        await validate_learner_access_to_notebook(
+        notebook = await validate_learner_access_to_notebook(
             notebook_id=notebook_id, learner_context=learner
         )
 
@@ -136,13 +141,74 @@ async def stream_learner_chat(
         """Generate SSE events from LangGraph streaming output.
 
         Translates LangGraph events to assistant-ui SSE protocol format.
+        Story 4.2: Includes first-visit proactive greeting detection and generation.
         """
         try:
             # Thread ID pattern: user:{user_id}:notebook:{notebook_id}
             thread_id = f"user:{learner.user.id}:notebook:{notebook_id}"
             logger.info(f"Using thread_id: {thread_id}")
 
-            # Prepare user message
+            # Story 4.2: Check if this is first visit (no messages in checkpoint)
+            is_first_visit = False
+            try:
+                # Get thread state from checkpoint
+                thread_state = chat_memory.get({"configurable": {"thread_id": thread_id}})
+
+                # First visit if no state OR messages list is empty
+                if thread_state is None or not thread_state.values.get("messages"):
+                    is_first_visit = True
+                    logger.info(f"First visit detected for thread {thread_id}")
+                else:
+                    logger.info(f"Continuing conversation for thread {thread_id}")
+            except Exception as e:
+                logger.warning(f"Could not check thread state, assuming first visit: {e}")
+                is_first_visit = True
+
+            # Story 4.2: Generate and stream proactive greeting on first visit
+            # Greeting is sent BEFORE processing user's first message
+            if is_first_visit:
+                logger.info("Generating proactive greeting...")
+                try:
+                    greeting = await generate_proactive_greeting(
+                        notebook_id=notebook_id,
+                        learner_profile=learner_profile_dict,
+                        notebook=notebook,
+                    )
+
+                    # Stream greeting token-by-token for smooth UX
+                    # Split into words for token-like streaming effect
+                    words = greeting.split()
+                    for word in words:
+                        text_event = SSETextEvent(delta=word + " ")
+                        yield f"event: text\ndata: {text_event.model_dump_json()}\n\n"
+
+                    # Send message complete for greeting
+                    greeting_complete_event = SSEMessageCompleteEvent(
+                        messageId=f"greeting_{thread_id}",
+                        metadata={
+                            "thread_id": thread_id,
+                            "notebook_id": notebook_id,
+                            "type": "proactive_greeting",
+                        },
+                    )
+                    yield f"event: message_complete\ndata: {greeting_complete_event.model_dump_json()}\n\n"
+
+                    logger.info("Proactive greeting sent successfully")
+
+                except Exception as e:
+                    logger.error(f"Failed to generate proactive greeting: {e}")
+                    # Continue with normal chat flow if greeting fails
+
+            # Story 4.2: If greeting-only request, return after sending greeting
+            if request.request_greeting_only or (is_first_visit and not request.message.strip()):
+                logger.info("Greeting-only request completed")
+                return
+
+            # Prepare user message (skip if empty)
+            if not request.message.strip():
+                logger.warning("Empty message received, skipping graph invocation")
+                return
+
             user_message = HumanMessage(content=request.message)
 
             # Stream events from chat graph with assembled system prompt

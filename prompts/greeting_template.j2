@@ -1,0 +1,19 @@
+Hello {{ learner_profile.role }}! Welcome to {{ module_title }}.
+
+{% if learner_profile.ai_familiarity == "expert" %}
+I see you're already familiar with AI concepts, so we'll move at a good pace and dive into the details.
+{% elif learner_profile.ai_familiarity == "intermediate" %}
+You have some AI background, which is great! We'll build on that foundation and explore new concepts together.
+{% elif learner_profile.ai_familiarity == "beginner" %}
+No problem if AI is new to you — we'll explore these concepts step by step, starting from the basics.
+{% else %}
+Let's explore these concepts together at a comfortable pace.
+{% endif %}
+
+{% if learner_profile.job_description %}
+Given your work as {{ learner_profile.job_description }}, I'll try to connect these concepts to scenarios you might encounter in your role.
+{% endif %}
+
+Let's start with our first learning objective: {{ first_objective_text }}
+
+{{ opening_question }}
