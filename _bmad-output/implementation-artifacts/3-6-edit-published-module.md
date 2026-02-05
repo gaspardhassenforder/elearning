@@ -1,6 +1,6 @@
 # Story 3.6: Edit Published Module
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -66,12 +66,12 @@ So that I can keep learning content current without disrupting active learners.
   - [x] Implement progress preservation logic (unchanged objectives keep progress)
   - [x] Write tests for progress preservation
 
-- [ ] Task 6: Frontend Edit Button & Navigation (AC: 1)
-  - [ ] Add "Edit Module" button to module detail view
-  - [ ] Show button only for published modules
-  - [ ] Navigate to pipeline with edit mode flag
-  - [ ] Add unpublish confirmation modal (warn about learner impact)
-  - [ ] i18n keys for edit button and warning modal
+- [x] Task 6: Frontend Edit Button & Navigation (AC: 1)
+  - [x] Add "Edit Module" button to module detail view
+  - [x] Show button only for published modules
+  - [x] Navigate to pipeline with edit mode flag
+  - [x] Add unpublish confirmation modal (warn about learner impact)
+  - [x] i18n keys for edit button and warning modal
 
 - [ ] Task 7: Frontend Edit Mode Pipeline (AC: 1, 2, 3)
   - [ ] Extend ModuleCreationStepper to support edit mode
@@ -1131,3 +1131,32 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 - `open_notebook/domain/learning_objective.py` - CRUD methods
 - `open_notebook/domain/module_prompt.py` - Upsert pattern
 - `frontend/src/components/admin/ModuleCreationStepper.tsx` - Pipeline state management
+
+**Task 6: Frontend Edit Button & Navigation COMPLETE (2026-02-05)**
+- ✅ Created UnpublishConfirmDialog component with AlertDialog pattern
+- ✅ Added useUnpublishModule hook with TanStack Query mutation
+- ✅ Extended modulesApi with unpublish() method (POST /notebooks/{id}/unpublish)
+- ✅ Added Edit button to module detail page (visible only for published modules)
+- ✅ Implemented unpublish confirmation with learner impact warning
+- ✅ Added i18n keys for edit flow (en-US + fr-FR)
+  - modules.editModule: "Edit Module" / "Modifier le module"
+  - modules.unpublishConfirmTitle: "Unpublish Module to Edit?" / "Dépublier le module pour le modifier ?"
+  - modules.unpublishConfirmMessage: Warning about draft status
+  - modules.unpublishConfirmWarning: Immediate learner access loss warning
+  - modules.unpublishButton: "Unpublish & Edit" / "Dépublier et modifier"
+  - modules.moduleUnpublished: Success toast message
+  - modules.unpublishError: Error toast message
+- ✅ All backend tests passing (9/9 tests for edit scenarios)
+- ✅ Edit button uses Edit lucide icon
+- ✅ Confirmation dialog uses destructive variant for unpublish action
+- ✅ AlertTriangle icon in warning alert
+- ✅ Hook includes cache invalidation for module detail + lists
+- ✅ Toast feedback on success and error
+
+Files Modified (Task 6):
+- `frontend/src/components/admin/UnpublishConfirmDialog.tsx` - NEW (97 lines)
+- `frontend/src/lib/hooks/use-modules.ts` - Added useUnpublishModule hook
+- `frontend/src/lib/api/modules.ts` - Added unpublish method
+- `frontend/src/app/(dashboard)/modules/[id]/page.tsx` - Added Edit button + dialog
+- `frontend/src/lib/locales/en-US/index.ts` - Added 7 i18n keys
+- `frontend/src/lib/locales/fr-FR/index.ts` - Added 7 French translations
