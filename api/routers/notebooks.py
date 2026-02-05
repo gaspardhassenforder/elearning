@@ -742,6 +742,10 @@ async def publish_notebook(
         # Get objective count
         objective_count = await LearningObjective.count_for_notebook(notebook_id)
 
+        # Check for module prompt (optional, display only)
+        module_prompt = await ModulePrompt.get_by_notebook(notebook_id)
+        has_prompt = module_prompt is not None and bool(module_prompt.system_prompt)
+
         # Validate requirements
         errors = []
         if source_count < 1:
@@ -788,6 +792,8 @@ async def publish_notebook(
             updated=str(notebook.updated),
             source_count=source_count,
             note_count=note_count,
+            objectives_count=objective_count,
+            has_prompt=has_prompt,
         )
 
     except HTTPException:
@@ -858,6 +864,14 @@ async def unpublish_notebook(
             except Exception as e:
                 logger.warning(f"Failed to get objectives count for {nb_id}: {e}")
 
+            # Check for module prompt
+            has_prompt = False
+            try:
+                module_prompt = await ModulePrompt.get_by_notebook(nb_id)
+                has_prompt = module_prompt is not None and bool(module_prompt.system_prompt)
+            except Exception as e:
+                logger.warning(f"Failed to check prompt status for {nb_id}: {e}")
+
             return NotebookResponse(
                 id=nb_id,
                 name=nb.get("name", ""),
@@ -869,6 +883,7 @@ async def unpublish_notebook(
                 source_count=nb.get("source_count", 0),
                 note_count=nb.get("note_count", 0),
                 objectives_count=objectives_count,
+                has_prompt=has_prompt,
             )
 
         # Fallback if query fails
@@ -883,6 +898,7 @@ async def unpublish_notebook(
             source_count=0,
             note_count=0,
             objectives_count=0,
+            has_prompt=False,
         )
     except HTTPException:
         raise

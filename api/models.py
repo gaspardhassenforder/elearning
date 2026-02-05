@@ -238,7 +238,8 @@ class NotebookResponse(BaseModel):
     updated: str
     source_count: int
     note_count: int
-    objectives_count: int = 0  # Count of learning objectives (Story 3.6)
+    objectives_count: int = 0  # Count of learning objectives (Story 3.3)
+    has_prompt: bool = False  # Whether module has custom AI prompt configured (Story 3.4)
 
 
 # Document Upload models (Story 3.1)

@@ -89,6 +89,8 @@ class TestPublishValidation:
         assert response.status_code == 200
         data = response.json()
         assert data["published"] is True
+        assert data["objectives_count"] == 1  # Verify objectives_count returned
+        assert "has_prompt" in data  # Verify has_prompt field present
         assert mock_notebook.published is True
         mock_notebook.save.assert_called_once()
 
@@ -306,6 +308,8 @@ class TestPublishResponse:
         assert data["published"] is True
         assert data["source_count"] == 3
         assert data["note_count"] == 2
+        assert data["objectives_count"] == 4  # Verify objectives_count field
+        assert data["has_prompt"] is True  # Verify has_prompt field (mocked with prompt)
 
 
 class TestAuthenticationRequired:

@@ -32,7 +32,6 @@ interface ValidationStatus {
 }
 
 interface ModuleSummaryCardProps {
-  notebookId: string
   validation: ValidationStatus
   isLoading?: boolean
 }

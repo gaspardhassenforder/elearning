@@ -3,10 +3,13 @@ export interface NotebookResponse {
   name: string
   description: string
   archived: boolean
+  published: boolean
   created: string
   updated: string
   source_count: number
   note_count: number
+  objectives_count: number
+  has_prompt: boolean
 }
 
 export interface NoteResponse {

@@ -42,7 +42,7 @@ export function ModulePublishFlow({ notebookId, onSuccess, onBack }: ModulePubli
     sourceCount: notebook?.source_count ?? 0,
     objectiveCount: notebook?.objectives_count ?? 0,
     artifactCount: notebook?.note_count ?? 0,
-    hasPrompt: false, // TODO: Add prompt status to NotebookResponse
+    hasPrompt: notebook?.has_prompt ?? false,
     errors: [] as Array<{ field: string; message: string }>,
   }
 
@@ -89,7 +89,6 @@ export function ModulePublishFlow({ notebookId, onSuccess, onBack }: ModulePubli
     <div className="space-y-6">
       {/* Summary Card */}
       <ModuleSummaryCard
-        notebookId={notebookId}
         validation={validation}
         isLoading={isLoadingNotebook}
       />
