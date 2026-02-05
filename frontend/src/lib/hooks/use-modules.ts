@@ -153,3 +153,24 @@ export function useUnpublishModule() {
     },
   });
 }
+
+/**
+ * Hook to remove a document from a module (Story 3.6, Task 8)
+ * Deletes the source relationship in edit mode
+ */
+export function useRemoveDocument(moduleId: string) {
+  const queryClient = useQueryClient();
+  const { t } = useTranslation();
+
+  return useMutation({
+    mutationFn: (sourceId: string) => modulesApi.removeDocument(moduleId, sourceId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: moduleKeys.documents(moduleId) });
+      queryClient.invalidateQueries({ queryKey: moduleKeys.detail(moduleId) });
+      toast.success(t.modules.documentRemoved);
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.detail || t.modules.removeDocumentError);
+    },
+  });
+}

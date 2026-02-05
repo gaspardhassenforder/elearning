@@ -5,14 +5,18 @@
  *
  * Drag-and-drop file uploader with progress tracking.
  * Polls backend for processing status and displays inline errors.
+ *
+ * Extended in Story 3.6, Task 8 to support document removal in edit mode.
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { Upload, FileText, Check, AlertCircle, Loader2, X } from 'lucide-react';
+import { Upload, FileText, Check, AlertCircle, Loader2, X, Trash2 } from 'lucide-react';
 import { useUploadDocument, useModuleDocuments } from '@/lib/hooks/use-modules';
+import { useModuleCreationStore } from '@/lib/stores/module-creation-store';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import { RemoveDocumentDialog } from './RemoveDocumentDialog';
 import { cn } from '@/lib/utils';
 
 interface DocumentUploaderProps {
@@ -31,9 +35,14 @@ export function DocumentUploader({ moduleId }: DocumentUploaderProps) {
   const { t } = useTranslation();
   const uploadDocument = useUploadDocument(moduleId);
   const { data: documents } = useModuleDocuments(moduleId, { pollingInterval: 2000 });
+  const { isEditMode } = useModuleCreationStore();
 
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Remove document dialog state (Story 3.6, Task 8)
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
+  const [documentToRemove, setDocumentToRemove] = useState<{ id: string; title: string } | null>(null);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -150,6 +159,12 @@ export function DocumentUploader({ moduleId }: DocumentUploaderProps) {
 
   const handleRemove = (uploadingFile: UploadingFile) => {
     setUploadingFiles((prev) => prev.filter((f) => f !== uploadingFile));
+  };
+
+  // Handle removing existing document (Story 3.6, Task 8)
+  const handleRemoveDocument = (doc: { id: string; title: string }) => {
+    setDocumentToRemove(doc);
+    setRemoveDialogOpen(true);
   };
 
   // Update status from polling when documents change
@@ -321,9 +336,32 @@ export function DocumentUploader({ moduleId }: DocumentUploaderProps) {
               {doc.status === 'error' && (
                 <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />
               )}
+              {/* Remove button in edit mode (Story 3.6, Task 8) */}
+              {isEditMode && doc.status === 'completed' && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => handleRemoveDocument({ id: doc.id, title: doc.title })}
+                  className="h-8 w-8 flex-shrink-0"
+                  title={t.modules.removeDocument}
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              )}
             </div>
           ))}
         </div>
+      )}
+
+      {/* Remove Document Confirmation Dialog (Story 3.6, Task 8) */}
+      {documentToRemove && (
+        <RemoveDocumentDialog
+          open={removeDialogOpen}
+          onOpenChange={setRemoveDialogOpen}
+          moduleId={moduleId}
+          documentId={documentToRemove.id}
+          documentTitle={documentToRemove.title}
+        />
       )}
     </div>
   );

@@ -120,4 +120,12 @@ export const modulesApi = {
     const response = await apiClient.post<Module>(`/notebooks/${id}/unpublish`);
     return response.data;
   },
+
+  /**
+   * Remove a document/source from a module (Story 3.6, Task 8)
+   * Deletes the source relationship from the module
+   */
+  async removeDocument(moduleId: string, sourceId: string): Promise<void> {
+    await apiClient.delete(`/notebooks/${moduleId}/sources/${sourceId}`);
+  },
 };
