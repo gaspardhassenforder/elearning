@@ -48,6 +48,13 @@ export const frFR = {
     added: "Ajouté le {date}",
     adding: "Ajout...",
     addSelected: "Ajouter la sélection",
+  },
+  adminAssistant: {
+    title: "Assistant IA",
+    subtitle: "Obtenez de l'aide pour la création de modules, les invites et la stratégie de contenu",
+    chatTitle: "Assistant administrateur",
+    askQuestion: "Demandez de l'aide pour la création de modules...",
+  },
     customModel: "Modèle personnalisé",
     messages: "Messages",
     failed: "échec",

@@ -63,7 +63,7 @@ development_status:
   3-4-ai-teacher-prompt-configuration: review  # All 8 tasks complete: Backend (Migration 24, ModulePrompt, API, prompt assembly) + Frontend (ModulePromptEditor, hooks, pipeline integration, E2E testing)
   3-5-module-publishing: ready-for-dev  # Comprehensive story created: Validation + publish endpoint, ModuleSummaryCard, PublishedBadge, NO NEW MIGRATION (published field exists)
   3-6-edit-published-module: in-progress  # Comprehensive story created: Unpublish endpoint, edit mode pipeline, progress preservation, NO NEW MIGRATION
-  3-7-admin-ai-chatbot-assistant: in-progress  # Story created: Admin AI assistant for module creation help, reuses chat workflow with custom prompt
+  3-7-admin-ai-chatbot-assistant: review  # Story created: Admin AI assistant for module creation help, reuses chat workflow with custom prompt
   epic-3-retrospective: optional
 
   # Epic 4: Learner AI Chat Experience

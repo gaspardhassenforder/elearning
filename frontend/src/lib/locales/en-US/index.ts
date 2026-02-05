@@ -48,6 +48,13 @@ export const enUS = {
     added: "Added on {date}",
     adding: "Adding...",
     addSelected: "Add Selected",
+  },
+  adminAssistant: {
+    title: "AI Assistant",
+    subtitle: "Get help with module creation, prompts, and content strategy",
+    chatTitle: "Admin Assistant",
+    askQuestion: "Ask for help with module creation...",
+  },
     customModel: "Custom Model",
     messages: "Messages",
     failed: "failed",

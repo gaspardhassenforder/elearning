@@ -21,6 +21,7 @@ import { ModuleCreationStepper } from '@/components/admin/ModuleCreationStepper'
 import { ArtifactGenerationPanel } from '@/components/admin/ArtifactGenerationPanel';
 import { LearningObjectivesEditor } from '@/components/admin/LearningObjectivesEditor';
 import { ModulePromptEditor } from '@/components/admin/ModulePromptEditor';
+import { AdminAssistantChat } from '@/components/admin/AdminAssistantChat';
 import { useModuleCreationStore } from '@/lib/stores/module-creation-store';
 import { useArtifacts } from '@/lib/hooks/use-artifacts';
 import { useLearningObjectives } from '@/lib/hooks/use-learning-objectives';
@@ -223,6 +224,9 @@ export default function ModulePage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Admin Assistant Chat - Floating Button Available Across All Steps */}
+      <AdminAssistantChat moduleId={moduleId} />
     </div>
   );
 }
