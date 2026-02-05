@@ -51,9 +51,17 @@ async def assemble_admin_context(notebook_id: str) -> Dict[str, Any]:
     if not notebook:
         raise HTTPException(status_code=404, detail="Notebook not found")
 
-    # Load sources (documents)
+    # Load sources (documents) with content summaries for RAG grounding
     sources = await notebook.get_sources()
-    documents = [{"title": source.title} for source in sources]
+    documents = []
+    for source in sources:
+        # Use get_context() to get formatted summary with key excerpts
+        source_context = await source.get_context(context_size="short")
+        documents.append({
+            "title": source.title,
+            "summary": source_context.get("summary", "No summary available"),
+            "excerpt": source_context.get("content", "")[:500]  # First 500 chars for context
+        })
 
     # Load learning objectives
     objectives = await LearningObjective.get_for_notebook(notebook_id, ordered=True)

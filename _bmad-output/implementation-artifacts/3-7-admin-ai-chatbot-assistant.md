@@ -485,6 +485,29 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 
 N/A - Implementation proceeded smoothly with RED-GREEN-REFACTOR TDD approach
 
+### Code Review Fixes (2026-02-05)
+
+**CRITICAL FIX - Issue #3: RAG Grounding (AC#3 Violation)**
+- **Problem:** Context assembly only passed document titles, not content - AC#3 falsely claimed as complete
+- **Fix:** Updated `assemble_admin_context()` to call `source.get_context()` for summaries and excerpts
+- **Impact:** Admin assistant can now make content-aware suggestions grounded in actual document text
+- **Tests Added:** 2 new tests verify document content inclusion and RAG grounding guidelines
+- **Files Modified:**
+  - `api/routers/admin_chat.py` - Added source.get_context() calls
+  - `prompts/admin_assistant_prompt.jinja` - Updated to show summaries/excerpts, emphasized grounding
+  - `tests/test_admin_chat_api.py` - Added integration test for RAG (test_assemble_context_includes_document_content_for_rag)
+  - `tests/test_admin_assistant_prompt.py` - Updated document test, added RAG guideline test
+
+**Test Coverage:** Now 13 tests (was 11) - 7 prompt tests + 6 API tests
+
+**Known Limitations (Deferred):**
+1. **Non-streaming responses** - Admin waits for full response (30-60s for complex questions)
+   - Recommendation: Add loading indicator or implement SSE streaming (like learner chat)
+2. **No conversation history** - Each message is independent, no multi-turn context
+   - Recommendation: Persist chat history or use backend session storage
+3. **Generic error messages** - Uses common.error instead of admin-specific messages
+   - Recommendation: Add adminAssistant.error i18n keys with admin-specific guidance
+
 ### Completion Notes List
 
 **Tasks 1-2 Complete (Backend)**:
@@ -539,8 +562,14 @@ N/A - Implementation proceeded smoothly with RED-GREEN-REFACTOR TDD approach
 - `frontend/src/lib/hooks/use-admin-chat.ts` - Admin chat state hook
 - `frontend/src/lib/api/admin-chat.ts` - API client
 
-**MODIFIED:**
+**MODIFIED (Initial Implementation):**
 - `api/main.py` - Registered admin_chat router
 - `frontend/src/app/(dashboard)/modules/[id]/page.tsx` - Integrated admin assistant
 - `frontend/src/lib/locales/en-US/index.ts` - Added adminAssistant i18n keys
 - `frontend/src/lib/locales/fr-FR/index.ts` - Added adminAssistant i18n keys (French)
+
+**MODIFIED (Code Review Fixes - 2026-02-05):**
+- `api/routers/admin_chat.py` - Fixed RAG grounding (AC#3): Added source.get_context() calls
+- `prompts/admin_assistant_prompt.jinja` - Enhanced to show document summaries/excerpts, emphasized grounding
+- `tests/test_admin_chat_api.py` - Added RAG integration test (13 tests total, was 11)
+- `tests/test_admin_assistant_prompt.py` - Updated document test, added RAG guideline test
