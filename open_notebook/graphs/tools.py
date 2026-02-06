@@ -259,3 +259,205 @@ async def check_off_objective(
     except Exception as e:
         logger.error(f"Error in check_off_objective tool for objective {objective_id}: {e}")
         return {"error": f"Failed to check off objective: {str(e)}", "objective_id": objective_id}
+
+
+@tool
+async def surface_quiz(quiz_id: str, config: Optional[dict] = None) -> dict:
+    """Surface a quiz in the chat conversation.
+
+    Use this tool when you want to validate learner understanding through an interactive quiz.
+    The quiz will display inline in the chat with the first question, allowing immediate interaction.
+
+    Args:
+        quiz_id: The record ID of the quiz (e.g., "quiz:abc123")
+        config: RunnableConfig containing user_id and notebook_id (injected by chat graph)
+
+    Returns:
+        dict: Quiz preview data with questions (WITHOUT correct_answer field for security)
+
+    Security Note:
+        Company scoping is validated by checking that the quiz's notebook belongs to
+        the learner's company via module assignments. User context passed via RunnableConfig.
+    """
+    from open_notebook.domain.quiz import Quiz
+    from open_notebook.domain.user import User
+    from open_notebook.database.repository import repo_query
+    from open_notebook.exceptions import NotFoundError
+
+    logger.info(f"surface_quiz tool called for quiz_id: {quiz_id}")
+
+    try:
+        # Load quiz
+        try:
+            quiz = await Quiz.get(quiz_id)
+        except NotFoundError:
+            logger.warning(f"Quiz not found: {quiz_id}")
+            return {"error": "Quiz not found", "quiz_id": quiz_id}
+
+        if not quiz:
+            logger.warning(f"Quiz not found: {quiz_id}")
+            return {"error": "Quiz not found", "quiz_id": quiz_id}
+
+        # Extract user_id from config for company scoping validation
+        user_id = None
+        if config:
+            configurable = config.get("configurable", {})
+            user_id = configurable.get("user_id")
+
+        if user_id:
+            # Validate company scoping: quiz.notebook_id must belong to learner's company
+            user = await User.get(user_id)
+            if user and user.company_id:
+                # Check if quiz's notebook is assigned to learner's company
+                query = """
+                    SELECT VALUE true
+                    FROM module_assignment
+                    WHERE notebook_id = $notebook_id
+                      AND company_id = $company_id
+                    LIMIT 1
+                """
+                results = await repo_query(
+                    query,
+                    {"notebook_id": quiz.notebook_id, "company_id": user.company_id},
+                )
+
+                if not results:
+                    logger.warning(
+                        f"Company scoping violation: Quiz {quiz_id} not accessible to user {user_id}"
+                    )
+                    return {
+                        "error": "Quiz not accessible",
+                        "quiz_id": quiz_id,
+                        "note": "This quiz is not available for your company"
+                    }
+
+        # Prepare questions WITHOUT correct_answer field (security - no cheating)
+        questions_preview = []
+        for q in quiz.questions:
+            questions_preview.append({
+                "text": q.question,
+                "options": q.options,
+                # Intentionally exclude correct_answer
+            })
+
+        # Show only first question for inline preview
+        first_question_only = questions_preview[:1] if questions_preview else []
+
+        # Return structured data for frontend rendering
+        result = {
+            "artifact_type": "quiz",
+            "quiz_id": quiz_id,
+            "title": quiz.title,
+            "description": quiz.description,
+            "questions": first_question_only,  # Only first question
+            "total_questions": len(quiz.questions),
+            "quiz_url": f"/quizzes/{quiz_id}",  # Frontend route
+        }
+
+        logger.info(f"Successfully surfaced quiz: {quiz.title} ({len(quiz.questions)} questions)")
+        return result
+
+    except Exception as e:
+        logger.error(f"Error in surface_quiz tool for quiz {quiz_id}: {e}")
+        return {"error": f"Failed to surface quiz: {str(e)}", "quiz_id": quiz_id}
+
+
+@tool
+async def surface_podcast(podcast_id: str, config: Optional[dict] = None) -> dict:
+    """Surface a podcast in the chat conversation.
+
+    Use this tool when you want to offer an audio learning experience.
+    The podcast will display inline in the chat with playback controls.
+
+    Args:
+        podcast_id: The record ID of the podcast (e.g., "podcast:xyz789")
+        config: RunnableConfig containing user_id and notebook_id (injected by chat graph)
+
+    Returns:
+        dict: Podcast metadata with audio URL and playback information
+
+    Security Note:
+        Company scoping is validated by checking that the podcast's notebook belongs to
+        the learner's company via module assignments. User context passed via RunnableConfig.
+    """
+    from open_notebook.domain.podcast import Podcast
+    from open_notebook.domain.user import User
+    from open_notebook.database.repository import repo_query
+    from open_notebook.exceptions import NotFoundError
+
+    logger.info(f"surface_podcast tool called for podcast_id: {podcast_id}")
+
+    try:
+        # Load podcast
+        try:
+            podcast = await Podcast.get(podcast_id)
+        except NotFoundError:
+            logger.warning(f"Podcast not found: {podcast_id}")
+            return {"error": "Podcast not found", "podcast_id": podcast_id}
+
+        if not podcast:
+            logger.warning(f"Podcast not found: {podcast_id}")
+            return {"error": "Podcast not found", "podcast_id": podcast_id}
+
+        # Extract user_id from config for company scoping validation
+        user_id = None
+        if config:
+            configurable = config.get("configurable", {})
+            user_id = configurable.get("user_id")
+
+        if user_id:
+            # Validate company scoping: podcast.notebook_id must belong to learner's company
+            user = await User.get(user_id)
+            if user and user.company_id:
+                # Check if podcast's notebook is assigned to learner's company
+                query = """
+                    SELECT VALUE true
+                    FROM module_assignment
+                    WHERE notebook_id = $notebook_id
+                      AND company_id = $company_id
+                    LIMIT 1
+                """
+                results = await repo_query(
+                    query,
+                    {"notebook_id": podcast.notebook_id, "company_id": user.company_id},
+                )
+
+                if not results:
+                    logger.warning(
+                        f"Company scoping violation: Podcast {podcast_id} not accessible to user {user_id}"
+                    )
+                    return {
+                        "error": "Podcast not accessible",
+                        "podcast_id": podcast_id,
+                        "note": "This podcast is not available for your company"
+                    }
+
+        # Check if podcast is ready
+        if not podcast.is_ready:
+            logger.info(f"Podcast {podcast_id} is not ready yet (status: {podcast.status})")
+            return {
+                "artifact_type": "podcast",
+                "podcast_id": podcast_id,
+                "title": podcast.title,
+                "status": podcast.status,
+                "error": "Podcast not ready",
+                "note": f"This podcast is currently {podcast.status}. Please try again later."
+            }
+
+        # Return structured data for frontend rendering
+        result = {
+            "artifact_type": "podcast",
+            "podcast_id": podcast_id,
+            "title": podcast.title,
+            "audio_url": f"/api/podcasts/{podcast_id}/audio",
+            "duration_minutes": podcast.duration_minutes,
+            "transcript_url": f"/api/podcasts/{podcast_id}/transcript",
+            "status": podcast.status,
+        }
+
+        logger.info(f"Successfully surfaced podcast: {podcast.title} ({podcast.duration_minutes} min)")
+        return result
+
+    except Exception as e:
+        logger.error(f"Error in surface_podcast tool for podcast {podcast_id}: {e}")
+        return {"error": f"Failed to surface podcast: {str(e)}", "podcast_id": podcast_id}

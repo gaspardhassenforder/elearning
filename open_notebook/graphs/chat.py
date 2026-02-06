@@ -13,7 +13,12 @@ from typing_extensions import TypedDict
 from open_notebook.ai.provision import provision_langchain_model
 from open_notebook.config import LANGGRAPH_CHECKPOINT_FILE
 from open_notebook.domain.notebook import Notebook
-from open_notebook.graphs.tools import surface_document, check_off_objective
+from open_notebook.graphs.tools import (
+    surface_document,
+    check_off_objective,
+    surface_quiz,
+    surface_podcast,
+)
 from open_notebook.utils import clean_thinking_content
 
 
@@ -66,7 +71,8 @@ def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict
     # Determine which tools to bind based on context
     # Story 4.3: surface_document for document references
     # Story 4.4: check_off_objective for progress tracking (learner chat only)
-    tools = [surface_document]
+    # Story 4.6: surface_quiz and surface_podcast for artifact surfacing
+    tools = [surface_document, surface_quiz, surface_podcast]
     if user_id:
         # Only bind check_off_objective for learner chat (has user_id)
         tools.append(check_off_objective)
