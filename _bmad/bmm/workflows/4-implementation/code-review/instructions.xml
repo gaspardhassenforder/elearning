@@ -14,6 +14,13 @@
   <critical>Acceptance Criteria not implemented = HIGH severity finding</critical>
   <critical>Do not review files that are not part of the application's source code. Always exclude the _bmad/ and _bmad-output/ folders from the review. Always exclude IDE and CLI configuration folders like .cursor/ and .windsurf/ and .claude/</critical>
 
+  <note>🎯 AUTOMATED APPROVAL WORKFLOW: When user chooses "Fix them automatically" (Option 1) and ALL HIGH/MEDIUM issues are resolved:
+    1. Code and tests are automatically updated
+    2. All tests are run to verify fixes
+    3. Story status is automatically set to "done" in story file
+    4. Sprint-status.yaml is automatically synced to "done"
+    5. Code review section is added to story with complete audit trail
+    This eliminates manual status updates when code review passes with auto-fix.</note>
 
   <step n="1" goal="Load story and discover changes">
     <action>Use provided {{story_path}} or ask user which story file to review</action>
