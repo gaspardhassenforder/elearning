@@ -72,12 +72,24 @@ export async function sendLearnerChatMessage(
   return response
 }
 
+// Story 4.4: Objective checked event data
+export interface ObjectiveCheckedData {
+  objective_id: string
+  objective_text: string
+  evidence: string
+  total_completed: number
+  total_objectives: number
+  all_complete: boolean
+}
+
 // Story 4.3: Extended stream event for tracking tool calls
+// Story 4.4: Added objective_checked event type
 export interface StreamEvent {
-  type: 'text' | 'tool_call' | 'tool_result' | 'message_complete'
+  type: 'text' | 'tool_call' | 'tool_result' | 'message_complete' | 'objective_checked'
   delta?: string
   toolCall?: ToolCall
   toolResult?: { id: string; result: Record<string, any> }
+  objectiveChecked?: ObjectiveCheckedData  // Story 4.4
 }
 
 /**
@@ -160,6 +172,21 @@ export async function* parseLearnerChatStream(
           // Story 4.3: Yield message complete event
           if (eventType === 'message_complete') {
             yield { type: 'message_complete' }
+          }
+
+          // Story 4.4: Yield objective checked event
+          if (eventType === 'objective_checked') {
+            yield {
+              type: 'objective_checked',
+              objectiveChecked: {
+                objective_id: data.objective_id,
+                objective_text: data.objective_text,
+                evidence: data.evidence,
+                total_completed: data.total_completed,
+                total_objectives: data.total_objectives,
+                all_complete: data.all_complete,
+              },
+            }
           }
 
           // Handle errors

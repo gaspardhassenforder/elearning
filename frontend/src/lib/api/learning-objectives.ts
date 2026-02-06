@@ -11,6 +11,7 @@ import type {
   UpdateLearningObjectiveRequest,
   ReorderLearningObjectivesRequest,
   BatchGenerationResponse,
+  LearnerObjectivesProgressResponse,
 } from '@/lib/types/api'
 
 /**
@@ -91,4 +92,17 @@ export async function reorderLearningObjectives(
     `/api/notebooks/${notebookId}/learning-objectives/reorder`,
     data
   )
+}
+
+/**
+ * Get learning objectives with learner progress (Story 4.4)
+ * Returns objectives with completion status for the authenticated learner
+ */
+export async function getLearnerObjectivesProgress(
+  notebookId: string
+): Promise<LearnerObjectivesProgressResponse> {
+  const response = await apiClient.get<LearnerObjectivesProgressResponse>(
+    `/api/notebooks/${notebookId}/learning-objectives/progress`
+  )
+  return response.data
 }

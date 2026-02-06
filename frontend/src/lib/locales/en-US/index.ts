@@ -49,13 +49,6 @@ export const enUS = {
     added: "Added on {date}",
     adding: "Adding...",
     addSelected: "Add Selected",
-  },
-  adminAssistant: {
-    title: "AI Assistant",
-    subtitle: "Get help with module creation, prompts, and content strategy",
-    chatTitle: "Admin Assistant",
-    askQuestion: "Ask for help with module creation...",
-  },
     customModel: "Custom Model",
     messages: "Messages",
     failed: "failed",
@@ -144,6 +137,12 @@ export const enUS = {
       clickToCycle: "Click to cycle",
     },
     clickToEdit: "Click to edit",
+  },
+  adminAssistant: {
+    title: "AI Assistant",
+    subtitle: "Get help with module creation, prompts, and content strategy",
+    chatTitle: "Admin Assistant",
+    askQuestion: "Ask for help with module creation...",
   },
   apiErrors: {
     notebookNotFound: "Notebook not found",
@@ -1353,6 +1352,9 @@ export const enUS = {
       noObjectives: "No Learning Objectives",
       noObjectivesDesc: "Learning objectives will appear here once configured by your instructor.",
       allComplete: "Congratulations! You've completed all learning objectives!",
+      // Story 4.4: Toast notifications
+      objectiveCompleted: "Objective completed",
+      allObjectivesCompleted: "All objectives complete!",
     },
     // Story 4.6: Quiz Widget
     quiz: {

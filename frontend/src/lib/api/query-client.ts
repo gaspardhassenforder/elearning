@@ -42,4 +42,6 @@ export const QUERY_KEYS = {
   assignmentMatrix: ['assignments', 'matrix'] as const,
   learnerModules: ['learner-modules'] as const,
   learnerModule: (notebookId: string) => ['learner-modules', notebookId] as const,
+  // Story 4.4: Learner objectives progress
+  learnerObjectivesProgress: (notebookId: string) => ['learning-objectives', 'progress', notebookId] as const,
 }

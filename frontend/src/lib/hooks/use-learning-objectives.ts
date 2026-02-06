@@ -12,6 +12,7 @@ import type {
   CreateLearningObjectiveRequest,
   UpdateLearningObjectiveRequest,
   ReorderLearningObjectivesRequest,
+  LearnerObjectivesProgressResponse,
 } from '@/lib/types/api'
 import {
   listLearningObjectives,
@@ -20,6 +21,7 @@ import {
   updateLearningObjective,
   deleteLearningObjective,
   reorderLearningObjectives,
+  getLearnerObjectivesProgress,
 } from '@/lib/api/learning-objectives'
 
 /**
@@ -31,6 +33,10 @@ export const learningObjectivesKeys = {
   lists: () => [...learningObjectivesKeys.all, 'list'] as const,
   list: (notebookId: string) =>
     [...learningObjectivesKeys.lists(), notebookId] as const,
+  // Story 4.4: Learner progress keys
+  progress: () => [...learningObjectivesKeys.all, 'progress'] as const,
+  progressByNotebook: (notebookId: string) =>
+    [...learningObjectivesKeys.progress(), notebookId] as const,
 }
 
 /**
@@ -196,5 +202,21 @@ export function useReorderLearningObjectives(notebookId: string) {
         queryKey: learningObjectivesKeys.list(notebookId),
       })
     },
+  })
+}
+
+/**
+ * Query hook: Get learner objectives with progress (Story 4.4)
+ * Returns objectives with completion status for authenticated learner
+ */
+export function useLearnerObjectivesProgress(notebookId: string) {
+  return useQuery({
+    queryKey: learningObjectivesKeys.progressByNotebook(notebookId),
+    queryFn: () => getLearnerObjectivesProgress(notebookId),
+    enabled: !!notebookId,
+    // Refetch when window regains focus to catch AI-triggered completions
+    refetchOnWindowFocus: true,
+    // Keep data fresh - objectives might be checked off during conversation
+    staleTime: 30 * 1000, // 30 seconds
   })
 }

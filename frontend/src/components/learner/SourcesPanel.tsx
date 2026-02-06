@@ -26,6 +26,7 @@ import { useTranslation } from '@/lib/hooks/use-translation'
 import { useNotebookSources } from '@/lib/hooks/use-sources'
 import { useLearnerStore } from '@/lib/stores/learner-store'
 import { DocumentCard } from './DocumentCard'
+import { ObjectiveProgressList } from './ObjectiveProgressList'
 
 interface SourcesPanelProps {
   notebookId: string
@@ -203,15 +204,9 @@ export function SourcesPanel({ notebookId }: SourcesPanelProps) {
               </div>
             </TabsContent>
 
-            {/* Progress Tab - Placeholder for Story 5.3 */}
+            {/* Progress Tab - Story 4.4: Learning Objectives Progress */}
             <TabsContent value="progress" className="h-full m-0">
-              <div className="h-full flex items-center justify-center px-4">
-                <EmptyState
-                  icon={TrendingUp}
-                  title={t.learner.progress.comingSoon}
-                  description={t.learner.progress.comingSoonDesc}
-                />
-              </div>
+              <ObjectiveProgressList notebookId={notebookId} />
             </TabsContent>
           </div>
         </Tabs>

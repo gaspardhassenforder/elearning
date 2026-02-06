@@ -49,13 +49,6 @@ export const frFR = {
     added: "Ajouté le {date}",
     adding: "Ajout...",
     addSelected: "Ajouter la sélection",
-  },
-  adminAssistant: {
-    title: "Assistant IA",
-    subtitle: "Obtenez de l'aide pour la création de modules, les invites et la stratégie de contenu",
-    chatTitle: "Assistant administrateur",
-    askQuestion: "Demandez de l'aide pour la création de modules...",
-  },
     customModel: "Modèle personnalisé",
     messages: "Messages",
     failed: "échec",
@@ -144,6 +137,12 @@ export const frFR = {
       clickToCycle: "Cliquer pour faire défiler",
     },
     clickToEdit: "Cliquer pour modifier",
+  },
+  adminAssistant: {
+    title: "Assistant IA",
+    subtitle: "Obtenez de l'aide pour la création de modules, les invites et la stratégie de contenu",
+    chatTitle: "Assistant administrateur",
+    askQuestion: "Demandez de l'aide pour la création de modules...",
   },
   apiErrors: {
     notebookNotFound: "Carnet introuvable",
@@ -1348,6 +1347,9 @@ export const frFR = {
       noObjectives: "Aucun objectif d'apprentissage",
       noObjectivesDesc: "Les objectifs d'apprentissage apparaîtront ici une fois configurés par votre instructeur.",
       allComplete: "Félicitations ! Vous avez terminé tous les objectifs d'apprentissage !",
+      // Story 4.4: Notifications toast
+      objectiveCompleted: "Objectif terminé",
+      allObjectivesCompleted: "Tous les objectifs sont terminés !",
     },
     // Story 4.6: Widget de quiz
     quiz: {

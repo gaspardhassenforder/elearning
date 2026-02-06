@@ -26,6 +26,7 @@ import { useToast } from '@/lib/hooks/use-toast'
 import { useLearnerModule } from '@/lib/hooks/use-learner-modules'
 import { SourcesPanel } from '@/components/learner/SourcesPanel'
 import { ChatPanel } from '@/components/learner/ChatPanel'
+import { AmbientProgressBar } from '@/components/learner/AmbientProgressBar'
 
 export default function ModuleConversationPage() {
   const { t } = useTranslation()
@@ -128,6 +129,9 @@ export default function ModuleConversationPage() {
           </div>
         </div>
       </div>
+
+      {/* Story 4.4: Ambient Progress Bar - thin indicator below header */}
+      <AmbientProgressBar notebookId={moduleId} />
 
       {/* Two-Panel Layout with Resizable Divider */}
       <div className="flex-1 min-h-0">

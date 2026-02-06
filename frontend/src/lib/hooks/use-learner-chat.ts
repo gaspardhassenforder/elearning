@@ -10,10 +10,11 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
-import { sendLearnerChatMessage, parseLearnerChatStream, LearnerChatMessage, ToolCall } from '../api/learner-chat'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { sendLearnerChatMessage, parseLearnerChatStream, LearnerChatMessage, ToolCall, ObjectiveCheckedData } from '../api/learner-chat'
 import { useToast } from './use-toast'
 import { useLearnerStore } from '../stores/learner-store'
+import { learningObjectivesKeys } from './use-learning-objectives'
 
 interface UseLearnerChatResult {
   messages: LearnerChatMessage[]
@@ -23,6 +24,7 @@ interface UseLearnerChatResult {
   sendMessage: (content: string) => Promise<void>
   clearMessages: () => void
   greetingRequested: boolean  // Story 4.2: Track if greeting was requested
+  lastObjectiveChecked: ObjectiveCheckedData | null  // Story 4.4: Last checked objective for inline confirmation
 }
 
 /**
@@ -33,8 +35,11 @@ interface UseLearnerChatResult {
  */
 export function useLearnerChat(notebookId: string): UseLearnerChatResult {
   const { toast } = useToast()
+  const queryClient = useQueryClient()
   const [messages, setMessages] = useState<LearnerChatMessage[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
+  // Story 4.4: Track last checked objective for inline confirmation
+  const [lastObjectiveChecked, setLastObjectiveChecked] = useState<ObjectiveCheckedData | null>(null)
 
   // Story 4.3: Access scroll actions from store
   const { scrollToSourceId: setScrollToSourceId, panelManuallyCollapsed } = useLearnerStore(
@@ -122,6 +127,24 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
             if (toolCall) {
               toolCall.result = event.toolResult.result
             }
+          } else if (event.type === 'objective_checked' && event.objectiveChecked) {
+            // Story 4.4: Objective was checked off - update progress
+            const objectiveData = event.objectiveChecked
+            setLastObjectiveChecked(objectiveData)
+
+            // Invalidate progress query to trigger refetch
+            queryClient.invalidateQueries({
+              queryKey: learningObjectivesKeys.progressByNotebook(notebookId),
+            })
+
+            // Show toast notification for completed objective
+            toast({
+              title: objectiveData.all_complete
+                ? '🎉 All objectives complete!'
+                : '✓ Objective completed',
+              description: objectiveData.objective_text,
+              duration: 5000,
+            })
           } else if (event.type === 'message_complete') {
             // Story 4.3: Message streaming complete - trigger reactive scroll
             const completedToolCalls = Array.from(toolCallsMap.values())
@@ -271,5 +294,6 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
     sendMessage,
     clearMessages,
     greetingRequested,
+    lastObjectiveChecked,  // Story 4.4: Expose for inline confirmation
   }
 }
