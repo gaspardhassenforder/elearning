@@ -2,6 +2,7 @@
 
 /**
  * Story 4.4: Learning Objectives Progress Display
+ * Story 5.3: Warm Glow Animation for Recently Checked Objectives
  *
  * Displays learning objectives as a checklist with progress status.
  * Used in the Progress tab of the learner SourcesPanel.
@@ -11,8 +12,10 @@
  * - Status-based styling (completed = green, not started = gray)
  * - Shows evidence summary on hover for completed objectives
  * - Auto-refreshes to catch AI-triggered completions
+ * - Story 5.3: Warm glow animation for newly checked objectives (3s duration)
  */
 
+import { useState, useEffect } from 'react'
 import { CheckCircle2, Circle, Target, Loader2 } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -29,6 +32,9 @@ import { useLearnerObjectivesProgress } from '@/lib/hooks/use-learning-objective
 import type { ObjectiveWithProgress } from '@/lib/types/api'
 import { cn } from '@/lib/utils'
 
+// Story 5.3: Duration for warm glow animation
+const GLOW_DURATION_MS = 3000
+
 interface ObjectiveProgressListProps {
   notebookId: string
 }
@@ -36,19 +42,21 @@ interface ObjectiveProgressListProps {
 interface ObjectiveItemProps {
   objective: ObjectiveWithProgress
   t: ReturnType<typeof useTranslation>['t']
+  hasWarmGlow?: boolean  // Story 5.3: Track if objective should display glow
 }
 
-function ObjectiveItem({ objective, t }: ObjectiveItemProps) {
+function ObjectiveItem({ objective, t, hasWarmGlow = false }: ObjectiveItemProps) {
   const isCompleted = objective.progress_status === 'completed'
   const hasEvidence = isCompleted && objective.progress_evidence
 
   const content = (
     <div
       className={cn(
-        'flex items-start gap-3 p-3 rounded-lg transition-colors',
+        'flex items-start gap-3 p-3 rounded-lg transition-all duration-150',
         isCompleted
           ? 'bg-green-50 dark:bg-green-950/30'
-          : 'bg-muted/50 hover:bg-muted'
+          : 'bg-muted/50 hover:bg-muted',
+        hasWarmGlow && 'ring-2 ring-primary/50 animate-pulse'  // Story 5.3: Warm glow styling
       )}
     >
       {/* Checkbox icon */}
@@ -108,6 +116,39 @@ export function ObjectiveProgressList({ notebookId }: ObjectiveProgressListProps
   const { t } = useTranslation()
   const { data, isLoading, error } = useLearnerObjectivesProgress(notebookId)
 
+  // Story 5.3: Track recently checked objectives with timestamps
+  const [recentlyCheckedObjectiveIds, setRecentlyCheckedObjectiveIds] =
+    useState<Map<string, number>>(new Map())
+
+  // Story 5.3: Listen for objective_checked SSE events
+  useEffect(() => {
+    const handleObjectiveChecked = (event: Event) => {
+      const customEvent = event as CustomEvent<{ objective_id: string }>
+      const { objective_id } = customEvent.detail
+
+      // Add to recently checked map
+      setRecentlyCheckedObjectiveIds((prev) =>
+        new Map(prev).set(objective_id, Date.now())
+      )
+
+      // Auto-remove after GLOW_DURATION_MS
+      setTimeout(() => {
+        setRecentlyCheckedObjectiveIds((prev) => {
+          const next = new Map(prev)
+          next.delete(objective_id)
+          return next
+        })
+      }, GLOW_DURATION_MS)
+    }
+
+    // Subscribe to objective_checked events
+    window.addEventListener('objective_checked', handleObjectiveChecked)
+
+    return () => {
+      window.removeEventListener('objective_checked', handleObjectiveChecked)
+    }
+  }, [])
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -165,6 +206,7 @@ export function ObjectiveProgressList({ notebookId }: ObjectiveProgressListProps
                 key={objective.id}
                 objective={objective}
                 t={t}
+                hasWarmGlow={recentlyCheckedObjectiveIds.has(objective.id)}  // Story 5.3: Pass glow state
               />
             ))}
           </div>

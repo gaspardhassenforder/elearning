@@ -288,4 +288,212 @@ describe('ObjectiveProgressList', () => {
 
     expect(screen.getByText('Failed to load objectives')).toBeInTheDocument()
   })
+
+  // Story 5.3: Warm Glow Animation Tests
+  describe('Warm Glow Animation', () => {
+    it('applies warm glow when objective_checked event fired', async () => {
+      const objectives: ObjectiveWithProgress[] = [
+        {
+          id: 'learning_objective:abc123',
+          notebook_id: 'notebook:123',
+          text: 'Understand gradient descent',
+          order: 1,
+          auto_generated: false,
+          progress_status: 'completed',
+          progress_completed_at: '2024-01-15T10:00:00Z',
+          progress_evidence: 'Demonstrated understanding',
+        },
+      ]
+
+      mockUseLearnerObjectivesProgress.mockReturnValue({
+        data: {
+          objectives,
+          completed_count: 1,
+          total_count: 1,
+        },
+        isLoading: false,
+        error: null,
+      })
+
+      const { container } = render(<ObjectiveProgressList notebookId="notebook:123" />)
+
+      // Dispatch objective_checked event
+      const event = new CustomEvent('objective_checked', {
+        detail: { objective_id: 'learning_objective:abc123' }
+      })
+      window.dispatchEvent(event)
+
+      // Wait for React to process state updates
+      await vi.waitFor(() => {
+        // Find the container div with the styling (parent of text)
+        const textElement = screen.getByText('Understand gradient descent')
+        const containerDiv = textElement.closest('.flex.items-start.gap-3')
+        expect(containerDiv).toHaveClass('ring-2')
+        expect(containerDiv).toHaveClass('ring-primary/50')
+        expect(containerDiv).toHaveClass('animate-pulse')
+      })
+    })
+
+    it('removes warm glow after 3 seconds', async () => {
+      vi.useFakeTimers()
+
+      const objectives: ObjectiveWithProgress[] = [
+        {
+          id: 'learning_objective:abc123',
+          notebook_id: 'notebook:123',
+          text: 'Understand gradient descent',
+          order: 1,
+          auto_generated: false,
+          progress_status: 'completed',
+          progress_completed_at: '2024-01-15T10:00:00Z',
+          progress_evidence: 'Demonstrated understanding',
+        },
+      ]
+
+      mockUseLearnerObjectivesProgress.mockReturnValue({
+        data: {
+          objectives,
+          completed_count: 1,
+          total_count: 1,
+        },
+        isLoading: false,
+        error: null,
+      })
+
+      render(<ObjectiveProgressList notebookId="notebook:123" />)
+
+      // Dispatch event
+      window.dispatchEvent(new CustomEvent('objective_checked', {
+        detail: { objective_id: 'learning_objective:abc123' }
+      }))
+
+      // Wait for glow to be applied
+      await vi.waitFor(() => {
+        const textElement = screen.getByText('Understand gradient descent')
+        const containerDiv = textElement.closest('.flex.items-start.gap-3')
+        expect(containerDiv).toHaveClass('ring-2')
+      })
+
+      // Fast-forward 3 seconds
+      vi.advanceTimersByTime(3000)
+
+      // Wait for React to process state updates and glow to be removed
+      await vi.waitFor(() => {
+        const textElement = screen.getByText('Understand gradient descent')
+        const containerDiv = textElement.closest('.flex.items-start.gap-3')
+        expect(containerDiv).not.toHaveClass('ring-2')
+      })
+
+      vi.useRealTimers()
+    })
+
+    it('supports multiple objectives glowing simultaneously', async () => {
+      const objectives: ObjectiveWithProgress[] = [
+        {
+          id: 'learning_objective:obj1',
+          notebook_id: 'notebook:123',
+          text: 'Objective 1',
+          order: 1,
+          auto_generated: false,
+          progress_status: 'completed',
+          progress_completed_at: '2024-01-15T10:00:00Z',
+          progress_evidence: 'Evidence 1',
+        },
+        {
+          id: 'learning_objective:obj2',
+          notebook_id: 'notebook:123',
+          text: 'Objective 2',
+          order: 2,
+          auto_generated: false,
+          progress_status: 'completed',
+          progress_completed_at: '2024-01-15T11:00:00Z',
+          progress_evidence: 'Evidence 2',
+        },
+      ]
+
+      mockUseLearnerObjectivesProgress.mockReturnValue({
+        data: {
+          objectives,
+          completed_count: 2,
+          total_count: 2,
+        },
+        isLoading: false,
+        error: null,
+      })
+
+      render(<ObjectiveProgressList notebookId="notebook:123" />)
+
+      // Check off two objectives quickly
+      window.dispatchEvent(new CustomEvent('objective_checked', {
+        detail: { objective_id: 'learning_objective:obj1' }
+      }))
+      window.dispatchEvent(new CustomEvent('objective_checked', {
+        detail: { objective_id: 'learning_objective:obj2' }
+      }))
+
+      // Wait for both glows to be applied
+      await vi.waitFor(() => {
+        const objective1 = screen.getByText('Objective 1').closest('.flex.items-start.gap-3')
+        const objective2 = screen.getByText('Objective 2').closest('.flex.items-start.gap-3')
+        expect(objective1).toHaveClass('ring-2')
+        expect(objective2).toHaveClass('ring-2')
+      })
+    })
+
+    it('does not glow objectives that were already completed', () => {
+      const objectives: ObjectiveWithProgress[] = [
+        {
+          id: 'learning_objective:old',
+          notebook_id: 'notebook:123',
+          text: 'Already Completed Objective',
+          order: 1,
+          auto_generated: false,
+          progress_status: 'completed',
+          progress_completed_at: '2024-01-10T10:00:00Z',
+          progress_evidence: 'Old evidence',
+        },
+      ]
+
+      mockUseLearnerObjectivesProgress.mockReturnValue({
+        data: {
+          objectives,
+          completed_count: 1,
+          total_count: 1,
+        },
+        isLoading: false,
+        error: null,
+      })
+
+      render(<ObjectiveProgressList notebookId="notebook:123" />)
+
+      // Verify no glow on mount (only completed status styling)
+      const completedObjective = screen.getByText('Already Completed Objective').closest('.flex.items-start.gap-3')
+      expect(completedObjective).toHaveClass('bg-green-50')
+      expect(completedObjective).not.toHaveClass('ring-2')
+    })
+
+    it('cleans up event listeners on unmount', () => {
+      mockUseLearnerObjectivesProgress.mockReturnValue({
+        data: {
+          objectives: [],
+          completed_count: 0,
+          total_count: 0,
+        },
+        isLoading: false,
+        error: null,
+      })
+
+      const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener')
+      const { unmount } = render(<ObjectiveProgressList notebookId="notebook:123" />)
+
+      unmount()
+
+      expect(removeEventListenerSpy).toHaveBeenCalledWith(
+        'objective_checked',
+        expect.any(Function)
+      )
+
+      removeEventListenerSpy.mockRestore()
+    })
+  })
 })

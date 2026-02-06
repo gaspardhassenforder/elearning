@@ -82,18 +82,18 @@ development_status:
   epic-5: in-progress
   5-1-sources-panel-with-document-browsing: done  # Code review complete: All HIGH and MEDIUM issues fixed (accordion comment, File List updated with cross-story dependencies), all ACs met, 10 backend + 30 frontend tests passing
   5-2-artifacts-browsing-in-side-panel: done  # Code review complete: 7 issues fixed (backend integration tests, cache invalidation, error state UI, i18n). All 3 ACs met, 32 backend tests + 37 frontend tests passing.
-  5-3-learning-progress-display: backlog
+  5-3-learning-progress-display: review  # All 3 tasks complete: Warm glow animation (3s ring pulse), Progress tab verification, 5 frontend tests passing (11/11 total). Frontend-only changes to ObjectiveProgressList + use-learner-chat hook. NO BACKEND CHANGES.
   epic-5-retrospective: optional
 
   # Epic 6: Platform Navigation & Voice Input
-  epic-6: backlog
-  6-1-platform-wide-ai-navigation-assistant: backlog
-  6-2-voice-to-text-input: backlog
+  epic-6: in-progress
+  6-1-platform-wide-ai-navigation-assistant: in-progress
+  6-2-voice-to-text-input: in-progress  # Story created: Browser-native Speech API voice input. Frontend-only (no backend changes). VoiceInput button in ChatPanel, useVoiceInput hook, comprehensive i18n (en-US + fr-FR), full accessibility, graceful degradation.
   epic-6-retrospective: optional
 
   # Epic 7: Error Handling, Observability & Data Privacy
-  epic-7: backlog
-  7-1-graceful-error-handling-and-user-friendly-messages: backlog
+  epic-7: in-progress
+  7-1-graceful-error-handling-and-user-friendly-messages: in-progress
   7-2-structured-contextual-error-logging: backlog
   7-3-admin-error-notifications: backlog
   7-4-langsmith-llm-tracing-integration: backlog

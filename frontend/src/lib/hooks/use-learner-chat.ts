@@ -11,7 +11,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { sendLearnerChatMessage, parseLearnerChatStream, LearnerChatMessage, ToolCall, ObjectiveCheckedData } from '../api/learner-chat'
+import { sendLearnerChatMessage, parseLearnerChatStream, LearnerChatMessage, ToolCall, ObjectiveCheckedData, SSEErrorData } from '../api/learner-chat'
 import { useToast } from './use-toast'
 import { useLearnerStore } from '../stores/learner-store'
 import { learningObjectivesKeys } from './use-learning-objectives'
@@ -166,6 +166,21 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
                 : '✓ Objective completed',
               description: objectiveData.objective_text,
               duration: 5000,
+            })
+
+            // Story 5.3: Emit custom event for ObjectiveProgressList warm glow
+            window.dispatchEvent(new CustomEvent('objective_checked', {
+              detail: objectiveData
+            }))
+          } else if (event.type === 'error' && event.errorData) {
+            // Story 7.1: Handle SSE error events - attach to current assistant message
+            setMessages((prev) => {
+              const updated = [...prev]
+              const lastMessage = updated[updated.length - 1]
+              if (lastMessage && lastMessage.role === 'assistant') {
+                lastMessage.sseError = event.errorData
+              }
+              return updated
             })
           } else if (event.type === 'message_complete') {
             // Story 4.3: Message streaming complete - trigger reactive scroll
