@@ -80,8 +80,8 @@ development_status:
 
   # Epic 5: Content Browsing & Learning Progress
   epic-5: in-progress
-  5-1-sources-panel-with-document-browsing: review  # All tasks complete: Backend content endpoint with company scoping + Frontend DocumentCard expand/collapse, CollapsedPanelIndicator, PulseBadge, accordion behavior, badge notifications + Tests (10 backend + 30 frontend tests passing)
-  5-2-artifacts-browsing-in-side-panel: backlog
+  5-1-sources-panel-with-document-browsing: done  # Code review complete: All HIGH and MEDIUM issues fixed (accordion comment, File List updated with cross-story dependencies), all ACs met, 10 backend + 30 frontend tests passing
+  5-2-artifacts-browsing-in-side-panel: review  # All tasks complete: Backend (learner-scoped endpoints with company validation, 20 tests) + Frontend (ArtifactsPanel, ArtifactCard with type-specific rendering, lazy loading, accordion behavior, 37 tests), all 3 ACs met
   5-3-learning-progress-display: backlog
   epic-5-retrospective: optional
 

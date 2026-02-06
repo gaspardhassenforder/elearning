@@ -3,6 +3,7 @@
 /**
  * Story 4.1: Learner Sources Panel
  * Story 4.3: Scroll-to-document and highlight animation
+ * Story 5.1: Document expand/collapse accordion behavior
  *
  * Tabbed panel showing:
  * - Sources: Document cards (collapsible)
@@ -13,6 +14,11 @@
  * - Scroll to document when scrollToSourceId changes in store
  * - Highlight animation on target document (3s glow)
  * - Smooth scroll behavior
+ *
+ * Story 5.1 additions:
+ * - Accordion behavior: only one document expanded at a time
+ * - Track expandedSourceId in learner-store
+ * - Pass isExpanded and onToggleExpand to DocumentCard
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -27,6 +33,7 @@ import { useNotebookSources } from '@/lib/hooks/use-sources'
 import { useLearnerStore } from '@/lib/stores/learner-store'
 import { DocumentCard } from './DocumentCard'
 import { ObjectiveProgressList } from './ObjectiveProgressList'
+import { ArtifactsPanel } from './ArtifactsPanel'
 
 interface SourcesPanelProps {
   notebookId: string
@@ -47,6 +54,10 @@ export function SourcesPanel({ notebookId }: SourcesPanelProps) {
   // Story 4.3: Listen to scroll target from store
   const scrollToSourceId = useLearnerStore((state) => state.scrollToSourceId)
   const setScrollToSourceId = useLearnerStore((state) => state.setScrollToSourceId)
+
+  // Story 5.1: Track expanded document (accordion behavior)
+  const expandedSourceId = useLearnerStore((state) => state.expandedSourceId)
+  const setExpandedSourceId = useLearnerStore((state) => state.setExpandedSourceId)
 
   const {
     sources,
@@ -128,6 +139,14 @@ export function SourcesPanel({ notebookId }: SourcesPanelProps) {
     }
   }, [])
 
+  // Story 5.1: Toggle expand handler (accordion behavior)
+  const handleToggleExpand = useCallback((sourceId: string) => {
+    // Accordion pattern: only one document expanded at a time
+    // If clicking the already expanded card, collapse it (set to null)
+    // Otherwise, expand this card (automatically collapses any other expanded card)
+    setExpandedSourceId(expandedSourceId === sourceId ? null : sourceId)
+  }, [expandedSourceId, setExpandedSourceId])
+
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="pb-3 flex-shrink-0">
@@ -181,6 +200,8 @@ export function SourcesPanel({ notebookId }: SourcesPanelProps) {
                         source={source}
                         ref={(el) => setDocumentRef(source.id, el)}
                         isHighlighted={highlightedSourceId === source.id}
+                        isExpanded={expandedSourceId === source.id}
+                        onToggleExpand={() => handleToggleExpand(source.id)}
                       />
                     ))}
                     {isFetchingNextPage && (
@@ -193,15 +214,9 @@ export function SourcesPanel({ notebookId }: SourcesPanelProps) {
               </ScrollArea>
             </TabsContent>
 
-            {/* Artifacts Tab - Placeholder for Story 5.2 */}
+            {/* Artifacts Tab - Story 5.2: Artifacts Browsing */}
             <TabsContent value="artifacts" className="h-full m-0">
-              <div className="h-full flex items-center justify-center px-4">
-                <EmptyState
-                  icon={GraduationCap}
-                  title={t.learner.artifacts.comingSoon}
-                  description={t.learner.artifacts.comingSoonDesc}
-                />
-              </div>
+              <ArtifactsPanel notebookId={notebookId} />
             </TabsContent>
 
             {/* Progress Tab - Story 4.4: Learning Objectives Progress */}
