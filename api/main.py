@@ -4,7 +4,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import os
+import traceback
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+from typing import Optional
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +23,7 @@ from api.routers import (
     companies,
     config,
     context,
+    debug,
     embedding,
     embedding_rebuild,
     episode_profiles,
@@ -149,6 +153,73 @@ app.add_middleware(
 )
 
 
+# Import notification service
+from open_notebook.observability.notification_service import (
+    get_notification_service,
+    NotificationPayload,
+)
+from open_notebook.observability.request_context import (
+    get_request_context,
+    context_buffer as context_buffer_var,
+)
+import traceback
+
+
+async def send_error_notification(
+    error_type: str,
+    error_summary: str,
+    severity: str = "ERROR",
+    exc_info: Optional[Exception] = None,
+):
+    """
+    Helper function to send admin error notification.
+
+    Extracts request context and sends notification via configured backend.
+    Gracefully handles notification failures (never raises).
+    """
+    try:
+        # Get request context from contextvars
+        ctx = get_request_context()
+        buffer = context_buffer_var.get()
+
+        # Extract context snippet (last 3 operations)
+        context_snippet = []
+        if buffer:
+            recent_ops = buffer.peek()[-3:]  # Last 3 operations
+            context_snippet = [
+                f"{op.get('type', 'unknown')}: {op.get('details', {})}"
+                for op in recent_ops
+            ]
+
+        # Extract stack trace preview if exception provided
+        stack_trace_preview = None
+        if exc_info:
+            tb = "".join(traceback.format_exception(type(exc_info), exc_info, exc_info.__traceback__))
+            stack_trace_preview = tb[:500]  # Truncate to 500 chars
+
+        # Build notification payload
+        payload = NotificationPayload(
+            error_summary=error_summary[:200],  # Truncate to 200 chars
+            error_type=error_type,
+            severity=severity,
+            request_id=ctx.get("request_id"),
+            user_id=ctx.get("user_id"),
+            company_id=ctx.get("company_id"),
+            endpoint=ctx.get("endpoint"),
+            timestamp=datetime.now(datetime.UTC if hasattr(datetime, "UTC") else timezone.utc),
+            context_snippet=context_snippet,
+            stack_trace_preview=stack_trace_preview,
+        )
+
+        # Send notification (async, non-blocking)
+        service = get_notification_service()
+        await service.notify(payload)
+
+    except Exception as e:
+        # Notification failure MUST NOT affect error handling
+        logger.warning(f"Failed to send error notification: {e}")
+
+
 # Custom exception handler to ensure CORS headers are included in error responses
 # This helps when errors occur before the CORS middleware can process them
 @app.exception_handler(StarletteHTTPException)
@@ -161,6 +232,14 @@ async def custom_http_exception_handler(request: Request, exc: StarletteHTTPExce
     FastAPI, this handler won't be called. In that case, configure your reverse proxy
     to add CORS headers to error responses.
     """
+    # Send admin notification for 5xx errors (server errors)
+    if exc.status_code >= 500:
+        await send_error_notification(
+            error_type=f"HTTP{exc.status_code}",
+            error_summary=str(exc.detail),
+            severity="ERROR",
+        )
+
     # Get the origin from the request
     origin = request.headers.get("origin", "*")
 
@@ -169,6 +248,39 @@ async def custom_http_exception_handler(request: Request, exc: StarletteHTTPExce
         content={"detail": exc.detail},
         headers={
             **(exc.headers or {}), "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Headers": "*",
+        },
+    )
+
+
+# Add unhandled exception handler for all other exceptions
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """
+    Global exception handler for unhandled exceptions.
+
+    Logs the exception, sends admin notification, and returns 500 error response.
+    """
+    # Log exception
+    logger.error(f"Unhandled exception: {str(exc)}", exc_info=exc)
+
+    # Send admin notification
+    await send_error_notification(
+        error_type=type(exc).__name__,
+        error_summary=str(exc),
+        severity="ERROR",
+        exc_info=exc,
+    )
+
+    # Return error response
+    origin = request.headers.get("origin", "*")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+        headers={
+            "Access-Control-Allow-Origin": origin,
             "Access-Control-Allow-Credentials": "true",
             "Access-Control-Allow-Methods": "*",
             "Access-Control-Allow-Headers": "*",
@@ -209,6 +321,7 @@ app.include_router(learning_objectives.router, prefix="/api", tags=["learning-ob
 app.include_router(learning_objectives.learner_router, prefix="/api", tags=["learner-objectives"])  # Story 4.4
 app.include_router(module_prompts.router, prefix="/api", tags=["module-prompts"])
 app.include_router(admin_chat.router, prefix="/api", tags=["admin-chat"])
+app.include_router(debug.router, prefix="/api", tags=["debug"])
 
 
 @app.get("/")
