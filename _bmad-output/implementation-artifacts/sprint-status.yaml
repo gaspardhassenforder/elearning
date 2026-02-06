@@ -73,14 +73,14 @@ development_status:
   4-3-inline-document-snippets-in-chat: done  # Code review complete: All ACs met, 13 issues found (4 HIGH + 5 MEDIUM + 4 LOW), 7 resolved (4 HIGH + 3 MEDIUM code fixes), tests added (5 backend + 10 frontend), security documentation, error handling, memory leak fixed
   4-4-learning-objectives-assessment-and-progress-tracking: done  # All tasks complete: Backend (Migration 22, domain model, check_off_objective tool, API progress endpoint) + Frontend (ObjectiveProgressList, AmbientProgressBar, SSE parser, inline confirmation via toast) + Tests (18 frontend tests passing)
   4-5-adaptive-teaching-and-fast-track-for-advanced-learners: done  # Code review complete: 14 issues found (8 HIGH + 4 MEDIUM + 2 LOW), all HIGH issues fixed (API model extension, type safety, test coverage, frontend tests). Adaptive teaching via prompt engineering, multiple objective check-offs, module suggestions, 10 backend + 5 frontend tests passing.
-  4-6-ai-surfaces-artifacts-in-conversation: in-progress  # Comprehensive story created: InlineQuizWidget (interactive quiz preview), InlineAudioPlayer (audio playback controls), surface_quiz/surface_podcast LangGraph tools, artifact context in prompts, company-scoped artifact endpoints
+  4-6-ai-surfaces-artifacts-in-conversation: done  # All 7 tasks complete: Backend (surface_quiz/surface_podcast tools, prompt injection, 7 tests) + Frontend (InlineQuizWidget, InlineAudioPlayer, ChatPanel integration, 42 tests) + API (company-scoped endpoints). All ACs verified via unit/integration tests.
   4-7-async-task-handling-in-chat: review  # All tasks complete: generate_artifact tool, AsyncStatusBar component, useJobStatus polling hook, ChatPanel integration, SSE event detection, toast notifications, 18 backend tests + 50+ frontend tests, all ACs verified
   4-8-persistent-chat-history: review  # All tasks complete (1-10): Backend (Thread ID, re-engagement, history endpoint, pagination) + Frontend (ChatPanel history loading, scroll behavior, i18n, useChatHistory hook), 14 backend tests passing, all 3 ACs met
   epic-4-retrospective: optional
 
   # Epic 5: Content Browsing & Learning Progress
   epic-5: in-progress
-  5-1-sources-panel-with-document-browsing: in-progress  # Implementation started: DocumentCard expand/collapse, panel collapse with badge notifications, full document content endpoint, accordion behavior
+  5-1-sources-panel-with-document-browsing: review  # All tasks complete: Backend content endpoint with company scoping + Frontend DocumentCard expand/collapse, CollapsedPanelIndicator, PulseBadge, accordion behavior, badge notifications + Tests (10 backend + 30 frontend tests passing)
   5-2-artifacts-browsing-in-side-panel: backlog
   5-3-learning-progress-display: backlog
   epic-5-retrospective: optional
