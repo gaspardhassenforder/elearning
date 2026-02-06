@@ -890,6 +890,14 @@ class ObjectiveWithProgress(BaseModel):
     progress_evidence: Optional[str] = None
 
 
+class SuggestedModule(BaseModel):
+    """Suggested module for learner continuation (Story 4.5)."""
+
+    id: str
+    title: str
+    description: str = ""
+
+
 class ObjectiveCheckOffResult(BaseModel):
     """Result of check_off_objective tool invocation."""
 
@@ -899,3 +907,7 @@ class ObjectiveCheckOffResult(BaseModel):
     total_completed: int
     total_objectives: int
     all_complete: bool
+    suggested_modules: List[SuggestedModule] = Field(
+        default_factory=list,
+        description="Suggested next modules when all objectives complete (Story 4.5)"
+    )

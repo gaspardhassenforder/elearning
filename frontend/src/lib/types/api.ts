@@ -399,3 +399,41 @@ export interface ModulePrompt {
 export interface ModulePromptUpdate {
   system_prompt: string | null
 }
+
+// Learning Objectives Progress types (Story 4.4: Learner Progress Tracking)
+export type ObjectiveProgressStatus = 'not_started' | 'in_progress' | 'completed'
+
+export interface ObjectiveWithProgress {
+  id: string
+  notebook_id: string
+  text: string
+  order: number
+  auto_generated: boolean
+  // Progress fields (null if not started)
+  progress_status: ObjectiveProgressStatus | null
+  progress_completed_at: string | null
+  progress_evidence: string | null
+}
+
+export interface LearnerObjectivesProgressResponse {
+  objectives: ObjectiveWithProgress[]
+  completed_count: number
+  total_count: number
+}
+
+// Objective Check-Off types (Story 4.5: Adaptive Teaching & Module Suggestions)
+export interface SuggestedModule {
+  id: string
+  title: string
+  description: string
+}
+
+export interface ObjectiveCheckOffResult {
+  objective_id: string
+  objective_text: string
+  evidence: string
+  total_completed: number
+  total_objectives: number
+  all_complete: boolean
+  suggested_modules: SuggestedModule[]
+}

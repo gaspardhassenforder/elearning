@@ -22,6 +22,7 @@ import { useLearnerChat } from '@/lib/hooks/use-learner-chat'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { DocumentSnippetCard } from './DocumentSnippetCard'
 import { ModuleSuggestionCard } from './ModuleSuggestionCard'
+import type { SuggestedModule } from '@/lib/types/api'
 
 interface ChatPanelProps {
   notebookId: string
@@ -172,7 +173,7 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
                                 <p className="text-xs font-medium text-muted-foreground">
                                   {t.learner.chat.suggestedModules}
                                 </p>
-                                {tc.result!.suggested_modules.map((module: any, modIndex: number) => (
+                                {tc.result!.suggested_modules.map((module: SuggestedModule, modIndex: number) => (
                                   <ModuleSuggestionCard
                                     key={`module-${index}-${tcIndex}-${modIndex}`}
                                     moduleId={module.id}

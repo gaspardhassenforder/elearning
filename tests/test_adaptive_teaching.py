@@ -195,45 +195,85 @@ class TestModuleSuggestions:
     @pytest.mark.asyncio
     async def test_suggestions_included_when_all_complete(self):
         """Test suggested_modules included when all_complete == true."""
-        from open_notebook.graphs.tools import check_off_objective
-        from open_notebook.domain.learning_objective import LearningObjective
-        from open_notebook.domain.notebook import Notebook
-        from open_notebook.domain.user import User
-        from open_notebook.domain.learner_objective_progress import LearnerObjectiveProgress
-        from open_notebook.database.repository import repo_query
+        from open_notebook.graphs.tools import _fetch_suggested_modules
+        from unittest.mock import AsyncMock, patch
 
-        # This test would require a real database setup
-        # For now, just test that the tool returns the expected structure
-        # We'll mock the database in integration tests
+        # Mock User.get to return user with company_id
+        mock_user = AsyncMock()
+        mock_user.company_id = "company:test123"
 
-        # Test the expected return structure
-        expected_keys = ["objective_id", "objective_text", "evidence",
-                        "total_completed", "total_objectives", "all_complete"]
+        # Mock repo_query to return 2 suggested modules
+        mock_suggestions = [
+            {"id": "notebook:module1", "title": "Advanced ML", "description": "Deep learning basics"},
+            {"id": "notebook:module2", "title": "MLOps", "description": "Production ML systems"}
+        ]
 
-        # When all_complete is true, should also have suggested_modules key
-        # This will be verified in integration tests with real DB
+        with patch('open_notebook.graphs.tools.User.get', return_value=mock_user), \
+             patch('open_notebook.graphs.tools.repo_query', return_value=mock_suggestions):
 
-        # Placeholder assertion - will be replaced with integration test
-        assert True
+            result = await _fetch_suggested_modules(
+                user_id="user:learner1",
+                current_notebook_id="notebook:current"
+            )
+
+            # Verify returned structure
+            assert len(result) == 2
+            assert result[0]["id"] == "notebook:module1"
+            assert result[0]["title"] == "Advanced ML"
+            assert result[1]["id"] == "notebook:module2"
+            assert "description" in result[0]
 
     @pytest.mark.asyncio
     async def test_suggestions_company_scoped(self):
         """Test suggestions filtered by learner's company."""
-        # This requires database setup with:
-        # - Multiple companies
-        # - Modules assigned to different companies
-        # - Verify only learner's company modules are suggested
+        from open_notebook.graphs.tools import _fetch_suggested_modules
+        from unittest.mock import AsyncMock, patch
 
-        # Placeholder - will be implemented as integration test
-        assert True
+        # Mock User.get to return user with company_id
+        mock_user = AsyncMock()
+        mock_user.company_id = "company:acme"
+
+        # Mock repo_query to verify company_id is passed correctly
+        mock_repo_query = AsyncMock(return_value=[
+            {"id": "notebook:acme_module", "title": "ACME Training", "description": "Company specific"}
+        ])
+
+        with patch('open_notebook.graphs.tools.User.get', return_value=mock_user), \
+             patch('open_notebook.graphs.tools.repo_query', mock_repo_query):
+
+            result = await _fetch_suggested_modules(
+                user_id="user:alice",
+                current_notebook_id="notebook:current"
+            )
+
+            # Verify repo_query was called with correct company_id
+            mock_repo_query.assert_called_once()
+            call_args = mock_repo_query.call_args
+            assert call_args[0][1]["company_id"] == "company:acme"
+
+            # Verify company-specific module returned
+            assert len(result) == 1
+            assert result[0]["id"] == "notebook:acme_module"
 
     @pytest.mark.asyncio
     async def test_no_suggestions_when_none_available(self):
         """Test suggested_modules = [] when no modules available."""
-        # Test scenario:
-        # - Learner completes all objectives
-        # - No other modules assigned to their company
-        # - Should return empty suggested_modules list
+        from open_notebook.graphs.tools import _fetch_suggested_modules
+        from unittest.mock import AsyncMock, patch
 
-        # Placeholder - will be implemented as integration test
-        assert True
+        # Mock User.get to return user with company_id
+        mock_user = AsyncMock()
+        mock_user.company_id = "company:startup"
+
+        # Mock repo_query to return empty list (no modules available)
+        with patch('open_notebook.graphs.tools.User.get', return_value=mock_user), \
+             patch('open_notebook.graphs.tools.repo_query', return_value=[]):
+
+            result = await _fetch_suggested_modules(
+                user_id="user:bob",
+                current_notebook_id="notebook:only_module"
+            )
+
+            # Verify empty list returned
+            assert result == []
+            assert isinstance(result, list)
