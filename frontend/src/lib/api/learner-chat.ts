@@ -221,16 +221,27 @@ export async function* parseLearnerChatStream(
  * Get chat history for a notebook
  *
  * Story 4.8: Load previous conversation history for persistent chat.
- * Returns all messages from the learner's conversation thread with this module.
+ * Returns messages from the learner's conversation thread with this module.
+ *
+ * Story 4.8 Task 9: Supports pagination for long conversations (50+ messages).
  *
  * @param notebookId - Notebook/module ID
- * @returns Chat history response with messages array
+ * @param options - Pagination options (limit, offset)
+ * @returns Chat history response with messages array and has_more flag
  */
 export async function getChatHistory(
-  notebookId: string
+  notebookId: string,
+  options?: { limit?: number; offset?: number }
 ): Promise<ChatHistoryResponse> {
-  const response = await apiClient.get<ChatHistoryResponse>(
-    `/chat/learner/${notebookId}/history`
-  )
+  const params = new URLSearchParams()
+  if (options?.limit !== undefined) params.append('limit', options.limit.toString())
+  if (options?.offset !== undefined) params.append('offset', options.offset.toString())
+
+  const queryString = params.toString()
+  const url = queryString
+    ? `/chat/learner/${notebookId}/history?${queryString}`
+    : `/chat/learner/${notebookId}/history`
+
+  const response = await apiClient.get<ChatHistoryResponse>(url)
   return response.data
 }

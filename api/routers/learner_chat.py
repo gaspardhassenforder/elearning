@@ -9,7 +9,7 @@ Story: 4.1 - Learner Chat Interface & SSE Streaming
 import json
 from typing import AsyncIterator
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import HumanMessage
 from loguru import logger
@@ -107,21 +107,28 @@ class SSEObjectiveCheckedEvent(BaseModel):
 @router.get("/chat/learner/{notebook_id}/history", response_model=ChatHistoryResponse)
 async def get_chat_history(
     notebook_id: str,
+    limit: int = Query(50, ge=1, le=100, description="Maximum messages to return"),
+    offset: int = Query(0, ge=0, description="Number of messages to skip from start"),
     learner: LearnerContext = Depends(get_current_learner),
 ) -> ChatHistoryResponse:
     """Load chat history for learner's conversation in this module.
 
     Story 4.8: Persistent chat history endpoint.
-    Returns all previous messages from the thread checkpoint for this
+    Returns previous messages from the thread checkpoint for this
     user/notebook combination. Used by frontend to initialize Thread component
     with historical messages on page load.
 
+    Pagination: Returns `limit` messages starting from `offset`. Use `has_more`
+    flag to determine if more messages exist.
+
     Args:
         notebook_id: Notebook/module record ID
+        limit: Maximum number of messages to return (default: 50, max: 100)
+        offset: Number of messages to skip from start (default: 0)
         learner: Authenticated learner context (auto-injected)
 
     Returns:
-        ChatHistoryResponse with messages array and thread ID
+        ChatHistoryResponse with messages array, thread ID, and has_more flag
 
     Raises:
         HTTPException 403: Learner does not have access to notebook
@@ -187,12 +194,24 @@ async def get_chat_history(
                 has_more=False
             )
 
+        # Story 4.8 Task 9: Apply pagination
+        total_messages = len(messages)
+        has_more = (offset + limit) < total_messages
+
+        # Slice messages for pagination (offset from start, limit count)
+        paginated_messages = messages[offset:offset + limit]
+
+        logger.info(
+            f"Pagination: total={total_messages}, offset={offset}, "
+            f"limit={limit}, returning={len(paginated_messages)}, has_more={has_more}"
+        )
+
         # 4. Transform messages to frontend format (assistant-ui compatible)
         import uuid
         from datetime import datetime
 
         formatted_messages = []
-        for msg in messages:
+        for msg in paginated_messages:
             # Determine role
             from langchain_core.messages import AIMessage
 
@@ -229,12 +248,15 @@ async def get_chat_history(
                 )
             )
 
-        logger.info(f"Loaded {len(formatted_messages)} messages for thread {thread_id}")
+        logger.info(
+            f"Loaded {len(formatted_messages)} messages for thread {thread_id} "
+            f"(page: offset={offset}, limit={limit}, has_more={has_more})"
+        )
 
         return ChatHistoryResponse(
             messages=formatted_messages,
             thread_id=thread_id,
-            has_more=False  # TODO: Implement pagination in Task 9
+            has_more=has_more
         )
 
     except Exception as e:

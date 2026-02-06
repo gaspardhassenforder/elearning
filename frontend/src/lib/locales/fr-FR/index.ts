@@ -1318,6 +1318,10 @@ export const frFR = {
       errorDesc: "Veuillez vérifier votre connexion et réessayer.",
       greeting: "Bonjour ! Je suis votre enseignant IA. Je suis là pour vous guider à travers ce module. Qu'aimeriez-vous explorer en premier ?",
       greetingLoading: "Préparation de votre message d'accueil personnalisé...",  // Story 4.2: Chargement du message d'accueil proactif
+      // Story 4.8: Historique de chat persistant
+      welcomeBack: "Bon retour !",
+      continueDiscussion: "Continuons notre discussion",
+      loadingHistory: "Chargement de l'historique de conversation...",
       // Story 4.5: Suggestions de modules à la fin
       suggestedModules: "Modules suggérés",
       startModule: "Commencer le module",

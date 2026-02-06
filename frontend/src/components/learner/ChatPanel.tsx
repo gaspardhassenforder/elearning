@@ -17,8 +17,9 @@
  */
 
 import { useEffect, useState, useRef } from 'react'
-import { MessageSquare } from 'lucide-react'
+import { MessageSquare, ArrowDown } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { useLearnerChat, useChatHistory } from '@/lib/hooks/use-learner-chat'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -41,6 +42,10 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
   const { toast } = useToast()
   const [mounted, setMounted] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const [historyLoaded, setHistoryLoaded] = useState(false)
+  const [isUserScrolledUp, setIsUserScrolledUp] = useState(false)
+  const [showScrollButton, setShowScrollButton] = useState(false)
 
   // Story 4.7: Access active job state from store
   const { activeJob, setActiveJob, clearActiveJob } = useLearnerStore((state) => ({
@@ -54,6 +59,13 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
     setMounted(true)
   }, [])
 
+  // Story 4.8: Load chat history
+  const {
+    data: historyData,
+    isLoading: isLoadingHistory,
+    error: historyError,
+  } = useChatHistory(notebookId)
+
   const {
     isLoading,
     isStreaming,
@@ -62,10 +74,58 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
     messages,
   } = useLearnerChat(notebookId)
 
-  // Auto-scroll to bottom when messages change or streaming updates
+  // Story 4.8: Merge history with current messages (history first, then new messages)
+  const allMessages = historyLoaded && historyData?.messages
+    ? [...historyData.messages, ...messages]
+    : messages
+
+  // Story 4.8: Track when history finishes loading
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, isStreaming])
+    if (!isLoadingHistory && historyData && !historyLoaded) {
+      setHistoryLoaded(true)
+    }
+  }, [isLoadingHistory, historyData, historyLoaded])
+
+  // Story 4.8: Auto-scroll to bottom after history loads
+  useEffect(() => {
+    if (historyLoaded && allMessages.length > 0) {
+      // Delay scroll slightly to ensure messages are rendered
+      const timer = setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [historyLoaded, allMessages.length])
+
+  // Story 4.8: Detect user manual scroll
+  const handleScroll = () => {
+    const container = messagesContainerRef.current
+    if (!container) return
+
+    const { scrollTop, scrollHeight, clientHeight } = container
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight
+
+    // Consider "at bottom" if within 50px
+    const isAtBottom = distanceFromBottom < 50
+
+    setIsUserScrolledUp(!isAtBottom)
+    setShowScrollButton(!isAtBottom)
+  }
+
+  // Story 4.8: Scroll to bottom function
+  const scrollToBottom = (smooth = true) => {
+    messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' })
+    setIsUserScrolledUp(false)
+    setShowScrollButton(false)
+  }
+
+  // Auto-scroll to bottom when messages change or streaming updates
+  // Only if user hasn't manually scrolled up
+  useEffect(() => {
+    if (!isUserScrolledUp) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [messages, isStreaming, isUserScrolledUp])
 
   // Story 4.7: Poll job status when active job exists
   const { status, progress, error: jobError } = useJobStatus(
@@ -109,11 +169,11 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
       </CardHeader>
 
       <CardContent className="flex-1 overflow-hidden p-0">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-full">
+        {isLoading || isLoadingHistory ? (
+          <div className="flex items-center justify-center h-full" data-testid="history-loading-skeleton">
             <LoadingSpinner size="lg" />
           </div>
-        ) : error ? (
+        ) : error || historyError ? (
           <div className="flex items-center justify-center h-full p-6 text-center">
             <div>
               <p className="text-sm text-muted-foreground mb-2">{t.learner.chat.error}</p>
@@ -121,10 +181,14 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
             </div>
           </div>
         ) : (
-          <div className="h-full flex flex-col">
+          <div className="h-full flex flex-col relative">
             {/* Chat Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {messages.length === 0 && isStreaming ? (
+            <div
+              ref={messagesContainerRef}
+              onScroll={handleScroll}
+              className="flex-1 overflow-y-auto p-4 space-y-4"
+            >
+              {allMessages.length === 0 && isStreaming ? (
                 // Story 4.2: Show loading indicator while fetching greeting
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -136,7 +200,7 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
                     </p>
                   </div>
                 </div>
-              ) : messages.length === 0 ? (
+              ) : allMessages.length === 0 ? (
                 // Fallback empty state (shouldn't normally be seen due to auto greeting request)
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -149,7 +213,7 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
                   </div>
                 </div>
               ) : (
-                messages.map((message, index) => (
+                allMessages.map((message, index) => (
                   <div
                     key={index}
                     className={`flex items-start gap-3 ${
@@ -174,7 +238,7 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
                         {message.content}
                         {/* Show streaming cursor on last assistant message during streaming */}
                         {message.role === 'assistant' &&
-                         index === messages.length - 1 &&
+                         index === allMessages.length - 1 &&
                          isStreaming && (
                           <span className="inline-block w-1.5 h-4 ml-1 bg-primary animate-pulse" />
                         )}
@@ -272,6 +336,21 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
               {/* Scroll anchor for auto-scroll */}
               <div ref={messagesEndRef} />
             </div>
+
+            {/* Story 4.8: Scroll to bottom button */}
+            {showScrollButton && (
+              <div className="absolute bottom-20 right-6 z-10">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="rounded-full shadow-lg"
+                  onClick={() => scrollToBottom(true)}
+                  aria-label="Scroll to bottom"
+                >
+                  <ArrowDown className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
 
             {/* Message Input Area */}
             <div className="flex-shrink-0 border-t p-4">

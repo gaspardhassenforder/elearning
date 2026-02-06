@@ -1323,6 +1323,10 @@ export const enUS = {
       errorDesc: "Please check your connection and try again.",
       greeting: "Hello! I'm your AI teacher. I'm here to guide you through this module. What would you like to explore first?",
       greetingLoading: "Preparing your personalized greeting...",  // Story 4.2: Proactive greeting loading
+      // Story 4.8: Persistent Chat History
+      welcomeBack: "Welcome back!",
+      continueDiscussion: "Let's continue our discussion",
+      loadingHistory: "Loading conversation history...",
       // Story 4.5: Module Suggestions on Completion
       suggestedModules: "Suggested Modules",
       startModule: "Start Module",
@@ -1337,6 +1341,19 @@ export const enUS = {
       processing: "Processing",
       error: "Error",
       ready: "Ready",
+      // Story 5.1: Document expand/collapse
+      expandDocument: "Expand document",
+      collapseDocument: "Collapse document",
+      loadingContent: "Loading content...",
+      contentError: "Failed to load content",
+      retry: "Retry",
+      words: "words",
+      noContent: "No content available",
+    },
+    // Story 5.1: Panel collapse
+    panel: {
+      collapsed: "Show sources",
+      newDocuments: "{count} new documents referenced",
     },
     tabs: {
       sources: "Sources",
