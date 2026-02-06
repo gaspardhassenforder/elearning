@@ -74,13 +74,13 @@ development_status:
   4-4-learning-objectives-assessment-and-progress-tracking: done  # All tasks complete: Backend (Migration 22, domain model, check_off_objective tool, API progress endpoint) + Frontend (ObjectiveProgressList, AmbientProgressBar, SSE parser, inline confirmation via toast) + Tests (18 frontend tests passing)
   4-5-adaptive-teaching-and-fast-track-for-advanced-learners: done  # Code review complete: 14 issues found (8 HIGH + 4 MEDIUM + 2 LOW), all HIGH issues fixed (API model extension, type safety, test coverage, frontend tests). Adaptive teaching via prompt engineering, multiple objective check-offs, module suggestions, 10 backend + 5 frontend tests passing.
   4-6-ai-surfaces-artifacts-in-conversation: in-progress  # Comprehensive story created: InlineQuizWidget (interactive quiz preview), InlineAudioPlayer (audio playback controls), surface_quiz/surface_podcast LangGraph tools, artifact context in prompts, company-scoped artifact endpoints
-  4-7-async-task-handling-in-chat: in-progress
+  4-7-async-task-handling-in-chat: review  # All tasks complete: generate_artifact tool, AsyncStatusBar component, useJobStatus polling hook, ChatPanel integration, SSE event detection, toast notifications, 18 backend tests + 50+ frontend tests, all ACs verified
   4-8-persistent-chat-history: in-progress  # Implementation started: Thread isolation, history loading, re-engagement message generation, assistant-ui integration, 22+ tests
   epic-4-retrospective: optional
 
   # Epic 5: Content Browsing & Learning Progress
-  epic-5: backlog
-  5-1-sources-panel-with-document-browsing: backlog
+  epic-5: in-progress
+  5-1-sources-panel-with-document-browsing: in-progress  # Implementation started: DocumentCard expand/collapse, panel collapse with badge notifications, full document content endpoint, accordion behavior
   5-2-artifacts-browsing-in-side-panel: backlog
   5-3-learning-progress-display: backlog
   epic-5-retrospective: optional

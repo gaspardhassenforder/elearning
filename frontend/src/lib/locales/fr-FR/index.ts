@@ -472,6 +472,14 @@ export const frFR = {
     sessionUpdated: "Session mise à jour",
     sessionDeleted: "Session supprimée",
   },
+  asyncStatus: {
+    generatingArtifact: "Génération de {type}...",
+    artifactReady: "{type} prêt !",
+    artifactReadyDescription: "Vous pouvez le trouver dans le panneau Artefacts",
+    artifactFailed: "Échec de la génération de {type}",
+    autoDismiss: "Fermeture automatique dans 5s",
+    dismiss: "Fermer",
+  },
   searchPage: {
     askAndSearch: "Demander et rechercher",
     chooseAMode: "Choisir un mode",

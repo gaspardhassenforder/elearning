@@ -472,6 +472,14 @@ export const enUS = {
     sessionUpdated: "Session updated",
     sessionDeleted: "Session deleted",
   },
+  asyncStatus: {
+    generatingArtifact: "Generating {type}...",
+    artifactReady: "{type} ready!",
+    artifactReadyDescription: "You can find it in the Artifacts panel",
+    artifactFailed: "Failed to generate {type}",
+    autoDismiss: "Auto-dismiss in 5s",
+    dismiss: "Dismiss",
+  },
   searchPage: {
     askAndSearch: "Ask and Search",
     chooseAMode: "Choose a mode",

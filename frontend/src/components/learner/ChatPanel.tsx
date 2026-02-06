@@ -4,6 +4,7 @@
  * Story 4.1: Learner Chat Panel with assistant-ui
  * Story 4.2: Proactive AI Teacher Greeting
  * Story 4.3: Document Snippet Rendering
+ * Story 4.8: Persistent Chat History
  *
  * Features:
  * - SSE streaming with token-by-token rendering
@@ -12,18 +13,23 @@
  * - Flowing AI messages, subtle user backgrounds
  * - Streaming cursor during generation
  * - Document snippet cards inline (Story 4.3)
+ * - Persistent chat history loading (Story 4.8)
  */
 
 import { useEffect, useState, useRef } from 'react'
 import { MessageSquare } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useTranslation } from '@/lib/hooks/use-translation'
-import { useLearnerChat } from '@/lib/hooks/use-learner-chat'
+import { useLearnerChat, useChatHistory } from '@/lib/hooks/use-learner-chat'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { DocumentSnippetCard } from './DocumentSnippetCard'
 import { ModuleSuggestionCard } from './ModuleSuggestionCard'
 import { InlineQuizWidget } from './InlineQuizWidget'
 import { InlineAudioPlayer } from './InlineAudioPlayer'
+import { AsyncStatusBar } from './AsyncStatusBar'
+import { useJobStatus } from '@/lib/hooks/use-job-status'
+import { useLearnerStore } from '@/lib/stores/learner-store'
+import { useToast } from '@/lib/hooks/use-toast'
 import type { SuggestedModule } from '@/lib/types/api'
 
 interface ChatPanelProps {
@@ -32,8 +38,16 @@ interface ChatPanelProps {
 
 export function ChatPanel({ notebookId }: ChatPanelProps) {
   const { t } = useTranslation()
+  const { toast } = useToast()
   const [mounted, setMounted] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Story 4.7: Access active job state from store
+  const { activeJob, setActiveJob, clearActiveJob } = useLearnerStore((state) => ({
+    activeJob: state.activeJob,
+    setActiveJob: state.setActiveJob,
+    clearActiveJob: state.clearActiveJob,
+  }))
 
   // Wait for client-side mounting (assistant-ui uses browser APIs)
   useEffect(() => {
@@ -53,6 +67,27 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isStreaming])
 
+  // Story 4.7: Poll job status when active job exists
+  const { status, progress, error: jobError } = useJobStatus(
+    activeJob?.jobId || null,
+    {
+      notebookId,
+      onComplete: () => {
+        toast({
+          title: t.asyncStatus.artifactReady.replace('{type}', activeJob?.artifactType || 'artifact'),
+          description: t.asyncStatus.artifactReadyDescription,
+        })
+      },
+      onError: (errorMsg) => {
+        toast({
+          title: t.asyncStatus.artifactFailed.replace('{type}', activeJob?.artifactType || 'artifact'),
+          description: errorMsg,
+          variant: 'destructive',
+        })
+      },
+    }
+  )
+
   if (!mounted) {
     return (
       <Card className="h-full flex flex-col">
@@ -64,7 +99,8 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
   }
 
   return (
-    <Card className="h-full flex flex-col">
+    <>
+      <Card className="h-full flex flex-col">
       <CardHeader className="pb-3 flex-shrink-0 border-b">
         <CardTitle className="text-lg flex items-center gap-2">
           <MessageSquare className="h-5 w-5" />
@@ -269,5 +305,18 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
         )}
       </CardContent>
     </Card>
+
+      {/* Story 4.7: Async Status Bar - Fixed bottom viewport */}
+      {activeJob && (
+        <AsyncStatusBar
+          jobId={activeJob.jobId}
+          artifactType={activeJob.artifactType}
+          status={status || 'pending'}
+          progress={progress}
+          errorMessage={jobError}
+          onDismiss={clearActiveJob}
+        />
+      )}
+    </>
   )
 }

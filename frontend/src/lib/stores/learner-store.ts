@@ -1,6 +1,7 @@
 /**
  * Story 4.1: Learner Store
  * Story 4.3: Document Snippet Scroll State
+ * Story 4.7: Async Job Tracking
  *
  * Zustand store for learner UI state (NOT server data).
  * Handles:
@@ -8,6 +9,7 @@
  * - Scroll positions
  * - UI preferences
  * - Sources panel expansion and scroll targets (Story 4.3)
+ * - Active async job tracking (Story 4.7)
  *
  * Note: Server data (modules, chat messages) uses TanStack Query, not Zustand.
  */
@@ -19,6 +21,13 @@ interface PanelSizes {
   [notebookId: string]: number[] // Panel sizes for each notebook
 }
 
+// Story 4.7: Active async job state
+interface ActiveJob {
+  jobId: string
+  artifactType: 'podcast' | 'quiz' | string
+  notebookId: string
+}
+
 interface LearnerState {
   // Panel sizes per notebook
   panelSizes: PanelSizes
@@ -27,6 +36,9 @@ interface LearnerState {
   sourcesPanelExpanded: boolean
   scrollToSourceId: string | null
   panelManuallyCollapsed: boolean // Track if user manually collapsed panel
+
+  // Story 4.7: Active async job tracking
+  activeJob: ActiveJob | null
 
   // Actions
   setPanelSizes: (notebookId: string, sizes: number[]) => void
@@ -38,6 +50,10 @@ interface LearnerState {
   setScrollToSourceId: (id: string | null) => void
   setPanelManuallyCollapsed: (manual: boolean) => void
   expandAndScrollToSource: (sourceId: string) => void
+
+  // Story 4.7: Async job actions
+  setActiveJob: (job: ActiveJob | null) => void
+  clearActiveJob: () => void
 }
 
 export const useLearnerStore = create<LearnerState>()(
@@ -48,6 +64,8 @@ export const useLearnerStore = create<LearnerState>()(
       sourcesPanelExpanded: true,
       scrollToSourceId: null,
       panelManuallyCollapsed: false,
+      // Story 4.7: No active job by default
+      activeJob: null,
 
       setPanelSizes: (notebookId, sizes) =>
         set((state) => ({
@@ -88,15 +106,21 @@ export const useLearnerStore = create<LearnerState>()(
         // Set scroll target
         set({ scrollToSourceId: sourceId })
       },
+
+      // Story 4.7: Async job actions
+      setActiveJob: (job) => set({ activeJob: job }),
+      clearActiveJob: () => set({ activeJob: null }),
     }),
     {
       name: 'learner-ui-storage',
       // Only persist UI preferences, not server data
       // Story 4.3: Persist panel state
+      // Story 4.7: Don't persist activeJob (transient state)
       partialize: (state) => ({
         panelSizes: state.panelSizes,
         sourcesPanelExpanded: state.sourcesPanelExpanded,
         panelManuallyCollapsed: state.panelManuallyCollapsed,
+        // activeJob NOT persisted (transient)
       }),
     }
   )
