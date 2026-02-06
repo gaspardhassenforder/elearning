@@ -1373,6 +1373,11 @@ export const frFR = {
       expand: "Développer",
       collapse: "Réduire",
       createdAt: "Créé {time}",
+      // Story 5.2 Code Review: Clés i18n additionnelles
+      loadError: "Échec du chargement des artefacts",
+      loadErrorDesc: "Un problème est survenu lors du chargement des artefacts. Veuillez réessayer.",
+      noContent: "Aucun contenu disponible",
+      unsupportedType: "Type d'artefact non pris en charge",
     },
     progress: {
       comingSoon: "Suivi des progrès à venir",

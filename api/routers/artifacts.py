@@ -1,12 +1,15 @@
 """Artifacts API router."""
 
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from loguru import logger
 
-from api.auth import get_current_user, require_admin
+from api.auth import get_current_user, get_current_learner, LearnerContext, require_admin
 from open_notebook.domain.user import User
 from api import artifacts_service
+from api.models import ArtifactListResponse
+from open_notebook.database.repository import repo_query, ensure_record_id
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 
@@ -109,3 +112,210 @@ async def regenerate_artifact(artifact_id: str, admin: User = Depends(require_ad
         raise HTTPException(status_code=status_code, detail=result["error"])
 
     return result
+
+
+# ==============================================================================
+# Story 5.2: Learner-Scoped Artifact Endpoints
+# ==============================================================================
+
+
+async def validate_learner_access_to_notebook(
+    notebook_id: str, learner_context: LearnerContext
+) -> bool:
+    """Validate learner has access to a notebook via their company's module assignment.
+
+    Story 5.2: Company-scoped access control for artifacts.
+
+    Validates:
+    1. Notebook is assigned to learner's company
+    2. Notebook is published
+    3. Assignment is not locked
+
+    Args:
+        notebook_id: Notebook record ID
+        learner_context: Authenticated learner context with company_id
+
+    Returns:
+        True if access is granted
+
+    Raises:
+        HTTPException 403: Access denied (not assigned, locked, or unpublished)
+    """
+    result = await repo_query(
+        """
+        SELECT notebook.id, assignment.is_locked
+        FROM notebook
+        JOIN module_assignment AS assignment ON assignment.notebook_id = notebook.id
+        WHERE notebook.id = $notebook_id
+        AND assignment.company_id = $company_id
+        AND notebook.published = true
+        AND assignment.is_locked = false
+        LIMIT 1
+        """,
+        {"notebook_id": ensure_record_id(notebook_id), "company_id": learner_context.company_id},
+    )
+
+    if not result:
+        logger.warning(
+            f"Learner {learner_context.user.id} attempted to access artifacts for unauthorized notebook {notebook_id}"
+        )
+        raise HTTPException(
+            status_code=403, detail="You do not have access to this module"
+        )
+
+    return True
+
+
+@router.get("/learner/notebooks/{notebook_id}/artifacts", response_model=List[ArtifactListResponse])
+async def get_learner_notebook_artifacts(
+    notebook_id: str,
+    learner: LearnerContext = Depends(get_current_learner),
+) -> List[ArtifactListResponse]:
+    """Get artifacts for a notebook assigned to learner's company.
+
+    Story 5.2: Artifacts Browsing in Side Panel.
+
+    Returns a list of artifacts (quizzes, podcasts, summaries, transformations)
+    for a notebook that is assigned to the learner's company.
+
+    Company scoping: Validates notebook is assigned to learner's company,
+    is published, and is not locked.
+
+    Args:
+        notebook_id: Notebook record ID (e.g., "notebook:abc123")
+        learner: Authenticated learner context (injected via dependency)
+
+    Returns:
+        List of ArtifactListResponse with artifact metadata
+
+    Raises:
+        HTTPException 403: Notebook not accessible (not assigned, locked, unpublished)
+    """
+    try:
+        # Validate learner access to this notebook via company assignment
+        await validate_learner_access_to_notebook(notebook_id, learner)
+
+        # Get artifacts for the notebook
+        artifacts = await artifacts_service.get_notebook_artifacts(notebook_id)
+
+        logger.info(
+            f"Learner {learner.user.id} fetched {len(artifacts)} artifacts for notebook {notebook_id}"
+        )
+
+        return [
+            ArtifactListResponse(
+                id=a.id or "",
+                artifact_type=a.artifact_type,
+                title=a.title or "Untitled",
+                created=str(a.created),
+            )
+            for a in artifacts
+        ]
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching artifacts for notebook {notebook_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail="Error fetching artifacts"
+        )
+
+
+async def validate_learner_access_to_artifact(
+    artifact_id: str, learner_context: LearnerContext
+) -> None:
+    """Validate learner has access to an artifact via their company's module assignment.
+
+    Story 5.2: Company-scoped access control for artifact preview.
+
+    Validates:
+    1. Artifact exists
+    2. Artifact's notebook is assigned to learner's company
+    3. Notebook is published
+    4. Assignment is not locked
+
+    Args:
+        artifact_id: Artifact record ID
+        learner_context: Authenticated learner context with company_id
+
+    Raises:
+        HTTPException 403: Access denied (not assigned, locked, or unpublished)
+    """
+    result = await repo_query(
+        """
+        SELECT artifact.id, artifact.notebook_id, notebook.published, assignment.is_locked
+        FROM artifact
+        JOIN notebook ON notebook.id = artifact.notebook_id
+        JOIN module_assignment AS assignment ON assignment.notebook_id = notebook.id
+        WHERE artifact.id = $artifact_id
+        AND assignment.company_id = $company_id
+        AND notebook.published = true
+        AND assignment.is_locked = false
+        LIMIT 1
+        """,
+        {"artifact_id": ensure_record_id(artifact_id), "company_id": learner_context.company_id},
+    )
+
+    if not result:
+        logger.warning(
+            f"Learner {learner_context.user.id} attempted to access unauthorized artifact {artifact_id}"
+        )
+        raise HTTPException(
+            status_code=403, detail="You do not have access to this artifact"
+        )
+
+
+@router.get("/learner/artifacts/{artifact_id}/preview")
+async def get_learner_artifact_preview(
+    artifact_id: str,
+    learner: LearnerContext = Depends(get_current_learner),
+):
+    """Get artifact preview with company scoping validation.
+
+    Story 5.2: Artifacts Browsing in Side Panel.
+
+    Returns type-specific preview data for an artifact:
+    - Quiz: questions with answers, question count
+    - Podcast: audio URL, transcript, duration
+    - Summary: content, word count
+    - Transformation: content, word count, transformation name
+
+    Company scoping: Validates artifact belongs to a notebook assigned
+    to the learner's company, is published, and is not locked.
+
+    Args:
+        artifact_id: Artifact record ID (e.g., "artifact:abc123")
+        learner: Authenticated learner context (injected via dependency)
+
+    Returns:
+        Type-specific preview data
+
+    Raises:
+        HTTPException 403: Artifact not accessible (not assigned, locked, unpublished)
+        HTTPException 404: Artifact not found (after access validation)
+    """
+    try:
+        # Validate learner access to this artifact via company assignment
+        await validate_learner_access_to_artifact(artifact_id, learner)
+
+        # Get artifact preview (reuse existing service method)
+        preview = await artifacts_service.get_artifact_with_preview(artifact_id)
+        if not preview:
+            raise HTTPException(status_code=404, detail="Artifact not found")
+
+        if preview.get("error"):
+            raise HTTPException(status_code=500, detail=preview["error"])
+
+        logger.info(
+            f"Learner {learner.user.id} fetched preview for artifact {artifact_id}"
+        )
+
+        return preview
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching preview for artifact {artifact_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail="Error fetching artifact preview"
+        )

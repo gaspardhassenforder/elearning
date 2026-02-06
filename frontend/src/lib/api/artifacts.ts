@@ -76,6 +76,14 @@ export interface TransformationPreview {
 
 export type ArtifactPreview = QuizPreview | PodcastPreview | SummaryPreview | TransformationPreview
 
+// Learner artifact list response (Story 5.2)
+export interface LearnerArtifactListItem {
+  id: string
+  artifact_type: 'quiz' | 'podcast' | 'summary' | 'transformation'
+  title: string
+  created: string  // ISO timestamp
+}
+
 // Regeneration types (Story 3.2)
 export interface RegenerateResponse {
   artifact_id: string
@@ -134,5 +142,29 @@ export const artifactsApi = {
    */
   delete: async (artifactId: string) => {
     await apiClient.delete(`/artifacts/${artifactId}`)
-  }
+  },
+
+  // ============================================================================
+  // Story 5.2: Learner-Scoped Artifact Methods
+  // ============================================================================
+
+  /**
+   * List artifacts for a notebook (learner-scoped with company validation)
+   */
+  listLearner: async (notebookId: string): Promise<LearnerArtifactListItem[]> => {
+    const response = await apiClient.get<LearnerArtifactListItem[]>(
+      `/learner/notebooks/${notebookId}/artifacts`
+    )
+    return response.data
+  },
+
+  /**
+   * Get artifact preview (learner-scoped with company validation)
+   */
+  getLearnerPreview: async (artifactId: string): Promise<ArtifactPreview> => {
+    const response = await apiClient.get<ArtifactPreview>(
+      `/learner/artifacts/${artifactId}/preview`
+    )
+    return response.data
+  },
 }

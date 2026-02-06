@@ -3,7 +3,8 @@ import {
   artifactsApi,
   ArtifactResponse,
   BatchGenerationResponse,
-  ArtifactPreview
+  ArtifactPreview,
+  LearnerArtifactListItem,
 } from '@/lib/api/artifacts'
 import { quizzesApi, QuizGenerateRequest } from '@/lib/api/quizzes'
 import { QUERY_KEYS } from '@/lib/api/query-client'
@@ -70,8 +71,9 @@ export function useDeleteArtifact() {
   return useMutation({
     mutationFn: (artifactId: string) => artifactsApi.delete(artifactId),
     onSuccess: () => {
-      // Invalidate all artifacts queries
+      // Invalidate all artifacts queries (admin and learner)
       queryClient.invalidateQueries({ queryKey: ['artifacts'] })
+      queryClient.invalidateQueries({ queryKey: ['learner-artifacts'] })
       toast({
         title: t.common.success,
         description: t.artifacts?.deleteSuccess || 'Artifact deleted successfully',
@@ -99,8 +101,9 @@ export function useGenerateAllArtifacts(notebookId: string) {
   return useMutation({
     mutationFn: () => artifactsApi.generateAll(notebookId),
     onSuccess: (data: BatchGenerationResponse) => {
-      // Invalidate artifacts queries to pick up new artifacts
+      // Invalidate artifacts queries to pick up new artifacts (admin and learner)
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.artifacts(notebookId) })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.learnerArtifacts(notebookId) })
 
       // Count successful/processing artifacts
       const results = [
@@ -149,11 +152,13 @@ export function useRegenerateArtifact() {
   return useMutation({
     mutationFn: (artifactId: string) => artifactsApi.regenerate(artifactId),
     onSuccess: (data, artifactId) => {
-      // Invalidate the specific artifact preview
+      // Invalidate the specific artifact preview (admin and learner)
       queryClient.invalidateQueries({ queryKey: ['artifacts', 'preview', artifactId] })
+      queryClient.invalidateQueries({ queryKey: ['learner-artifacts', 'preview', artifactId] })
 
-      // Invalidate all artifact lists
+      // Invalidate all artifact lists (admin and learner)
       queryClient.invalidateQueries({ queryKey: ['artifacts'] })
+      queryClient.invalidateQueries({ queryKey: ['learner-artifacts'] })
 
       if (data.status === 'completed') {
         toast({
@@ -181,5 +186,46 @@ export function useRegenerateArtifact() {
         variant: 'destructive',
       })
     },
+  })
+}
+
+// ============================================================================
+// Story 5.2: Learner-Scoped Artifact Hooks
+// ============================================================================
+
+/**
+ * Hook to fetch artifacts for a notebook (learner-scoped).
+ *
+ * Uses company-scoped validation on backend.
+ * Caches results for 5 minutes (staleTime).
+ *
+ * @param notebookId - Notebook ID to fetch artifacts for
+ * @returns TanStack Query result with artifact list
+ */
+export function useNotebookArtifacts(notebookId: string | null) {
+  return useQuery<LearnerArtifactListItem[], Error>({
+    queryKey: QUERY_KEYS.learnerArtifacts(notebookId || ''),
+    queryFn: () => artifactsApi.listLearner(notebookId!),
+    enabled: !!notebookId,
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
+  })
+}
+
+/**
+ * Hook to fetch artifact preview (learner-scoped).
+ *
+ * Lazy-loads preview only when artifactId is provided.
+ * Used when user expands an artifact card.
+ * Caches results for 10 minutes (artifacts rarely change).
+ *
+ * @param artifactId - Artifact ID to fetch preview for (null to disable)
+ * @returns TanStack Query result with type-specific preview data
+ */
+export function useLearnerArtifactPreview(artifactId: string | null) {
+  return useQuery<ArtifactPreview, Error>({
+    queryKey: QUERY_KEYS.learnerArtifactPreview(artifactId || ''),
+    queryFn: () => artifactsApi.getLearnerPreview(artifactId!),
+    enabled: !!artifactId, // Only fetch when artifactId provided (lazy load)
+    staleTime: 10 * 60 * 1000, // 10 minutes cache (artifacts rarely change)
   })
 }
