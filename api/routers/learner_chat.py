@@ -23,6 +23,7 @@ from api.learner_chat_service import (
 )
 from open_notebook.graphs.prompt import generate_re_engagement_greeting
 from open_notebook.graphs.chat import graph as chat_graph, memory as chat_memory
+from open_notebook.observability.langsmith_handler import get_langsmith_callback
 
 router = APIRouter()
 
@@ -458,6 +459,18 @@ async def stream_learner_chat(
 
             user_message = HumanMessage(content=request.message)
 
+            # Story 7.4: Create LangSmith callback for tracing (or None if not configured)
+            langsmith_callback = get_langsmith_callback(
+                user_id=learner.user.id,
+                company_id=learner.company_id,
+                notebook_id=notebook_id,
+                workflow_name="learner_chat",
+                run_name=f"chat:{thread_id}",
+            )
+
+            # Build callbacks list (empty if LangSmith not configured)
+            callbacks = [langsmith_callback] if langsmith_callback else []
+
             # Stream events from chat graph with assembled system prompt
             # Story 4.4: Pass user_id for objective progress tracking
             async for event in chat_graph.astream_events(
@@ -474,7 +487,8 @@ async def stream_learner_chat(
                     "configurable": {
                         "thread_id": thread_id,
                         "user_id": learner.user.id,  # Story 4.4: Pass to tools
-                    }
+                    },
+                    "callbacks": callbacks,  # Story 7.4: LangSmith tracing
                 },
                 version="v2",
             ):

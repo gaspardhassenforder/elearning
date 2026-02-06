@@ -9,6 +9,7 @@ from open_notebook.domain.user import User
 from api.models import NoteCreate, NoteResponse, NoteUpdate
 from open_notebook.domain.notebook import Note
 from open_notebook.exceptions import InvalidInputError
+from open_notebook.observability.langsmith_handler import get_langsmith_callback
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 
@@ -59,11 +60,25 @@ async def create_note(note_data: NoteCreate, admin: User = Depends(require_admin
             from open_notebook.graphs.prompt import graph as prompt_graph
 
             prompt = "Based on the Note below, please provide a Title for this content, with max 15 words"
+
+            # Story 7.4: Create LangSmith callback for tracing (or None if not configured)
+            langsmith_callback = get_langsmith_callback(
+                user_id=admin.id,
+                company_id=None,  # Admin user - no company context
+                notebook_id=None,  # Note creation may not be tied to a specific notebook
+                workflow_name="note_title_generation",
+                run_name="note:title",
+            )
+
+            # Build callbacks list (empty if LangSmith not configured)
+            callbacks = [langsmith_callback] if langsmith_callback else []
+
             result = await prompt_graph.ainvoke(
                 {  # type: ignore[arg-type]
                     "input_text": note_data.content,
                     "prompt": prompt,
-                }
+                },
+                config={"callbacks": callbacks},  # Story 7.4: LangSmith tracing
             )
             title = result.get("output", "Untitled Note")
 

@@ -11,6 +11,7 @@ from open_notebook.ai.models import Model, model_manager
 from open_notebook.domain.notebook import text_search, vector_search
 from open_notebook.exceptions import DatabaseOperationError, InvalidInputError
 from open_notebook.graphs.ask import graph as ask_graph
+from open_notebook.observability.langsmith_handler import get_langsmith_callback
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 
@@ -60,11 +61,24 @@ async def search_knowledge_base(search_request: SearchRequest):
 
 
 async def stream_ask_response(
-    question: str, strategy_model: Model, answer_model: Model, final_answer_model: Model
+    question: str, strategy_model: Model, answer_model: Model, final_answer_model: Model,
+    user_id: str = None, notebook_id: str = None
 ) -> AsyncGenerator[str, None]:
     """Stream the ask response as Server-Sent Events."""
     try:
         final_answer = None
+
+        # Story 7.4: Create LangSmith callback for tracing (or None if not configured)
+        langsmith_callback = get_langsmith_callback(
+            user_id=user_id,
+            company_id=None,  # Ask/search endpoint - no company context
+            notebook_id=notebook_id,
+            workflow_name="ask_search",
+            run_name=f"ask:{question[:30]}",
+        )
+
+        # Build callbacks list (empty if LangSmith not configured)
+        callbacks = [langsmith_callback] if langsmith_callback else []
 
         async for chunk in ask_graph.astream(
             input=dict(question=question),  # type: ignore[arg-type]
@@ -73,7 +87,8 @@ async def stream_ask_response(
                     strategy_model=strategy_model.id,
                     answer_model=answer_model.id,
                     final_answer_model=final_answer_model.id,
-                )
+                ),
+                callbacks=callbacks,  # Story 7.4: LangSmith tracing
             ),
             stream_mode="updates",
         ):

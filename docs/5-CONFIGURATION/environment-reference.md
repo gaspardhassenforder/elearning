@@ -223,16 +223,90 @@ For self-hosted LLMs, LM Studio, or OpenAI-compatible endpoints:
 
 ---
 
-## Debugging & Monitoring
+## Debugging & Monitoring: LangSmith LLM Tracing
+
+LangSmith provides end-to-end tracing for all AI interactions in Open Notebook, enabling debugging of AI behavior, monitoring retrieval quality, and tracking token usage.
 
 | Variable | Required? | Default | Description |
 |----------|-----------|---------|-------------|
-| `LANGCHAIN_TRACING_V2` | No | false | Enable LangSmith tracing |
-| `LANGCHAIN_ENDPOINT` | No | https://api.smith.langchain.com | LangSmith endpoint |
-| `LANGCHAIN_API_KEY` | No | None | LangSmith API key |
-| `LANGCHAIN_PROJECT` | No | Open Notebook | LangSmith project name |
+| `LANGCHAIN_TRACING_V2` | No | false | Enable LangSmith tracing (set to `true` to activate) |
+| `LANGCHAIN_ENDPOINT` | No | https://api.smith.langchain.com | LangSmith API endpoint |
+| `LANGCHAIN_API_KEY` | No | None | LangSmith API key (get from dashboard) |
+| `LANGCHAIN_PROJECT` | No | Open Notebook | LangSmith project name (for organizing traces) |
 
-**Setup:** https://smith.langchain.com/
+**Setup Guide:**
+
+1. **Get LangSmith API Key:**
+   - Sign up at https://smith.langchain.com/
+   - Go to Settings → API Keys
+   - Create a new API key
+
+2. **Enable Tracing:**
+   ```bash
+   # In your .env file:
+   LANGCHAIN_TRACING_V2=true
+   LANGCHAIN_API_KEY=your_api_key_here
+   LANGCHAIN_PROJECT="Open Notebook"  # Optional: customize project name
+   ```
+
+3. **Restart API:**
+   ```bash
+   # Docker:
+   docker compose restart api
+
+   # Local development:
+   # Stop and restart your API server
+   ```
+
+4. **Verify Tracing:**
+   - Perform any AI interaction (chat, quiz generation, etc.)
+   - Open https://smith.langchain.com/
+   - Navigate to your project → Traces
+   - You should see traces with metadata tags (user_id, company_id, notebook_id, workflow_name)
+
+**What Gets Traced:**
+
+LangSmith automatically traces all AI workflows:
+- **Learner Chat** - Full conversation chains with tool calls (surface_document, check_off_objective)
+- **Admin Chat** - Module creation assistant conversations
+- **Navigation Assistant** - Cross-module search queries and suggestions
+- **Source Processing** - Content ingestion and transformation workflows
+- **Quiz Generation** - (Not currently traced - uses direct LLM calls)
+- **Learning Objectives** - Auto-generation from module content
+- **Transformations** - Custom content transformations
+- **RAG Retrieval** - Semantic search queries and results
+- **Tool Calls** - All AI tool invocations with parameters and results
+
+**Metadata Tags for Filtering:**
+
+Each trace includes metadata tags for easy filtering in LangSmith UI:
+- `user:<user_id>` - User who triggered the action
+- `company:<company_id>` - Company context (multi-tenancy)
+- `notebook:<notebook_id>` - Module context
+- `workflow:<workflow_name>` - Type of workflow (learner_chat, navigation_assistant, etc.)
+
+**Example Filtering:**
+- View all traces for a specific user: `user:user_abc123`
+- View all navigation assistant traces: `workflow:navigation_assistant`
+- View all traces for a module: `notebook:notebook_xyz789`
+
+**Troubleshooting:**
+
+**Tracing not appearing?**
+- Verify `LANGCHAIN_TRACING_V2=true` (not "True" or "1")
+- Check `LANGCHAIN_API_KEY` is set correctly
+- Restart API server after changing environment variables
+- Check API logs for LangSmith connection errors
+
+**Too many traces?**
+- LangSmith has free tier limits - check your plan
+- Traces are sent asynchronously and don't block workflows
+- Consider using selective tracing (e.g., only in staging)
+
+**Optional - Workflows Run Normally Without LangSmith:**
+- If `LANGCHAIN_TRACING_V2` is not set to "true", all workflows continue normally
+- No performance impact when tracing is disabled
+- Safe to enable/disable at any time
 
 ---
 

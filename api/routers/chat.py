@@ -14,6 +14,7 @@ from open_notebook.exceptions import (
     NotFoundError,
 )
 from open_notebook.graphs.chat import graph as chat_graph
+from open_notebook.observability.langsmith_handler import get_langsmith_callback
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 
@@ -353,6 +354,29 @@ async def execute_chat(request: ExecuteChatRequest):
         user_message = HumanMessage(content=request.message)
         state_values["messages"].append(user_message)
 
+        # Story 7.4: Get notebook_id from session relationship for tracing metadata
+        notebook_id = None
+        try:
+            notebook_query = await repo_query(
+                "SELECT out FROM refers_to WHERE in = $session_id",
+                {"session_id": ensure_record_id(full_session_id)},
+            )
+            notebook_id = notebook_query[0]["out"] if notebook_query else None
+        except Exception:
+            pass  # Continue without notebook_id if lookup fails
+
+        # Story 7.4: Create LangSmith callback for tracing (or None if not configured)
+        langsmith_callback = get_langsmith_callback(
+            user_id=None,  # Admin chat - no user_id available
+            company_id=None,  # Admin chat - no company context
+            notebook_id=notebook_id,
+            workflow_name="admin_chat",
+            run_name=f"admin_chat:{request.session_id}",
+        )
+
+        # Build callbacks list (empty if LangSmith not configured)
+        callbacks = [langsmith_callback] if langsmith_callback else []
+
         # Execute chat graph
         result = chat_graph.invoke(
             input=state_values,  # type: ignore[arg-type]
@@ -360,7 +384,8 @@ async def execute_chat(request: ExecuteChatRequest):
                 configurable={
                     "thread_id": request.session_id,
                     "model_id": model_override,
-                }
+                },
+                callbacks=callbacks,  # Story 7.4: LangSmith tracing
             ),
         )
 

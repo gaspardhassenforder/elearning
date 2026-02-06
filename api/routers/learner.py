@@ -1,13 +1,22 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
+from langchain_core.messages import HumanMessage
 from loguru import logger
 
 from api import assignment_service
 from api.auth import LearnerContext, get_current_learner
-from api.models import LearnerModuleResponse
+from api.models import (
+    LearnerModuleResponse,
+    ModuleSuggestion,
+    NavigationChatRequest,
+    NavigationChatResponse,
+    NavigationMessage,
+)
 from open_notebook.domain.module_assignment import ModuleAssignment
 from open_notebook.domain.notebook import Notebook
+from open_notebook.domain.user import User
+from open_notebook.observability.langsmith_handler import get_langsmith_callback
 
 router = APIRouter()
 
@@ -130,3 +139,195 @@ async def get_learner_module(
         source_count=source_count,
         assigned_at=assignment.assigned_at or "",
     )
+
+
+# ==============================================================================
+# Story 6.1: Platform-Wide AI Navigation Assistant
+# ==============================================================================
+
+
+@router.post("/learner/navigation/chat", response_model=NavigationChatResponse)
+async def navigation_chat(
+    request: NavigationChatRequest,
+    learner: LearnerContext = Depends(get_current_learner),
+):
+    """Send message to navigation assistant (Story 6.1).
+
+    Returns assistant response with optional module suggestions.
+
+    Navigation assistant helps learners find modules across their assigned content.
+    It does NOT teach - it redirects learning questions to module AI teachers.
+
+    Args:
+        request: NavigationChatRequest with message and optional current_notebook_id
+        learner: LearnerContext with user and company_id (auto-injected)
+
+    Returns:
+        NavigationChatResponse with assistant message and suggested_modules list
+
+    Note:
+        - Thread ID pattern: nav:user:{user_id} (persistent conversation history)
+        - Company scoping enforced via learner.company_id
+        - search_available_modules tool automatically excludes current_notebook_id
+    """
+    from open_notebook.graphs.navigation import navigation_graph
+
+    logger.info(f"Navigation chat for learner {learner.user.id}: '{request.message[:50]}...'")
+
+    # Get current module title for prompt context (if learner is in a module)
+    current_module_title = None
+    if request.current_notebook_id:
+        try:
+            notebook = await Notebook.get(request.current_notebook_id)
+            current_module_title = notebook.name if notebook else None
+        except Exception as e:
+            logger.warning(f"Failed to load current module {request.current_notebook_id}: {e}")
+
+    # Count available modules for prompt context
+    try:
+        assignments = await ModuleAssignment.get_by_company(learner.company_id)
+        available_modules_count = len(
+            [a for a in assignments if not a.is_locked]  # Only count unlocked modules
+        )
+    except Exception:
+        available_modules_count = 0
+
+    # Get company name for prompt context
+    company_name = "Unknown Company"
+    if learner.user.company_id:
+        try:
+            from open_notebook.domain.company import Company
+            company = await Company.get(learner.user.company_id)
+            company_name = company.name if company else "Unknown Company"
+        except Exception:
+            pass
+
+    # Build navigation state
+    state = {
+        "messages": [HumanMessage(content=request.message)],
+        "user_id": learner.user.id,
+        "company_id": learner.company_id,
+        "current_notebook_id": request.current_notebook_id,
+        "company_name": company_name,
+        "current_module_title": current_module_title,
+        "available_modules_count": available_modules_count,
+    }
+
+    # Thread ID for conversation persistence
+    thread_id = f"nav:user:{learner.user.id}"
+
+    # Story 7.4: Create LangSmith callback for tracing (or None if not configured)
+    langsmith_callback = get_langsmith_callback(
+        user_id=learner.user.id,
+        company_id=learner.company_id,
+        notebook_id=request.current_notebook_id,
+        workflow_name="navigation_assistant",
+        run_name=f"nav:{learner.user.id}",
+    )
+
+    # Build callbacks list (empty if LangSmith not configured)
+    callbacks = [langsmith_callback] if langsmith_callback else []
+
+    config = {
+        "configurable": {
+            "thread_id": thread_id,
+            "company_id": learner.company_id,  # For search_available_modules tool
+            "current_notebook_id": request.current_notebook_id,  # For search exclusion
+        },
+        "callbacks": callbacks,  # Story 7.4: LangSmith tracing
+    }
+
+    try:
+        # Invoke navigation graph
+        result = await navigation_graph.ainvoke(state, config)
+
+        # Extract assistant message
+        messages = result.get("messages", [])
+        assistant_message = messages[-1].content if messages else "I'm here to help you find modules!"
+
+        # Extract suggested modules from tool calls (if any)
+        # The search_available_modules tool returns list of dicts
+        # We need to check if the AI message has tool_calls and extract results
+        suggested_modules = []
+        if messages:
+            last_message = messages[-1]
+            # Check for tool_calls attribute (LangChain AIMessage structure)
+            if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+                for tool_call in last_message.tool_calls:
+                    if tool_call.get("name") == "search_available_modules":
+                        # Tool result should be in tool_call or in subsequent messages
+                        # For now, we'll leave this empty and let the narrative response suffice
+                        pass
+
+        logger.info(f"Navigation assistant response generated for learner {learner.user.id}")
+
+        return NavigationChatResponse(
+            message=assistant_message,
+            suggested_modules=[
+                ModuleSuggestion(**mod) for mod in suggested_modules
+            ]
+        )
+
+    except Exception as e:
+        logger.error(f"Navigation assistant error for learner {learner.user.id}: {e}", exc_info=True)
+        return NavigationChatResponse(
+            message="I'm having trouble searching right now. Please try again in a moment.",
+            suggested_modules=[]
+        )
+
+
+@router.get("/learner/navigation/history", response_model=List[NavigationMessage])
+async def get_navigation_history(
+    learner: LearnerContext = Depends(get_current_learner),
+):
+    """Get navigation conversation history (Story 6.1).
+
+    Returns last 10 navigation messages for continuity.
+
+    Args:
+        learner: LearnerContext with user and company_id (auto-injected)
+
+    Returns:
+        List of NavigationMessage (last 10 messages)
+
+    Note:
+        Thread ID pattern: nav:user:{user_id}
+        History persists across sessions via LangGraph checkpointer.
+    """
+    from open_notebook.graphs.navigation import navigation_graph
+
+    logger.info(f"Fetching navigation history for learner {learner.user.id}")
+
+    thread_id = f"nav:user:{learner.user.id}"
+    config = {"configurable": {"thread_id": thread_id}}
+
+    try:
+        # Load checkpoint state
+        state = navigation_graph.get_state(config)
+        messages = state.values.get("messages", []) if state and state.values else []
+
+        # Take last 10 messages
+        recent_messages = messages[-10:] if len(messages) > 10 else messages
+
+        # Convert to NavigationMessage format
+        history = []
+        for msg in recent_messages:
+            role = "user" if msg.type == "human" else "assistant"
+            content = msg.content if isinstance(msg.content, str) else str(msg.content)
+            timestamp = None  # LangGraph messages don't have timestamps by default
+
+            history.append(
+                NavigationMessage(
+                    role=role,
+                    content=content,
+                    timestamp=timestamp
+                )
+            )
+
+        logger.info(f"Returning {len(history)} navigation history messages for learner {learner.user.id}")
+        return history
+
+    except Exception as e:
+        logger.error(f"Error fetching navigation history for learner {learner.user.id}: {e}", exc_info=True)
+        # Return empty history on error (graceful fallback)
+        return []

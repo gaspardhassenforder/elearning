@@ -18,6 +18,7 @@ from api.models import (
 from open_notebook.ai.models import Model
 from open_notebook.domain.transformation import DefaultPrompts, Transformation
 from open_notebook.exceptions import InvalidInputError
+from open_notebook.observability.langsmith_handler import get_langsmith_callback
 from open_notebook.graphs.transformation import graph as transformation_graph
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
@@ -95,13 +96,28 @@ async def execute_transformation(execute_request: TransformationExecuteRequest):
         if not model:
             raise HTTPException(status_code=404, detail="Model not found")
 
+        # Story 7.4: Create LangSmith callback for tracing (or None if not configured)
+        langsmith_callback = get_langsmith_callback(
+            user_id=None,  # Transformation endpoint - no user context
+            company_id=None,  # No company context
+            notebook_id=None,  # Transformation can be applied to any content
+            workflow_name="transformation",
+            run_name=f"transformation:{execute_request.transformation_id}",
+        )
+
+        # Build callbacks list (empty if LangSmith not configured)
+        callbacks = [langsmith_callback] if langsmith_callback else []
+
         # Execute the transformation
         result = await transformation_graph.ainvoke(
             dict(  # type: ignore[arg-type]
                 input_text=execute_request.input_text,
                 transformation=transformation,
             ),
-            config=dict(configurable={"model_id": execute_request.model_id}),
+            config=dict(
+                configurable={"model_id": execute_request.model_id},
+                callbacks=callbacks,  # Story 7.4: LangSmith tracing
+            ),
         )
 
         return TransformationExecuteResponse(

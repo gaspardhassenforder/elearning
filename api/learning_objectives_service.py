@@ -12,6 +12,7 @@ from loguru import logger
 from open_notebook.domain.learning_objective import LearningObjective
 from open_notebook.domain.notebook import Notebook
 from open_notebook.graphs.learning_objectives_generation import objectives_generation_graph
+from open_notebook.observability.langsmith_handler import get_langsmith_callback
 
 
 async def list_objectives(notebook_id: str) -> List[LearningObjective]:
@@ -69,16 +70,31 @@ async def generate_objectives(notebook_id: str) -> Dict:
                 "error": "Notebook has no sources. Add documents before generating learning objectives.",
             }
 
+        # Story 7.4: Create LangSmith callback for tracing (or None if not configured)
+        langsmith_callback = get_langsmith_callback(
+            user_id=None,  # Objectives generation - typically triggered by admin
+            company_id=None,  # No company context at generation time
+            notebook_id=notebook_id,
+            workflow_name="objectives_generation",
+            run_name=f"objectives:{notebook_id}",
+        )
+
+        # Build callbacks list (empty if LangSmith not configured)
+        callbacks = [langsmith_callback] if langsmith_callback else []
+
         # Invoke LangGraph workflow
         logger.info(f"Invoking objectives generation workflow for notebook {notebook_id}")
-        result = await objectives_generation_graph.ainvoke({
-            "notebook_id": notebook_id,
-            "num_objectives": 4,  # Default to 4 objectives
-            "status": "pending",
-            "generated_objectives": [],
-            "objective_ids": [],
-            "error": None,
-        })
+        result = await objectives_generation_graph.ainvoke(
+            {
+                "notebook_id": notebook_id,
+                "num_objectives": 4,  # Default to 4 objectives
+                "status": "pending",
+                "generated_objectives": [],
+                "objective_ids": [],
+                "error": None,
+            },
+            config={"callbacks": callbacks},  # Story 7.4: LangSmith tracing
+        )
 
         logger.info(f"Workflow completed with status: {result['status']}")
 

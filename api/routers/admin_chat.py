@@ -14,6 +14,7 @@ from open_notebook.domain.learning_objective import LearningObjective
 from open_notebook.domain.module_prompt import ModulePrompt
 from open_notebook.graphs.chat import graph as chat_graph
 from open_notebook.domain.user import User
+from open_notebook.observability.langsmith_handler import get_langsmith_callback
 
 
 router = APIRouter(dependencies=[Depends(require_admin)])
@@ -119,6 +120,18 @@ async def admin_chat(
             "model_override": request.model_override
         }
 
+        # Story 7.4: Create LangSmith callback for tracing (or None if not configured)
+        langsmith_callback = get_langsmith_callback(
+            user_id=admin_user.id,
+            company_id=None,  # Admin user - no company context
+            notebook_id=request.notebook_id,
+            workflow_name="admin_assistant",
+            run_name=f"admin_assistant:{admin_user.id}:{request.notebook_id}",
+        )
+
+        # Build callbacks list (empty if LangSmith not configured)
+        callbacks = [langsmith_callback] if langsmith_callback else []
+
         # Invoke chat graph
         result = chat_graph.invoke(
             input=state,
@@ -126,7 +139,8 @@ async def admin_chat(
                 configurable={
                     "thread_id": f"admin_{admin_user.id}_{request.notebook_id}",
                     "model_id": request.model_override
-                }
+                },
+                callbacks=callbacks,  # Story 7.4: LangSmith tracing
             )
         )
 

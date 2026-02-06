@@ -8,6 +8,7 @@ from surreal_commands import CommandInput, CommandOutput, command
 from open_notebook.database.repository import ensure_record_id
 from open_notebook.domain.notebook import Source
 from open_notebook.domain.transformation import Transformation
+from open_notebook.observability.langsmith_handler import get_langsmith_callback
 
 try:
     from open_notebook.graphs.source import source_graph
@@ -99,6 +100,20 @@ async def process_source_command(
         # 3. Process source with all notebooks
         logger.info(f"Processing source with {len(input_data.notebook_ids)} notebooks")
 
+        # Story 7.4: Create LangSmith callback for tracing (or None if not configured)
+        # Get first notebook_id for metadata (source may belong to multiple notebooks)
+        notebook_id = input_data.notebook_ids[0] if input_data.notebook_ids else None
+        langsmith_callback = get_langsmith_callback(
+            user_id=None,  # Background job - no user context
+            company_id=None,  # Background job - no company context
+            notebook_id=notebook_id,
+            workflow_name="source_processing",
+            run_name=f"source:{input_data.source_id}",
+        )
+
+        # Build callbacks list (empty if LangSmith not configured)
+        callbacks = [langsmith_callback] if langsmith_callback else []
+
         # Execute source_graph with all notebooks
         result = await source_graph.ainvoke(
             {  # type: ignore[arg-type]
@@ -107,7 +122,8 @@ async def process_source_command(
                 "apply_transformations": transformations,
                 "embed": input_data.embed,
                 "source_id": input_data.source_id,  # Add the source_id to the state
-            }
+            },
+            config={"callbacks": callbacks},  # Story 7.4: LangSmith tracing
         )
 
         processed_source = result["source"]
