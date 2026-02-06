@@ -72,7 +72,7 @@ development_status:
   4-2-two-layer-prompt-system-and-proactive-ai-teacher: done  # Code review complete: 14 issues found (8 HIGH + 4 MEDIUM + 2 LOW), 10 resolved (6 code/test + 4 documentation), all ACs met via prompt engineering, tests passing (13 prompt assembly + 8 greeting)
   4-3-inline-document-snippets-in-chat: done  # Code review complete: All ACs met, 13 issues found (4 HIGH + 5 MEDIUM + 4 LOW), 7 resolved (4 HIGH + 3 MEDIUM code fixes), tests added (5 backend + 10 frontend), security documentation, error handling, memory leak fixed
   4-4-learning-objectives-assessment-and-progress-tracking: in-progress
-  4-5-adaptive-teaching-and-fast-track-for-advanced-learners: in-progress  # Comprehensive story created: Prompt engineering for adaptive behavior, multiple objective check-offs, module suggestions on completion, knowledge gap detection
+  4-5-adaptive-teaching-and-fast-track-for-advanced-learners: review  # COMPLETE: Adaptive teaching via prompt engineering (high/low/intermediate familiarity), multiple objective check-offs, module suggestions on completion, knowledge gap detection. All 5 tasks done, 10 tests passing.
   4-6-ai-surfaces-artifacts-in-conversation: backlog
   4-7-async-task-handling-in-chat: backlog
   4-8-persistent-chat-history: backlog

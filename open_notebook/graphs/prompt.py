@@ -124,11 +124,15 @@ async def assemble_system_prompt(
     with open(global_template_path, "r", encoding="utf-8") as f:
         global_template = f.read()
 
+    # Story 4.5: Extract ai_familiarity for adaptive teaching
+    ai_familiarity = learner_profile.get("ai_familiarity", "intermediate") if learner_profile else "intermediate"
+
     global_context = {
         "learner_profile": learner_profile,
         "objectives": objectives_with_status,
         "current_focus_objective": current_focus_objective,  # Story 4.2: Focus objective for AI
-        "context": context
+        "context": context,
+        "ai_familiarity": ai_familiarity  # Story 4.5: For adaptive teaching strategy
     }
 
     try:

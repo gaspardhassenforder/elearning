@@ -1316,6 +1316,10 @@ export const enUS = {
       errorDesc: "Please check your connection and try again.",
       greeting: "Hello! I'm your AI teacher. I'm here to guide you through this module. What would you like to explore first?",
       greetingLoading: "Preparing your personalized greeting...",  // Story 4.2: Proactive greeting loading
+      // Story 4.5: Module Suggestions on Completion
+      suggestedModules: "Suggested Modules",
+      startModule: "Start Module",
+      noMoreModules: "No more modules available",
     },
     sources: {
       title: "Documents",

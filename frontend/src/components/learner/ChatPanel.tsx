@@ -21,6 +21,7 @@ import { useTranslation } from '@/lib/hooks/use-translation'
 import { useLearnerChat } from '@/lib/hooks/use-learner-chat'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { DocumentSnippetCard } from './DocumentSnippetCard'
+import { ModuleSuggestionCard } from './ModuleSuggestionCard'
 
 interface ChatPanelProps {
   notebookId: string
@@ -155,6 +156,31 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
                                 sourceType={tc.result!.source_type}
                                 relevance={tc.result!.relevance}
                               />
+                            ))}
+
+                          {/* Story 4.5: Module suggestions on completion */}
+                          {message.toolCalls
+                            .filter((tc) =>
+                              tc.toolName === 'check_off_objective' &&
+                              tc.result &&
+                              tc.result.all_complete === true &&
+                              tc.result.suggested_modules &&
+                              tc.result.suggested_modules.length > 0
+                            )
+                            .map((tc, tcIndex) => (
+                              <div key={`suggestions-${index}-${tcIndex}`} className="space-y-2">
+                                <p className="text-xs font-medium text-muted-foreground">
+                                  {t.learner.chat.suggestedModules}
+                                </p>
+                                {tc.result!.suggested_modules.map((module: any, modIndex: number) => (
+                                  <ModuleSuggestionCard
+                                    key={`module-${index}-${tcIndex}-${modIndex}`}
+                                    moduleId={module.id}
+                                    title={module.title}
+                                    description={module.description}
+                                  />
+                                ))}
+                              </div>
                             ))}
 
                           {/* Error messages for failed tool calls */}
