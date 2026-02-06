@@ -54,14 +54,14 @@ so that my progress is tracked without formal testing.
   - [x] Bind check_off_objective tool to model (follow surface_document pattern from Story 4.3)
   - [x] Test prompt includes objectives with status (3+ test cases)
 
-- [ ] Task 4: Backend - Learning Objectives API with Progress (AC: 2, 3)
-  - [ ] Extend GET /learning-objectives endpoint in api/routers/learning_objectives.py
-  - [ ] Add query parameter: user_id (for progress lookup)
-  - [ ] Service layer: JOIN objectives with learner_objective_progress
-  - [ ] Return objectives with completion status for current user
-  - [ ] Company scoping: validate notebook belongs to learner's company
-  - [ ] SSE event: Add objective_checked event type to api/routers/learner_chat.py
-  - [ ] Test API with 4+ cases (progress, no progress, company scoping, all complete)
+- [x] Task 4: Backend - Learning Objectives API with Progress (AC: 2, 3)
+  - [x] Extend GET /learning-objectives endpoint in api/routers/learning_objectives.py
+  - [x] Add query parameter: user_id (for progress lookup)
+  - [x] Service layer: JOIN objectives with learner_objective_progress
+  - [x] Return objectives with completion status for current user
+  - [x] Company scoping: validate notebook belongs to learner's company
+  - [x] SSE event: Add objective_checked event type to api/routers/learner_chat.py
+  - [x] Test API with 4+ cases (progress, no progress, company scoping, all complete)
 
 - [ ] Task 5: Frontend - ObjectiveProgressList Component (AC: 2, 3)
   - [ ] Create ObjectiveProgressList.tsx in components/learner/

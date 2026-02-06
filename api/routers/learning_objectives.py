@@ -2,25 +2,34 @@
 
 Story 3.3: Learning Objectives Configuration
 Admin-only CRUD operations for managing learning objectives.
+
+Story 4.4: Learning Objectives Assessment & Progress Tracking
+Learner-facing endpoint for objectives with progress status.
 """
 
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
 
 from api import learning_objectives_service
-from api.auth import require_admin
+from api.auth import LearnerContext, get_current_learner, require_admin
+from api.learner_chat_service import get_learner_objectives_with_status, validate_learner_access_to_notebook
 from api.models import (
     BatchGenerationResponse,
     LearningObjectiveCreate,
     LearningObjectiveReorder,
     LearningObjectiveResponse,
     LearningObjectiveUpdate,
+    ObjectiveWithProgress,
 )
 from open_notebook.domain.user import User
 
+# Admin router for CRUD operations
 router = APIRouter(dependencies=[Depends(require_admin)])
+
+# Learner router for progress-aware endpoints (no admin dependency)
+learner_router = APIRouter()
 
 
 @router.get("/notebooks/{notebook_id}/learning-objectives", response_model=List[LearningObjectiveResponse])
@@ -222,3 +231,81 @@ async def reorder_objectives(
         raise HTTPException(status_code=400, detail="Failed to reorder objectives")
 
     return {"message": f"Successfully reordered {len(data.objectives)} objectives"}
+
+
+# ==============================================================================
+# Story 4.4: Learner-facing endpoints for objectives with progress
+# ==============================================================================
+
+
+@learner_router.get(
+    "/notebooks/{notebook_id}/learning-objectives/progress",
+    response_model=List[ObjectiveWithProgress],
+)
+async def get_objectives_with_progress(
+    notebook_id: str,
+    learner: LearnerContext = Depends(get_current_learner),
+):
+    """Get learning objectives with learner's completion progress.
+
+    Story 4.4: Returns objectives with progress status for the current learner.
+    Used by ObjectiveProgressList component and ambient progress bar.
+
+    Access control:
+    - Validates notebook is published and assigned to learner's company
+    - Returns 403 if notebook is locked or not assigned
+    - Uses company scoping to prevent data leakage
+
+    Args:
+        notebook_id: Notebook record ID
+        learner: Authenticated learner context (auto-injected)
+
+    Returns:
+        List of ObjectiveWithProgress with completion status
+
+    Raises:
+        HTTPException 403: Learner does not have access to notebook
+        HTTPException 404: Notebook not found
+    """
+    logger.info(
+        f"Get objectives with progress for learner {learner.user.id} in notebook {notebook_id}"
+    )
+
+    try:
+        # Validate learner has access to this notebook
+        # (published + assigned to learner's company + not locked)
+        await validate_learner_access_to_notebook(
+            notebook_id=notebook_id, learner_context=learner
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error validating learner access to notebook {notebook_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to validate notebook access")
+
+    try:
+        # Get objectives with progress status
+        objectives_data = await get_learner_objectives_with_status(
+            notebook_id=notebook_id, user_id=learner.user.id
+        )
+
+        # Convert to response model
+        return [
+            ObjectiveWithProgress(
+                id=obj.get("id", ""),
+                notebook_id=notebook_id,
+                text=obj.get("text", ""),
+                order=obj.get("order", 0),
+                auto_generated=obj.get("auto_generated", False),
+                progress_status=obj.get("status"),
+                progress_completed_at=obj.get("completed_at"),
+                progress_evidence=obj.get("evidence"),
+            )
+            for obj in objectives_data
+        ]
+
+    except Exception as e:
+        logger.error(f"Error fetching objectives with progress for notebook {notebook_id}: {e}")
+        raise HTTPException(
+            status_code=500, detail="Failed to fetch learning objectives"
+        )

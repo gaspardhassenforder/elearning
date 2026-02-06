@@ -69,6 +69,17 @@ class SSEMessageCompleteEvent(BaseModel):
     metadata: dict
 
 
+class SSEObjectiveCheckedEvent(BaseModel):
+    """SSE event emitted when AI checks off a learning objective (Story 4.4)."""
+
+    objective_id: str
+    objective_text: str
+    evidence: str
+    total_completed: int
+    total_objectives: int
+    all_complete: bool
+
+
 # ============================================================================
 # SSE Streaming Endpoint
 # ============================================================================
@@ -257,11 +268,29 @@ async def stream_learner_chat(
                 elif event_type == "on_tool_end":
                     tool_result = event.get("data", {}).get("output", {})
                     tool_run_id = event.get("run_id", "call_result")
+                    tool_name = event.get("name", "")
 
                     tool_result_event = SSEToolResultEvent(
                         id=tool_run_id, result={"output": tool_result}
                     )
                     yield f"event: tool_result\ndata: {tool_result_event.model_dump_json()}\n\n"
+
+                    # Story 4.4: Emit objective_checked event when check_off_objective completes
+                    if tool_name == "check_off_objective" and isinstance(tool_result, dict):
+                        # Only emit if successful (no error key)
+                        if "error" not in tool_result and "objective_id" in tool_result:
+                            objective_event = SSEObjectiveCheckedEvent(
+                                objective_id=tool_result.get("objective_id", ""),
+                                objective_text=tool_result.get("objective_text", ""),
+                                evidence=tool_result.get("evidence", ""),
+                                total_completed=tool_result.get("total_completed", 0),
+                                total_objectives=tool_result.get("total_objectives", 0),
+                                all_complete=tool_result.get("all_complete", False),
+                            )
+                            yield f"event: objective_checked\ndata: {objective_event.model_dump_json()}\n\n"
+                            logger.info(
+                                f"Emitted objective_checked event: {tool_result.get('total_completed')}/{tool_result.get('total_objectives')}"
+                            )
 
             # Message complete event
             message_complete_event = SSEMessageCompleteEvent(

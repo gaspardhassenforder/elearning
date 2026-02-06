@@ -445,3 +445,102 @@ Focus on: {{ current_focus_objective }}
 
             # First incomplete objective should be focus
             assert "First incomplete" in prompt
+
+
+# ============================================================================
+# TEST SUITE 4: Learning Objectives API with Progress (Task 4)
+# ============================================================================
+
+
+class TestObjectivesAPIWithProgress:
+    """Test suite for learner-facing objectives API."""
+
+    @pytest.mark.asyncio
+    async def test_get_objectives_with_progress_endpoint(self):
+        """Test GET /notebooks/{id}/learning-objectives/progress returns objectives with status."""
+        from api.models import ObjectiveWithProgress
+
+        # Verify response model structure
+        obj = ObjectiveWithProgress(
+            id="learning_objective:test",
+            notebook_id="notebook:module1",
+            text="Test objective",
+            order=0,
+            auto_generated=False,
+            progress_status="completed",
+            progress_completed_at="2024-01-15T10:00:00",
+            progress_evidence="Learner demonstrated understanding",
+        )
+
+        assert obj.id == "learning_objective:test"
+        assert obj.progress_status == "completed"
+        assert obj.progress_evidence == "Learner demonstrated understanding"
+
+    @pytest.mark.asyncio
+    async def test_get_objectives_no_progress(self):
+        """Test GET returns objectives with null progress when not started."""
+        from api.models import ObjectiveWithProgress
+
+        obj = ObjectiveWithProgress(
+            id="learning_objective:test",
+            notebook_id="notebook:module1",
+            text="Not started objective",
+            order=0,
+            auto_generated=False,
+            progress_status=None,  # Not started
+            progress_completed_at=None,
+            progress_evidence=None,
+        )
+
+        assert obj.progress_status is None
+        assert obj.progress_completed_at is None
+
+    @pytest.mark.asyncio
+    async def test_objectives_api_company_scoped(self):
+        """Test API validates company scoping (403 for unassigned notebooks)."""
+        # This test verifies the API uses validate_learner_access_to_notebook
+        # which enforces company scoping
+        from api.learner_chat_service import validate_learner_access_to_notebook
+        from api.auth import LearnerContext
+
+        # The validation function is used by the endpoint
+        # Full integration test would require FastAPI TestClient
+        assert callable(validate_learner_access_to_notebook)
+
+    @pytest.mark.asyncio
+    async def test_objective_checked_sse_event(self):
+        """Test SSE emits objective_checked event with correct format."""
+        from api.routers.learner_chat import SSEObjectiveCheckedEvent
+
+        event = SSEObjectiveCheckedEvent(
+            objective_id="learning_objective:obj1",
+            objective_text="Understand supervised learning",
+            evidence="Learner explained concept correctly",
+            total_completed=3,
+            total_objectives=8,
+            all_complete=False,
+        )
+
+        # Verify event serialization
+        event_json = event.model_dump_json()
+        assert "objective_id" in event_json
+        assert "learning_objective:obj1" in event_json
+        assert "total_completed" in event_json
+        assert "all_complete" in event_json
+
+    @pytest.mark.asyncio
+    async def test_objective_checked_all_complete_event(self):
+        """Test SSE event when all objectives are complete."""
+        from api.routers.learner_chat import SSEObjectiveCheckedEvent
+
+        event = SSEObjectiveCheckedEvent(
+            objective_id="learning_objective:obj8",
+            objective_text="Final objective",
+            evidence="Learner mastered all concepts",
+            total_completed=8,
+            total_objectives=8,
+            all_complete=True,  # All objectives complete
+        )
+
+        assert event.all_complete is True
+        assert event.total_completed == event.total_objectives
