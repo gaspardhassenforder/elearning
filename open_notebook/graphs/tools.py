@@ -93,3 +93,103 @@ async def surface_document(source_id: str, excerpt_text: str, relevance_reason: 
             "error": f"Failed to surface document: {str(e)}",
             "source_id": source_id
         }
+
+
+@tool
+async def check_off_objective(objective_id: str, evidence_text: str) -> dict:
+    """Check off a learning objective when learner demonstrates understanding.
+
+    Use this tool when you assess that the learner has demonstrated comprehension
+    of a specific learning objective through their conversation. The evidence text
+    should explain what the learner said or did that demonstrates understanding.
+
+    Args:
+        objective_id: The record ID of the learning objective (e.g., "learning_objective:abc123")
+        evidence_text: Your reasoning explaining why this objective is now complete
+            (e.g., "Learner correctly explained the difference between supervised and unsupervised learning")
+
+    Returns:
+        dict: Progress data including completion counts and all_complete flag
+
+    Security Note:
+        Currently relies on API-layer access control via notebook assignment.
+        The learner chat endpoint validates notebook assignment before invoking this tool.
+
+        TODO (Story 7.5): Add defense-in-depth validation to verify objective belongs to
+        the notebook in the current chat session. Requires passing notebook_id and user_id
+        via RunnableConfig.
+    """
+    from open_notebook.domain.learning_objective import LearningObjective
+    from open_notebook.domain.learner_objective_progress import (
+        LearnerObjectiveProgress,
+        ProgressStatus,
+        CompletedVia,
+    )
+
+    logger.info(f"check_off_objective tool called for objective_id: {objective_id}")
+
+    try:
+        # Load objective to validate it exists
+        objective = await LearningObjective.get(objective_id)
+
+        if not objective:
+            logger.warning(f"Learning objective not found: {objective_id}")
+            return {"error": "Learning objective not found", "objective_id": objective_id}
+
+        # TODO (Story 7.5): Extract user_id from RunnableConfig context
+        # For now, this tool is only callable from learner chat context where
+        # user_id is available in the graph state. This is a temporary limitation.
+        # The learner_chat_service.py should inject user_id into config or state.
+
+        # Since we don't have user_id in tool context yet, we'll return a structured
+        # error that the API layer can detect and handle by extracting user_id from
+        # the session context. This is a known limitation that will be fixed in Story 7.5.
+
+        # TEMPORARY: Return error indicating missing user context
+        # The API layer (learner_chat_service.py) will need to handle this by
+        # injecting user_id before tool invocation or extracting from JWT token.
+        return {
+            "error": "User context not available in tool",
+            "objective_id": objective_id,
+            "objective_text": objective.text,
+            "evidence": evidence_text,
+            "note": "This tool requires user_id from session context (Story 4.4 limitation, fix in Story 7.5)"
+        }
+
+        # NOTE: The code below is the intended implementation once user_id is available:
+        #
+        # # Create or retrieve progress record (handles duplicates gracefully)
+        # progress = await LearnerObjectiveProgress.create(
+        #     user_id=user_id,  # From RunnableConfig or graph state
+        #     objective_id=objective_id,
+        #     status=ProgressStatus.COMPLETED,
+        #     completed_via=CompletedVia.CONVERSATION,
+        #     evidence=evidence_text,
+        # )
+        #
+        # # Count total completed vs total objectives for this notebook
+        # total_completed = await LearnerObjectiveProgress.count_completed_for_notebook(
+        #     user_id=user_id, notebook_id=objective.notebook_id
+        # )
+        # total_objectives = await LearningObjective.count_for_notebook(objective.notebook_id)
+        #
+        # # Determine if all objectives are complete
+        # all_complete = total_completed >= total_objectives
+        #
+        # result = {
+        #     "objective_id": objective_id,
+        #     "objective_text": objective.text,
+        #     "evidence": evidence_text,
+        #     "total_completed": total_completed,
+        #     "total_objectives": total_objectives,
+        #     "all_complete": all_complete,
+        # }
+        #
+        # logger.info(
+        #     f"Checked off objective {objective_id}: {total_completed}/{total_objectives} complete"
+        # )
+        # return result
+
+    except Exception as e:
+        logger.error(f"Error in check_off_objective tool for objective {objective_id}: {e}")
+        return {"error": f"Failed to check off objective: {str(e)}", "objective_id": objective_id}

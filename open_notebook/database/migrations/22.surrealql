@@ -1,0 +1,23 @@
+-- Migration 22: learner_objective_progress table
+-- Story 4.4: Learning Objectives Assessment & Progress Tracking
+-- Tracks learner progress on individual learning objectives
+
+DEFINE TABLE learner_objective_progress SCHEMAFULL;
+
+DEFINE FIELD user_id ON learner_objective_progress TYPE record<user> ASSERT $value != NONE;
+DEFINE FIELD objective_id ON learner_objective_progress TYPE record<learning_objective> ASSERT $value != NONE;
+DEFINE FIELD status ON learner_objective_progress TYPE string
+  ASSERT $value IN ['not_started', 'in_progress', 'completed'];
+DEFINE FIELD completed_via ON learner_objective_progress TYPE string
+  ASSERT $value IN ['conversation', 'quiz'];
+DEFINE FIELD evidence ON learner_objective_progress TYPE string;
+DEFINE FIELD completed_at ON learner_objective_progress TYPE datetime;
+DEFINE FIELD created ON learner_objective_progress TYPE datetime DEFAULT time::now();
+
+-- Unique constraint: prevent duplicate completion
+DEFINE INDEX idx_user_objective ON learner_objective_progress
+  FIELDS user_id, objective_id UNIQUE;
+
+-- Index for efficient progress queries
+DEFINE INDEX idx_user ON learner_objective_progress FIELDS user_id;
+DEFINE INDEX idx_objective ON learner_objective_progress FIELDS objective_id;

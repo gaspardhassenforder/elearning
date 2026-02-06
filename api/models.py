@@ -858,3 +858,44 @@ class LearnerSourceDocument(BaseModel):
     title: str
     file_type: Optional[str] = None
     size: Optional[int] = None  # File size in bytes
+
+
+# ==============================================================================
+# Story 4.4: Learning Objectives Assessment & Progress Tracking
+# ==============================================================================
+
+
+class LearnerObjectiveProgressResponse(BaseModel):
+    """Learner progress on a single learning objective."""
+
+    user_id: str
+    objective_id: str
+    status: str  # "not_started" | "in_progress" | "completed"
+    completed_via: Optional[str] = None  # "conversation" | "quiz"
+    evidence: Optional[str] = None
+    completed_at: Optional[str] = None
+
+
+class ObjectiveWithProgress(BaseModel):
+    """Learning objective with learner progress."""
+
+    id: str
+    notebook_id: str
+    text: str
+    order: int
+    auto_generated: bool
+    # Progress fields (null if not started)
+    progress_status: Optional[str] = None
+    progress_completed_at: Optional[str] = None
+    progress_evidence: Optional[str] = None
+
+
+class ObjectiveCheckOffResult(BaseModel):
+    """Result of check_off_objective tool invocation."""
+
+    objective_id: str
+    objective_text: str
+    evidence: str
+    total_completed: int
+    total_objectives: int
+    all_complete: bool
