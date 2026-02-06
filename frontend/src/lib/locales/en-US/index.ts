@@ -144,6 +144,40 @@ export const enUS = {
     chatTitle: "Admin Assistant",
     askQuestion: "Ask for help with module creation...",
   },
+  // Story 7.1: Learner-facing error messages (warm, user-friendly, never red)
+  learnerErrors: {
+    // General errors
+    generic: "Something went wrong. Please try again.",
+    networkError: "Connection problem. Please check your internet.",
+    timeout: "This is taking too long. Please try again.",
+
+    // Access errors
+    accessDenied: "You don't have access to this content.",
+    sessionExpired: "Your session has expired. Please log in again.",
+
+    // Content errors
+    notFound: "We couldn't find what you're looking for.",
+    moduleNotAvailable: "This module isn't available right now.",
+    contentLoadFailed: "Couldn't load this content. Please try again.",
+    notReady: "This content is still being prepared. Please try again in a moment.",
+
+    // Chat errors
+    chatError: "I had trouble processing that. Let me try again.",
+    toolFailed: "I couldn't complete that action. Let me help another way.",
+    streamingError: "Connection lost. Please refresh to continue.",
+
+    // Artifact errors
+    quizLoadFailed: "Couldn't load the quiz. Please try again.",
+    podcastLoadFailed: "Couldn't load the podcast. Please try again.",
+    artifactGenerationFailed: "I had trouble generating that. Let me explain it instead.",
+
+    // ErrorBoundary fallback UI
+    componentCrashed: "Something unexpected happened",
+    progressSaved: "Don't worry, your progress is saved.",
+    tryAgain: "Try Again",
+    returnToModules: "Return to Modules",
+    reloadPage: "Reload Page",
+  },
   apiErrors: {
     notebookNotFound: "Notebook not found",
     sourceNotFound: "Source not found",
@@ -1326,6 +1360,26 @@ export const enUS = {
       suggestedModules: "Suggested Modules",
       startModule: "Start Module",
       noMoreModules: "No more modules available",
+      // Story 6.2: Voice Input
+      voiceInput: {
+        startRecording: "Start voice input",
+        stopRecording: "Stop recording",
+        listening: "Listening...",
+        transcribing: "Transcribing...",
+        // Error messages
+        microphoneError: "Microphone access denied",
+        microphoneErrorDesc: "Please allow microphone access in your browser settings to use voice input.",
+        noSpeech: "No speech detected",
+        noSpeechDesc: "Please speak clearly into your microphone and try again.",
+        networkError: "Network error",
+        networkErrorDesc: "Voice recognition requires an internet connection. Please check your connection and try again.",
+        noMicrophone: "No microphone found",
+        noMicrophoneDesc: "Please connect a microphone to use voice input.",
+        error: "Voice input error",
+        errorDesc: "Something went wrong with voice input. Please try typing instead.",
+        notSupported: "Voice input not supported",
+        notSupportedDesc: "Your browser doesn't support voice input. Please use Chrome, Edge, or Safari.",
+      },
     },
     sources: {
       title: "Documents",

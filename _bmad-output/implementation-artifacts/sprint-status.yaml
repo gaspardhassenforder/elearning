@@ -88,7 +88,7 @@ development_status:
   # Epic 6: Platform Navigation & Voice Input
   epic-6: in-progress
   6-1-platform-wide-ai-navigation-assistant: in-progress
-  6-2-voice-to-text-input: in-progress  # Story created: Browser-native Speech API voice input. Frontend-only (no backend changes). VoiceInput button in ChatPanel, useVoiceInput hook, comprehensive i18n (en-US + fr-FR), full accessibility, graceful degradation.
+  6-2-voice-to-text-input: review  # All tasks complete: Browser-native Speech API voice input (frontend-only). 3 files created (hook + 2 test files), 3 files modified (ChatPanel + i18n). 24 tests passing (11 hook + 13 integration). Full accessibility, graceful degradation, comprehensive error handling.
   epic-6-retrospective: optional
 
   # Epic 7: Error Handling, Observability & Data Privacy

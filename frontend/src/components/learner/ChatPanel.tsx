@@ -17,7 +17,7 @@
  */
 
 import { useEffect, useState, useRef } from 'react'
-import { MessageSquare, ArrowDown } from 'lucide-react'
+import { MessageSquare, ArrowDown, Mic, MicOff } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useTranslation } from '@/lib/hooks/use-translation'
@@ -29,9 +29,11 @@ import { ModuleSuggestionCard } from './ModuleSuggestionCard'
 import { InlineQuizWidget } from './InlineQuizWidget'
 import { InlineAudioPlayer } from './InlineAudioPlayer'
 import { AsyncStatusBar } from './AsyncStatusBar'
+import { ChatErrorMessage } from './ChatErrorMessage'
 import { useJobStatus } from '@/lib/hooks/use-job-status'
 import { useLearnerStore } from '@/lib/stores/learner-store'
 import { useToast } from '@/lib/hooks/use-toast'
+import { useVoiceInput } from '@/lib/hooks/use-voice-input'
 import type { SuggestedModule } from '@/lib/types/api'
 
 interface ChatPanelProps {
@@ -74,6 +76,18 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
     sendMessage,
     messages,
   } = useLearnerChat(notebookId)
+
+  // Story 6.2: Voice input functionality
+  const {
+    isListening,
+    isSupported,
+    transcript,
+    startListening,
+    stopListening,
+    error: voiceError
+  } = useVoiceInput()
+
+  const inputRef = useRef<HTMLInputElement>(null)
 
   // Story 4.8: Merge history with current messages (history first, then new messages)
   const allMessages = historyLoaded && historyData?.messages
@@ -127,6 +141,49 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
   }, [messages, isStreaming, isUserScrolledUp])
+
+  // Story 6.2: Update input field when voice transcript changes
+  useEffect(() => {
+    if (transcript && inputRef.current) {
+      inputRef.current.value = transcript
+    }
+  }, [transcript])
+
+  // Story 6.2: Show error toasts for voice input errors
+  useEffect(() => {
+    if (voiceError) {
+      let title = ''
+      let description = ''
+
+      switch (voiceError) {
+        case 'microphone-permission-denied':
+          title = t.learner.chat.voiceInput.microphoneError
+          description = t.learner.chat.voiceInput.microphoneErrorDesc
+          break
+        case 'no-speech-detected':
+          title = t.learner.chat.voiceInput.noSpeech
+          description = t.learner.chat.voiceInput.noSpeechDesc
+          break
+        case 'network-error':
+          title = t.learner.chat.voiceInput.networkError
+          description = t.learner.chat.voiceInput.networkErrorDesc
+          break
+        case 'no-microphone':
+          title = t.learner.chat.voiceInput.noMicrophone
+          description = t.learner.chat.voiceInput.noMicrophoneDesc
+          break
+        default:
+          title = t.learner.chat.voiceInput.error
+          description = t.learner.chat.voiceInput.errorDesc
+      }
+
+      toast({
+        title,
+        description,
+        variant: 'destructive',
+      })
+    }
+  }, [voiceError, t, toast])
 
   // Story 4.7: Poll job status when active job exists
   const { status, progress, error: jobError } = useJobStatus(
@@ -329,17 +386,28 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
                               </div>
                             ))}
 
-                          {/* Error messages for failed tool calls */}
+                          {/* Story 7.1: Error messages for failed tool calls with amber styling */}
                           {message.toolCalls
                             .filter((tc) => tc.result?.error)
                             .map((tc, tcIndex) => (
-                              <div
+                              <ChatErrorMessage
                                 key={`error-${index}-${tcIndex}`}
-                                className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded px-2 py-1"
-                              >
-                                ⚠️ {tc.result!.error}
-                              </div>
+                                message={tc.result!.error}
+                                recoverable={tc.result!.recoverable ?? false}
+                                className="text-xs"
+                              />
                             ))}
+                        </div>
+                      )}
+
+                      {/* Story 7.1: Render SSE error events inline */}
+                      {message.role === 'assistant' && message.sseError && (
+                        <div className="mt-2">
+                          <ChatErrorMessage
+                            message={message.sseError.message || message.sseError.error || t.learnerErrors?.chatError || 'Something went wrong'}
+                            recoverable={message.sseError.recoverable ?? false}
+                            className="text-xs"
+                          />
                         </div>
                       )}
                     </div>
@@ -378,7 +446,26 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
                 }}
                 className="flex gap-2"
               >
+                {/* Story 6.2: Voice Input Button - Only show if supported */}
+                {isSupported && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={isListening ? stopListening : startListening}
+                    aria-label={isListening ? t.learner.chat.voiceInput.stopRecording : t.learner.chat.voiceInput.startRecording}
+                    className={isListening ? 'text-red-500 animate-pulse' : ''}
+                  >
+                    {isListening ? (
+                      <MicOff className="h-4 w-4" />
+                    ) : (
+                      <Mic className="h-4 w-4" />
+                    )}
+                  </Button>
+                )}
+
                 <input
+                  ref={inputRef}
                   type="text"
                   name="message"
                   placeholder={t.learner.chat.placeholder}

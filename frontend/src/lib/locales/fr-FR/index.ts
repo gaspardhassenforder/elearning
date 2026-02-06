@@ -144,6 +144,40 @@ export const frFR = {
     chatTitle: "Assistant administrateur",
     askQuestion: "Demandez de l'aide pour la création de modules...",
   },
+  // Story 7.1: Messages d'erreur pour les apprenants (chaleureux, conviviaux, jamais rouge)
+  learnerErrors: {
+    // Erreurs générales
+    generic: "Quelque chose s'est mal passé. Veuillez réessayer.",
+    networkError: "Problème de connexion. Veuillez vérifier votre connexion internet.",
+    timeout: "Cela prend trop de temps. Veuillez réessayer.",
+
+    // Erreurs d'accès
+    accessDenied: "Vous n'avez pas accès à ce contenu.",
+    sessionExpired: "Votre session a expiré. Veuillez vous reconnecter.",
+
+    // Erreurs de contenu
+    notFound: "Nous n'avons pas trouvé ce que vous cherchez.",
+    moduleNotAvailable: "Ce module n'est pas disponible pour le moment.",
+    contentLoadFailed: "Impossible de charger ce contenu. Veuillez réessayer.",
+    notReady: "Ce contenu est encore en préparation. Veuillez réessayer dans un moment.",
+
+    // Erreurs de chat
+    chatError: "J'ai eu un problème pour traiter cela. Laissez-moi réessayer.",
+    toolFailed: "Je n'ai pas pu effectuer cette action. Laissez-moi vous aider autrement.",
+    streamingError: "Connexion perdue. Veuillez actualiser pour continuer.",
+
+    // Erreurs d'artefacts
+    quizLoadFailed: "Impossible de charger le quiz. Veuillez réessayer.",
+    podcastLoadFailed: "Impossible de charger le podcast. Veuillez réessayer.",
+    artifactGenerationFailed: "J'ai eu du mal à générer cela. Laissez-moi vous l'expliquer à la place.",
+
+    // Interface de secours ErrorBoundary
+    componentCrashed: "Quelque chose d'inattendu s'est produit",
+    progressSaved: "Ne vous inquiétez pas, votre progression est sauvegardée.",
+    tryAgain: "Réessayer",
+    returnToModules: "Retourner aux modules",
+    reloadPage: "Recharger la page",
+  },
   apiErrors: {
     notebookNotFound: "Carnet introuvable",
     sourceNotFound: "Source introuvable",
@@ -1326,6 +1360,26 @@ export const frFR = {
       suggestedModules: "Modules suggérés",
       startModule: "Commencer le module",
       noMoreModules: "Aucun module disponible",
+      // Story 6.2: Saisie vocale
+      voiceInput: {
+        startRecording: "Démarrer la saisie vocale",
+        stopRecording: "Arrêter l'enregistrement",
+        listening: "Écoute en cours...",
+        transcribing: "Transcription en cours...",
+        // Messages d'erreur
+        microphoneError: "Accès au microphone refusé",
+        microphoneErrorDesc: "Veuillez autoriser l'accès au microphone dans les paramètres de votre navigateur pour utiliser la saisie vocale.",
+        noSpeech: "Aucune parole détectée",
+        noSpeechDesc: "Veuillez parler clairement dans votre microphone et réessayer.",
+        networkError: "Erreur réseau",
+        networkErrorDesc: "La reconnaissance vocale nécessite une connexion Internet. Veuillez vérifier votre connexion et réessayer.",
+        noMicrophone: "Aucun microphone trouvé",
+        noMicrophoneDesc: "Veuillez connecter un microphone pour utiliser la saisie vocale.",
+        error: "Erreur de saisie vocale",
+        errorDesc: "Un problème est survenu avec la saisie vocale. Veuillez essayer de taper à la place.",
+        notSupported: "Saisie vocale non prise en charge",
+        notSupportedDesc: "Votre navigateur ne prend pas en charge la saisie vocale. Veuillez utiliser Chrome, Edge ou Safari.",
+      },
     },
     sources: {
       title: "Documents",
