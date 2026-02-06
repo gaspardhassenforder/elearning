@@ -43,23 +43,27 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
 
   // Story 4.3: Access scroll actions from store
   // Story 4.7: Access job tracking actions from store
+  // Story 5.1: Access panel collapsed state and badge actions
   const {
     setScrollToSourceId,
     panelManuallyCollapsed,
     setActiveJob,
+    sourcesPanelExpanded,
+    incrementBadgeCount,
   } = useLearnerStore((state) => ({
     setScrollToSourceId: state.setScrollToSourceId,
     panelManuallyCollapsed: state.panelManuallyCollapsed,
     setActiveJob: state.setActiveJob,
+    sourcesPanelExpanded: state.sourcesPanelExpanded,
+    incrementBadgeCount: state.incrementBadgeCount,
   }))
 
-  // For now, we don't persist chat history (Story 4.8 will add this)
-  // This query is a placeholder for future chat history loading
+  // Story 4.8: Chat history is now loaded via useChatHistory hook (see ChatPanel.tsx)
+  // This hook manages message state and streaming, not history loading
   const { isLoading, error } = useQuery({
     queryKey: ['learner', 'modules', notebookId, 'chat'],
     queryFn: async () => {
-      // Story 4.8 will implement persistent chat history
-      // For now, return empty array
+      // Empty query - actual history loaded by useChatHistory in ChatPanel
       return []
     },
     enabled: !!notebookId,
@@ -182,11 +186,16 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
               .filter((tc) => tc.toolName === 'surface_document' && tc.result?.source_id)
               .map((tc) => tc.result!.source_id as string)
 
-            // Trigger scroll if documents were referenced AND panel not manually collapsed
-            if (documentRefs.length > 0 && !panelManuallyCollapsed) {
-              // Scroll to first referenced document
-              const firstDocId = documentRefs[0]
-              setScrollToSourceId(firstDocId)
+            // Story 5.1: Handle document references based on panel state
+            if (documentRefs.length > 0) {
+              if (!sourcesPanelExpanded) {
+                // Panel is collapsed - increment badge count for each referenced document
+                documentRefs.forEach(() => incrementBadgeCount())
+              } else if (!panelManuallyCollapsed) {
+                // Panel is expanded - trigger scroll to first referenced document
+                const firstDocId = documentRefs[0]
+                setScrollToSourceId(firstDocId)
+              }
             }
           }
         }

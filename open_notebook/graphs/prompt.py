@@ -372,24 +372,21 @@ async def generate_re_engagement_greeting(
                 objectives_with_status=objectives_with_status
             )
 
-        # Extract messages from checkpoint
-        # SqliteSaver returns dict, not CheckpointTuple class
-        if isinstance(checkpoint_tuple, dict):
-            checkpoint_data = checkpoint_tuple
-            if "channel_values" in checkpoint_data and "messages" in checkpoint_data["channel_values"]:
-                messages = checkpoint_data["channel_values"]["messages"]
-            else:
-                messages = checkpoint_data.get("messages", [])
+        # Extract messages from checkpoint (SqliteSaver returns dict directly)
+        if not isinstance(checkpoint_tuple, dict):
+            logger.error(f"Unexpected checkpoint type: {type(checkpoint_tuple)}")
+            # Fallback to standard greeting on unexpected format
+            return await generate_proactive_greeting(
+                notebook_id=notebook_id,
+                learner_profile=learner_profile,
+                objectives_with_status=objectives_with_status
+            )
+
+        # SqliteSaver structure: {"channel_values": {"messages": [...]}}
+        if "channel_values" in checkpoint_tuple and "messages" in checkpoint_tuple["channel_values"]:
+            messages = checkpoint_tuple["channel_values"]["messages"]
         else:
-            # If it's a tuple/object with .checkpoint attribute
-            checkpoint_data = checkpoint_tuple.checkpoint if hasattr(checkpoint_tuple, "checkpoint") else checkpoint_tuple
-            if isinstance(checkpoint_data, dict):
-                if "channel_values" in checkpoint_data:
-                    messages = checkpoint_data["channel_values"].get("messages", [])
-                else:
-                    messages = checkpoint_data.get("messages", [])
-            else:
-                messages = []
+            messages = checkpoint_tuple.get("messages", [])
 
         if not messages:
             logger.warning(f"Empty message history for thread {thread_id}, falling back to standard greeting")

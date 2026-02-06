@@ -128,8 +128,11 @@ class TestCheckpointPersistence:
 
         assert checkpoint_tuple is not None, "Checkpoint should exist after graph invocation"
 
-        # Extract channel values from checkpoint tuple
-        checkpoint_data = checkpoint_tuple.checkpoint
+        # Extract channel values from checkpoint (SqliteSaver returns dict, not tuple)
+        if isinstance(checkpoint_tuple, dict):
+            checkpoint_data = checkpoint_tuple
+        else:
+            checkpoint_data = checkpoint_tuple.checkpoint
         assert "channel_values" in checkpoint_data, "Checkpoint should have channel_values"
 
         channel_values = checkpoint_data["channel_values"]
@@ -182,9 +185,12 @@ class TestCheckpointPersistence:
                 config=config
             )
 
-        # Load checkpoint
+        # Load checkpoint (SqliteSaver returns dict, not tuple)
         checkpoint_tuple = chat_memory.get(config)
-        checkpoint_data = checkpoint_tuple.checkpoint
+        if isinstance(checkpoint_tuple, dict):
+            checkpoint_data = checkpoint_tuple
+        else:
+            checkpoint_data = checkpoint_tuple.checkpoint
         messages = checkpoint_data["channel_values"]["messages"]
 
         # Should have 4 messages: 2 user + 2 AI
@@ -260,14 +266,20 @@ class TestThreadIsolationIntegration:
                 config=bob_config
             )
 
-        # Check Alice's checkpoint
+        # Check Alice's checkpoint (SqliteSaver returns dict, not tuple)
         alice_checkpoint = chat_memory.get(alice_config)
-        alice_messages = alice_checkpoint.checkpoint["channel_values"]["messages"]
+        if isinstance(alice_checkpoint, dict):
+            alice_messages = alice_checkpoint["channel_values"]["messages"]
+        else:
+            alice_messages = alice_checkpoint.checkpoint["channel_values"]["messages"]
         alice_contents = " ".join([msg.content for msg in alice_messages])
 
-        # Check Bob's checkpoint
+        # Check Bob's checkpoint (SqliteSaver returns dict, not tuple)
         bob_checkpoint = chat_memory.get(bob_config)
-        bob_messages = bob_checkpoint.checkpoint["channel_values"]["messages"]
+        if isinstance(bob_checkpoint, dict):
+            bob_messages = bob_checkpoint["channel_values"]["messages"]
+        else:
+            bob_messages = bob_checkpoint.checkpoint["channel_values"]["messages"]
         bob_contents = " ".join([msg.content for msg in bob_messages])
 
         # Alice should only see her messages
@@ -323,14 +335,20 @@ class TestThreadIsolationIntegration:
                 config=config_b
             )
 
-        # Check notebook A checkpoint
+        # Check notebook A checkpoint (SqliteSaver returns dict, not tuple)
         checkpoint_a = chat_memory.get(config_a)
-        messages_a = checkpoint_a.checkpoint["channel_values"]["messages"]
+        if isinstance(checkpoint_a, dict):
+            messages_a = checkpoint_a["channel_values"]["messages"]
+        else:
+            messages_a = checkpoint_a.checkpoint["channel_values"]["messages"]
         contents_a = " ".join([msg.content for msg in messages_a])
 
-        # Check notebook B checkpoint
+        # Check notebook B checkpoint (SqliteSaver returns dict, not tuple)
         checkpoint_b = chat_memory.get(config_b)
-        messages_b = checkpoint_b.checkpoint["channel_values"]["messages"]
+        if isinstance(checkpoint_b, dict):
+            messages_b = checkpoint_b["channel_values"]["messages"]
+        else:
+            messages_b = checkpoint_b.checkpoint["channel_values"]["messages"]
         contents_b = " ".join([msg.content for msg in messages_b])
 
         # Notebook A should only have its messages

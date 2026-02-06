@@ -172,19 +172,20 @@ async def get_chat_history(
                 has_more=False
             )
 
-        # Extract messages from checkpoint (handle dict structure from SqliteSaver)
+        # Extract messages from checkpoint (SqliteSaver returns dict directly)
+        if not isinstance(checkpoint_tuple, dict):
+            logger.error(f"Unexpected checkpoint type: {type(checkpoint_tuple)}")
+            raise HTTPException(
+                status_code=500, detail="Internal error: invalid checkpoint format"
+            )
+
+        # SqliteSaver structure: {"channel_values": {"messages": [...]}}
         messages = []
-        if isinstance(checkpoint_tuple, dict):
-            # SqliteSaver returns dict
-            if "channel_values" in checkpoint_tuple and "messages" in checkpoint_tuple["channel_values"]:
-                messages = checkpoint_tuple["channel_values"]["messages"]
-            elif "messages" in checkpoint_tuple:
-                messages = checkpoint_tuple["messages"]
-        elif hasattr(checkpoint_tuple, "checkpoint"):
-            # CheckpointTuple object
-            checkpoint_data = checkpoint_tuple.checkpoint
-            if isinstance(checkpoint_data, dict) and "channel_values" in checkpoint_data:
-                messages = checkpoint_data["channel_values"].get("messages", [])
+        if "channel_values" in checkpoint_tuple and "messages" in checkpoint_tuple["channel_values"]:
+            messages = checkpoint_tuple["channel_values"]["messages"]
+        elif "messages" in checkpoint_tuple:
+            # Fallback: direct messages key (shouldn't happen with current SqliteSaver)
+            messages = checkpoint_tuple["messages"]
 
         if not messages:
             logger.info(f"Empty message history for thread {thread_id}")
@@ -212,41 +213,49 @@ async def get_chat_history(
 
         formatted_messages = []
         for msg in paginated_messages:
-            # Determine role
-            from langchain_core.messages import AIMessage
+            try:
+                # Determine role
+                from langchain_core.messages import AIMessage
 
-            role = "assistant" if isinstance(msg, AIMessage) else "user"
+                role = "assistant" if isinstance(msg, AIMessage) else "user"
 
-            # Extract content (handle structured content)
-            content = msg.content
-            if isinstance(content, list):
-                # Structured content: extract text from blocks
-                text_parts = []
-                for item in content:
-                    if isinstance(item, dict) and "text" in item:
-                        text_parts.append(item["text"])
-                content = "\n".join(text_parts) if text_parts else str(content)
-            elif not isinstance(content, str):
-                content = str(content)
+                # Extract content (handle structured content)
+                content = msg.content
+                if isinstance(content, list):
+                    # Structured content: extract text from blocks
+                    text_parts = []
+                    for item in content:
+                        if isinstance(item, dict) and "text" in item:
+                            text_parts.append(item["text"])
+                    content = "\n".join(text_parts) if text_parts else str(content)
+                elif not isinstance(content, str):
+                    content = str(content)
 
-            # Create message ID if not present
-            message_id = getattr(msg, "id", None) or str(uuid.uuid4())
+                # Create message ID if not present
+                message_id = getattr(msg, "id", None) or str(uuid.uuid4())
 
-            # Extract timestamp
-            created_at = getattr(msg, "additional_kwargs", {}).get(
-                "timestamp", datetime.now().isoformat()
-            )
-            if not isinstance(created_at, str):
-                created_at = datetime.now().isoformat()
-
-            formatted_messages.append(
-                ChatHistoryMessage(
-                    id=message_id,
-                    role=role,
-                    content=content,
-                    createdAt=created_at,
+                # Extract timestamp
+                created_at = getattr(msg, "additional_kwargs", {}).get(
+                    "timestamp", datetime.now().isoformat()
                 )
-            )
+                if not isinstance(created_at, str):
+                    created_at = datetime.now().isoformat()
+
+                formatted_messages.append(
+                    ChatHistoryMessage(
+                        id=message_id,
+                        role=role,
+                        content=content,
+                        createdAt=created_at,
+                    )
+                )
+            except Exception as e:
+                # Skip corrupt message but continue processing rest of history
+                msg_id = getattr(msg, "id", "unknown")
+                logger.warning(
+                    f"Skipping corrupt message {msg_id} in thread {thread_id}: {e}"
+                )
+                continue
 
         logger.info(
             f"Loaded {len(formatted_messages)} messages for thread {thread_id} "
