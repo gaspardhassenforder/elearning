@@ -11,6 +11,7 @@ export interface LearnerChatMessage {
   content: string
   timestamp?: string
   toolCalls?: ToolCall[]  // Story 4.3: Track tool calls for document snippets
+  sseError?: SSEErrorData  // Story 7.1: Inline error from SSE stream
 }
 
 // Story 4.3: Tool call tracking
@@ -96,14 +97,24 @@ export interface ChatHistoryResponse {
   has_more: boolean
 }
 
+// Story 7.1: Error event data from SSE stream
+export interface SSEErrorData {
+  error?: string
+  error_type?: string
+  recoverable?: boolean
+  message?: string
+}
+
 // Story 4.3: Extended stream event for tracking tool calls
 // Story 4.4: Added objective_checked event type
+// Story 7.1: Added error event type for inline error display
 export interface StreamEvent {
-  type: 'text' | 'tool_call' | 'tool_result' | 'message_complete' | 'objective_checked'
+  type: 'text' | 'tool_call' | 'tool_result' | 'message_complete' | 'objective_checked' | 'error'
   delta?: string
   toolCall?: ToolCall
   toolResult?: { id: string; result: Record<string, any> }
   objectiveChecked?: ObjectiveCheckedData  // Story 4.4
+  errorData?: SSEErrorData  // Story 7.1
 }
 
 /**
@@ -203,9 +214,18 @@ export async function* parseLearnerChatStream(
             }
           }
 
-          // Handle errors
+          // Story 7.1: Yield error events for inline display (don't throw)
+          // This allows the chat to display errors gracefully in the conversation
           if (eventType === 'error') {
-            throw new Error(data.detail || 'Stream error occurred')
+            yield {
+              type: 'error',
+              errorData: {
+                error: data.error || data.detail,
+                error_type: data.error_type,
+                recoverable: data.recoverable ?? false,
+                message: data.message,
+              },
+            }
           }
         } catch (e) {
           console.error('Failed to parse SSE data:', e, dataStr)

@@ -64,6 +64,110 @@ async def _fetch_suggested_modules(user_id: str, current_notebook_id: str) -> Li
         return []
 
 
+@tool
+async def search_available_modules(
+    query: str,
+    config: Optional[dict] = None,
+    limit: int = 5
+) -> list:
+    """Search across modules assigned to learner's company.
+
+    Use this tool to help learners find relevant modules based on topic keywords.
+    Searches module titles and descriptions for matches.
+
+    Args:
+        query: Search keywords (e.g., "machine learning", "AI logistics")
+        config: RunnableConfig containing company_id and current_notebook_id (injected by navigation graph)
+        limit: Max results to return (default: 5)
+
+    Returns:
+        List of ModuleSuggestion dicts with id, title, description, relevance_score
+
+    Security Note:
+        Company scoping is enforced by extracting company_id from the authenticated user context
+        passed via RunnableConfig. The navigation endpoint validates authentication before invoking.
+    """
+    from open_notebook.database.repository import repo_query
+
+    # Extract company_id and current_notebook_id from config (passed by navigation graph)
+    company_id = None
+    current_notebook_id = None
+    if config:
+        configurable = config.get("configurable", {})
+        company_id = configurable.get("company_id")
+        current_notebook_id = configurable.get("current_notebook_id")
+
+    if not company_id:
+        logger.warning("search_available_modules called without company_id in config")
+        return []
+
+    logger.info(f"search_available_modules: query='{query}', company={company_id}, exclude={current_notebook_id}")
+
+    try:
+        query_lower = query.lower()
+
+        # Build query with company scoping and published/unlocked filters
+        surql = """
+            SELECT
+              notebook.id,
+              notebook.title,
+              notebook.description,
+              notebook.created
+            FROM notebook
+            JOIN module_assignment ON module_assignment.notebook_id = notebook.id
+            WHERE
+              module_assignment.company_id = $company_id
+              AND module_assignment.is_locked = false
+              AND notebook.published = true
+              AND (
+                string::lowercase(notebook.title) CONTAINS $query OR
+                string::lowercase(notebook.description) CONTAINS $query
+              )
+        """
+
+        # Optionally exclude current module
+        if current_notebook_id:
+            surql += " AND notebook.id != $current_notebook_id"
+
+        # Priority: title matches first, then by creation date
+        surql += """
+            ORDER BY
+              (string::lowercase(notebook.title) CONTAINS $query) DESC,
+              notebook.created DESC
+            LIMIT $limit;
+        """
+
+        params = {
+            "company_id": company_id,
+            "query": query_lower,
+            "current_notebook_id": current_notebook_id,
+            "limit": limit
+        }
+
+        results = await repo_query(surql, params)
+
+        # Map to ModuleSuggestion format with relevance scoring
+        module_suggestions = []
+        for row in results:
+            # Title match gets higher relevance score
+            title_lower = row.get("title", "").lower()
+            relevance_score = 1.0 if query_lower in title_lower else 0.5
+
+            module_suggestions.append({
+                "id": row.get("id"),
+                "title": row.get("title", "Untitled Module"),
+                "description": row.get("description", ""),
+                "relevance_score": relevance_score
+            })
+
+        logger.info(f"Found {len(module_suggestions)} modules for query '{query}'")
+        return module_suggestions
+
+    except Exception as e:
+        logger.error(f"Error in search_available_modules: {e}", exc_info=True)
+        raise  # Re-raise to let caller handle gracefully
+
+
 # todo: turn this into a system prompt variable
 @tool
 def get_current_timestamp() -> str:
@@ -110,8 +214,9 @@ async def surface_document(source_id: str, excerpt_text: str, relevance_reason: 
         if not source:
             logger.warning(f"Source not found: {source_id}")
             return {
-                "error": "Source not found",
-                "source_id": source_id
+                "error": "I couldn't find that document",
+                "error_type": "not_found",
+                "recoverable": True,
             }
 
         # Truncate excerpt to 200 characters if needed
@@ -147,10 +252,11 @@ async def surface_document(source_id: str, excerpt_text: str, relevance_reason: 
         return result
 
     except Exception as e:
-        logger.error(f"Error in surface_document tool for source {source_id}: {e}")
+        logger.error(f"Error in surface_document tool for source {source_id}: {e}", exc_info=True)
         return {
-            "error": f"Failed to surface document: {str(e)}",
-            "source_id": source_id
+            "error": "I had trouble accessing that document",
+            "error_type": "service_error",
+            "recoverable": False,
         }
 
 
@@ -195,7 +301,11 @@ async def check_off_objective(
 
         if not objective:
             logger.warning(f"Learning objective not found: {objective_id}")
-            return {"error": "Learning objective not found", "objective_id": objective_id}
+            return {
+                "error": "I couldn't find that learning objective",
+                "error_type": "not_found",
+                "recoverable": True,
+            }
 
         # Extract user_id from config (passed by learner chat service)
         # Config is injected via RunnableConfig in chat graph
@@ -207,11 +317,9 @@ async def check_off_objective(
         if not user_id:
             logger.warning("check_off_objective called without user_id in config")
             return {
-                "error": "User context not available",
-                "objective_id": objective_id,
-                "objective_text": objective.text,
-                "evidence": evidence_text,
-                "note": "Ensure user_id is passed via RunnableConfig"
+                "error": "I couldn't record your progress right now",
+                "error_type": "service_error",
+                "recoverable": False,
             }
 
         # Create or retrieve progress record (handles duplicates gracefully)
@@ -257,8 +365,12 @@ async def check_off_objective(
         return result
 
     except Exception as e:
-        logger.error(f"Error in check_off_objective tool for objective {objective_id}: {e}")
-        return {"error": f"Failed to check off objective: {str(e)}", "objective_id": objective_id}
+        logger.error(f"Error in check_off_objective tool for objective {objective_id}: {e}", exc_info=True)
+        return {
+            "error": "I had trouble recording your progress",
+            "error_type": "service_error",
+            "recoverable": False,
+        }
 
 
 @tool
@@ -292,11 +404,19 @@ async def surface_quiz(quiz_id: str, config: Optional[dict] = None) -> dict:
             quiz = await Quiz.get(quiz_id)
         except NotFoundError:
             logger.warning(f"Quiz not found: {quiz_id}")
-            return {"error": "Quiz not found", "quiz_id": quiz_id}
+            return {
+                "error": "I couldn't find that quiz",
+                "error_type": "not_found",
+                "recoverable": True,
+            }
 
         if not quiz:
             logger.warning(f"Quiz not found: {quiz_id}")
-            return {"error": "Quiz not found", "quiz_id": quiz_id}
+            return {
+                "error": "I couldn't find that quiz",
+                "error_type": "not_found",
+                "recoverable": True,
+            }
 
         # Extract user_id from config for company scoping validation
         user_id = None
@@ -326,9 +446,9 @@ async def surface_quiz(quiz_id: str, config: Optional[dict] = None) -> dict:
                         f"Company scoping violation: Quiz {quiz_id} not accessible to user {user_id}"
                     )
                     return {
-                        "error": "Quiz not accessible",
-                        "quiz_id": quiz_id,
-                        "note": "This quiz is not available for your company"
+                        "error": "That quiz isn't available for you",
+                        "error_type": "access_denied",
+                        "recoverable": True,
                     }
 
         # Prepare questions WITHOUT correct_answer field (security - no cheating)
@@ -358,8 +478,12 @@ async def surface_quiz(quiz_id: str, config: Optional[dict] = None) -> dict:
         return result
 
     except Exception as e:
-        logger.error(f"Error in surface_quiz tool for quiz {quiz_id}: {e}")
-        return {"error": f"Failed to surface quiz: {str(e)}", "quiz_id": quiz_id}
+        logger.error(f"Error in surface_quiz tool for quiz {quiz_id}: {e}", exc_info=True)
+        return {
+            "error": "I had trouble loading that quiz",
+            "error_type": "service_error",
+            "recoverable": False,
+        }
 
 
 @tool
@@ -393,11 +517,19 @@ async def surface_podcast(podcast_id: str, config: Optional[dict] = None) -> dic
             podcast = await Podcast.get(podcast_id)
         except NotFoundError:
             logger.warning(f"Podcast not found: {podcast_id}")
-            return {"error": "Podcast not found", "podcast_id": podcast_id}
+            return {
+                "error": "I couldn't find that podcast",
+                "error_type": "not_found",
+                "recoverable": True,
+            }
 
         if not podcast:
             logger.warning(f"Podcast not found: {podcast_id}")
-            return {"error": "Podcast not found", "podcast_id": podcast_id}
+            return {
+                "error": "I couldn't find that podcast",
+                "error_type": "not_found",
+                "recoverable": True,
+            }
 
         # Extract user_id from config for company scoping validation
         user_id = None
@@ -427,21 +559,18 @@ async def surface_podcast(podcast_id: str, config: Optional[dict] = None) -> dic
                         f"Company scoping violation: Podcast {podcast_id} not accessible to user {user_id}"
                     )
                     return {
-                        "error": "Podcast not accessible",
-                        "podcast_id": podcast_id,
-                        "note": "This podcast is not available for your company"
+                        "error": "That podcast isn't available for you",
+                        "error_type": "access_denied",
+                        "recoverable": True,
                     }
 
         # Check if podcast is ready
         if not podcast.is_ready:
             logger.info(f"Podcast {podcast_id} is not ready yet (status: {podcast.status})")
             return {
-                "artifact_type": "podcast",
-                "podcast_id": podcast_id,
-                "title": podcast.title,
-                "status": podcast.status,
-                "error": "Podcast not ready",
-                "note": f"This podcast is currently {podcast.status}. Please try again later."
+                "error": "That podcast is still being generated",
+                "error_type": "not_ready",
+                "recoverable": True,
             }
 
         # Return structured data for frontend rendering
@@ -459,5 +588,152 @@ async def surface_podcast(podcast_id: str, config: Optional[dict] = None) -> dic
         return result
 
     except Exception as e:
-        logger.error(f"Error in surface_podcast tool for podcast {podcast_id}: {e}")
-        return {"error": f"Failed to surface podcast: {str(e)}", "podcast_id": podcast_id}
+        logger.error(f"Error in surface_podcast tool for podcast {podcast_id}: {e}", exc_info=True)
+        return {
+            "error": "I had trouble loading that podcast",
+            "error_type": "service_error",
+            "recoverable": False,
+        }
+
+
+@tool
+async def generate_artifact(
+    artifact_type: str,
+    topic: str,
+    notebook_id: Optional[str] = None,
+    num_questions: Optional[int] = 5,
+    speaker_profile: Optional[str] = "default",
+    config: Optional[dict] = None,
+) -> dict:
+    """Generate an artifact (podcast or quiz) asynchronously.
+
+    Use this tool when the learner requests artifact generation (e.g., "create a podcast about X").
+    The artifact generation will run in the background, allowing the conversation to continue
+    without blocking. The learner will be notified when the artifact is ready.
+
+    Args:
+        artifact_type: Type of artifact to generate ("podcast" or "quiz")
+        topic: Topic or title for the artifact
+        notebook_id: Notebook ID for the artifact (optional - from config if not provided)
+        num_questions: Number of questions for quiz (default: 5, only used for quizzes)
+        speaker_profile: Speaker profile name for podcast (default: "default", only used for podcasts)
+        config: RunnableConfig containing user_id and notebook_id (injected by chat graph)
+
+    Returns:
+        dict: Job submission result with job_id, artifact_ids, status, and message
+
+    Example:
+        When learner says: "Can you create a podcast summarizing this module?"
+        AI responds: "I'm generating that podcast for you. Let's continue while it's processing."
+
+    Security Note:
+        Artifact is created for the notebook from the current chat session (from config).
+        User context passed via RunnableConfig ensures company scoping.
+    """
+    from open_notebook.domain.artifact import Artifact
+
+    logger.info(f"generate_artifact tool called: {artifact_type} on topic '{topic}'")
+
+    try:
+        # Extract notebook_id and user_id from config
+        if config:
+            configurable = config.get("configurable", {})
+            if not notebook_id:
+                notebook_id = configurable.get("notebook_id")
+            user_id = configurable.get("user_id")
+        else:
+            user_id = None
+
+        if not notebook_id:
+            logger.warning("generate_artifact called without notebook_id")
+            return {
+                "error": "I couldn't determine which module to use",
+                "error_type": "service_error",
+                "recoverable": False,
+            }
+
+        # Submit async job based on artifact type
+        if artifact_type == "podcast":
+            # Import here to avoid circular dependencies
+            from api.podcast_service import PodcastService
+
+            logger.info(f"Submitting podcast generation job: topic={topic}, notebook={notebook_id}")
+
+            # Submit podcast generation job (returns job_id, artifact_ids)
+            job_id, artifact_ids = await PodcastService.submit_generation_job(
+                episode_profile_name=topic,
+                speaker_profile_name=speaker_profile,
+                episode_name=f"Podcast: {topic}",
+                notebook_id=notebook_id,
+            )
+
+            message = f"Podcast generation started. You'll be notified when it's ready."
+
+        elif artifact_type == "quiz":
+            # Import here to avoid circular dependencies
+            from api.quiz_service import generate_quiz
+
+            logger.info(f"Submitting quiz generation job: topic={topic}, notebook={notebook_id}")
+
+            # Generate quiz (currently synchronous, but we'll track as if async)
+            # TODO Story 4.7: Make quiz generation truly async via surreal-commands
+            result = await generate_quiz(
+                notebook_id=notebook_id,
+                topic=topic,
+                num_questions=num_questions,
+            )
+
+            # Check if quiz generation succeeded
+            if "quiz_id" in result:
+                quiz_id = result["quiz_id"]
+
+                # Create artifact tracker with quiz_id
+                artifact = await Artifact.create_for_artifact(
+                    notebook_id=notebook_id,
+                    artifact_type="quiz",
+                    artifact_id=quiz_id,
+                    title=f"Quiz: {topic}",
+                )
+
+                # For quiz, return completed status (since it's currently synchronous)
+                job_id = quiz_id  # Use quiz_id as job_id for now
+                artifact_ids = [str(artifact.id)]
+                message = f"Quiz '{topic}' has been generated and is ready."
+            else:
+                # Quiz generation failed
+                error_msg = result.get("error", "Unknown error")
+                logger.error(f"Quiz generation failed: {error_msg}")
+                return {
+                    "error": "I had trouble generating that quiz",
+                    "error_type": "service_error",
+                    "recoverable": False,
+                }
+
+        else:
+            logger.warning(f"Unsupported artifact type: {artifact_type}")
+            return {
+                "error": "I can only generate quizzes and podcasts",
+                "error_type": "validation",
+                "recoverable": True,
+            }
+
+        # Return tool result with job tracking info
+        result = {
+            "job_id": job_id,
+            "artifact_ids": artifact_ids,
+            "artifact_type": artifact_type,
+            "status": "submitted" if artifact_type == "podcast" else "completed",
+            "message": message,
+            "topic": topic
+        }
+
+        logger.info(f"Artifact generation job submitted: {result}")
+        return result
+
+    except Exception as e:
+        logger.error(f"Error in generate_artifact tool: {e}", exc_info=True)
+        return {
+            "error": "I had trouble creating that for you",
+            "error_type": "service_error",
+            "recoverable": False,
+        }

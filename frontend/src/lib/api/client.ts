@@ -120,12 +120,28 @@ apiClient.interceptors.response.use(
       return Promise.reject(error)
     }
 
-    // Handle 403 Forbidden - show access denied message (don't redirect)
+    // Story 7.1: Log common error status codes at debug level (calling code handles UI feedback)
+    // IMPORTANT: We log errors here but DO NOT show toasts.
+    // Why? Different consumers need different error UX:
+    // - Some endpoints show inline error messages (ChatErrorMessage)
+    // - Some use toast notifications (learnerToast.error)
+    // - Some display error states in components (loading/error UI)
+    // Letting calling code decide ensures consistent, context-appropriate error handling.
     if (error.response?.status === 403) {
-      console.error('Access denied:', error.response?.data?.detail || 'You do not have permission to perform this action')
-      // Let the calling code handle the 403 error (e.g., show toast)
+      console.debug('[API] Access denied:', error.config?.url)
+    } else if (error.response?.status === 404) {
+      console.debug('[API] Not found:', error.config?.url)
+    } else if (error.response?.status && error.response.status >= 500) {
+      console.debug('[API] Server error:', error.response.status, error.config?.url)
     }
 
+    // Handle network errors (no response from server)
+    if (!error.response && error.code) {
+      console.debug('[API] Network error:', error.code, error.config?.url)
+    }
+
+    // Always propagate - calling code decides on UI feedback (toast, inline message, etc.)
+    // This pattern prevents duplicate toasts and allows for context-specific error handling.
     return Promise.reject(error)
   }
 )

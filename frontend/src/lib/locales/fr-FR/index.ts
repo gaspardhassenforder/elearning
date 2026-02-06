@@ -1469,5 +1469,21 @@ export const frFR = {
       viewTranscript: "Voir la transcription",
       generating: "Le podcast est en cours de génération. Veuillez revenir plus tard.",
     },
+    // Story 6.1: Assistant de navigation
+    navigation: {
+      title: "Assistant de Navigation",
+      placeholder: "Demandez-moi de trouver un module...",
+      send: "Envoyer",
+      close: "Fermer",
+      openModule: "Ouvrir le module",
+      moduleNotFound: "Je n'ai trouvé aucun module correspondant.",
+      searchFailed: "La recherche a échoué. Veuillez réessayer.",
+      redirectToTeacher: "Votre professeur IA peut vous aider avec ça !",
+      loading: "Recherche en cours...",
+      typing: "L'assistant réfléchit...",
+      noHistory: "Aucun historique de conversation",
+      greeting: "Bonjour ! Je peux vous aider à trouver le bon module pour apprendre.",
+      greetingPrompt: "Essayez de demander : 'Où puis-je apprendre l'IA ?'",
+    },
   },
 }

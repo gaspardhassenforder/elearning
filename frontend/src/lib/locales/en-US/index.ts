@@ -1469,6 +1469,22 @@ export const enUS = {
       viewTranscript: "View Transcript",
       generating: "Podcast is currently being generated. Please check back later.",
     },
+    // Story 6.1: Navigation Assistant
+    navigation: {
+      title: "Navigation Assistant",
+      placeholder: "Ask me to find a module...",
+      send: "Send",
+      close: "Close",
+      openModule: "Open module",
+      moduleNotFound: "I couldn't find any modules matching that.",
+      searchFailed: "Search failed. Please try again.",
+      redirectToTeacher: "Your AI teacher can help with that!",
+      loading: "Searching...",
+      typing: "Assistant is thinking...",
+      noHistory: "No conversation history",
+      greeting: "Hi! I can help you find the right module to learn from.",
+      greetingPrompt: "Try asking: 'Where can I learn about AI?'",
+    },
   },
 }
 

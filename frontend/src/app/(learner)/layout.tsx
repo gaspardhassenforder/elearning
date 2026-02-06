@@ -4,7 +4,8 @@ import { useAuthStore } from '@/lib/stores/auth-store'
 import { useRouter, usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
-import { ErrorBoundary } from '@/components/common/ErrorBoundary'
+import { LearnerErrorBoundaryWithRouter } from '@/components/learner/LearnerErrorBoundary'
+import { NavigationAssistant } from '@/components/learner/NavigationAssistant'
 
 /**
  * Learner Layout
@@ -79,11 +80,17 @@ export default function LearnerLayout({
     return null
   }
 
+  // Extract current notebook ID from pathname for context-aware navigation
+  // Pattern: /modules/{notebookId}
+  const currentNotebookId = pathname.match(/\/modules\/([^/]+)/)?.[1]
+
   return (
-    <ErrorBoundary>
+    <LearnerErrorBoundaryWithRouter>
       <div className="min-h-screen bg-background">
         {children}
+        {/* Story 6.1: Platform-wide navigation assistant */}
+        <NavigationAssistant currentNotebookId={currentNotebookId} />
       </div>
-    </ErrorBoundary>
+    </LearnerErrorBoundaryWithRouter>
   )
 }
