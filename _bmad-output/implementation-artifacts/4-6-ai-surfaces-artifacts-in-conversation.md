@@ -1,6 +1,6 @@
 # Story 4.6: AI Surfaces Artifacts in Conversation
 
-Status: in-progress
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -1108,8 +1108,8 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 - ✅ Podcast validation checks is_ready status before surfacing
 - ✅ Comprehensive test suite: 7 tests covering valid/invalid/company scoping cases
 - ✅ Added _load_available_artifacts function to graphs/prompt.py
-- ✅ Artifacts list injected into global teacher prompt context
-- ✅ Extended global_teacher_prompt.j2 with "Artifact Surfacing Guidance" section
+- ✅ Artifacts list injected into global teacher prompt context (assemble_system_prompt line 224)
+- ✅ Extended global_teacher_prompt.j2 with "Artifact Surfacing Guidance" section (line 353)
 - ✅ AI teacher now has context of available quizzes and podcasts with surfacing guidance
 
 **Tasks 3-6 Complete (Frontend):**
@@ -1126,6 +1126,14 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 - ✅ Tests cover: rendering, state management, API calls, user interactions, error handling
 - ✅ All acceptance criteria validated through unit/integration tests
 
+**Code Review Fixes Applied (2026-02-06):**
+- ✅ **HIGH**: Documented Story 5.1/4.7 contamination in File List (9 frontend files + api/models.py)
+- ✅ **HIGH**: Updated story Status to "done" to match sprint-status.yaml
+- ✅ **MEDIUM**: Replaced window.location.href with Next.js router.push() in InlineQuizWidget and InlineAudioPlayer
+- ✅ **MEDIUM**: Added audio metadata loading state with "Loading..." indicator in InlineAudioPlayer
+- ✅ **MEDIUM**: Wrapped InlineQuizWidget and InlineAudioPlayer with ErrorBoundary in ChatPanel
+- ✅ **MEDIUM**: Implemented playback speed persistence via localStorage (survives component unmount/remount)
+
 ### File List
 
 **Backend (Complete):**
@@ -1135,13 +1143,26 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 - `prompts/global_teacher_prompt.j2` - MODIFIED - Added Artifact Surfacing Guidance section (60 lines)
 - `tests/test_artifact_surfacing.py` - NEW - Comprehensive tool tests (235 lines, 7 tests passing)
 - `api/routers/quizzes.py` - MODIFIED - Added company scoping to GET /quizzes/{id} and POST /quizzes/{id}/check (40 lines)
-- `api/routers/podcasts.py` - MODIFIED - Added company-scoped endpoints for Podcast model artifacts (90 lines)
+- `api/routers/podcasts.py` - EXISTING - No changes for Story 4.6 (podcast endpoints already existed)
+- `api/models.py` - MODIFIED - **Story 5.1 contamination** (42 lines for sources content endpoint)
 
 **Frontend (Complete):**
 - `frontend/src/components/learner/InlineQuizWidget.tsx` - NEW - Interactive quiz widget (245 lines)
 - `frontend/src/components/learner/InlineAudioPlayer.tsx` - NEW - Audio player with controls (200 lines)
 - `frontend/src/components/learner/__tests__/InlineQuizWidget.test.tsx` - NEW - Quiz widget tests (430 lines, 17 tests passing)
 - `frontend/src/components/learner/__tests__/InlineAudioPlayer.test.tsx` - NEW - Audio player tests (375 lines, 25 tests passing)
-- `frontend/src/components/learner/ChatPanel.tsx` - MODIFIED - Registered custom message parts (20 lines)
+- `frontend/src/components/learner/ChatPanel.tsx` - MODIFIED - Registered custom message parts + async status bar (30 lines Story 4.6 + 20 lines Story 4.7)
 - `frontend/src/lib/locales/en-US/index.ts` - MODIFIED - Added quiz and podcast i18n keys (13 keys)
 - `frontend/src/lib/locales/fr-FR/index.ts` - MODIFIED - Added French translations (13 keys)
+
+**Frontend Files with Story 5.1 Contamination (DOCUMENTED):**
+- `frontend/src/app/(learner)/modules/[id]/page.tsx` - **Story 5.1 changes** (59 lines for document expand/collapse)
+- `frontend/src/components/learner/DocumentCard.tsx` - **Story 5.1 changes** (114 lines for expand state)
+- `frontend/src/components/learner/SourcesPanel.tsx` - **Story 5.1 changes** (19 lines for badge notifications)
+- `frontend/src/lib/api/sources.ts` - **Story 5.1 changes** (22 lines for content fetching)
+- `frontend/src/lib/api/query-client.ts` - **Story 5.1 changes** (2 lines for new query keys)
+- `frontend/src/lib/stores/learner-store.ts` - **Story 5.1 changes** (24 lines for expand state)
+- `frontend/src/lib/types/api.ts` - **Story 5.1 changes** (25 lines for source content types)
+- `frontend/src/lib/hooks/use-learner-chat.ts` - **Story 4.7 changes** (20 lines for async job detection)
+
+**Note on Contamination:** This story implementation occurred in parallel with Stories 5.1 and 4.7, resulting in intermingled changes. All Story 4.6 specific code (InlineQuizWidget, InlineAudioPlayer, surface tools) is isolated and functional. The contaminated files contain valid implementations for their respective stories but were not committed separately.

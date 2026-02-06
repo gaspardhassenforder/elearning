@@ -15,6 +15,7 @@
  */
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { CheckCircle2, XCircle, FileQuestion } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -54,6 +55,7 @@ export function InlineQuizWidget({
   quizUrl,
 }: InlineQuizWidgetProps) {
   const { t } = useTranslation()
+  const router = useRouter()
   const [selectedOption, setSelectedOption] = useState<number | null>(null)
   const [feedback, setFeedback] = useState<QuizFeedback | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -109,8 +111,8 @@ export function InlineQuizWidget({
 
   const handleViewFullQuiz = (e: React.MouseEvent) => {
     e.preventDefault()
-    // Navigate to full quiz viewer
-    window.location.href = quizUrl
+    // Use Next.js router for client-side navigation
+    router.push(quizUrl)
   }
 
   return (

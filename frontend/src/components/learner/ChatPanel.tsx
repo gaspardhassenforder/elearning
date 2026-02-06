@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { useLearnerChat, useChatHistory } from '@/lib/hooks/use-learner-chat'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { ErrorBoundary } from '@/components/common/ErrorBoundary'
 import { DocumentSnippetCard } from './DocumentSnippetCard'
 import { ModuleSuggestionCard } from './ModuleSuggestionCard'
 import { InlineQuizWidget } from './InlineQuizWidget'
@@ -265,30 +266,42 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
                           {message.toolCalls
                             .filter((tc) => tc.toolName === 'surface_quiz' && tc.result && !tc.result.error)
                             .map((tc, tcIndex) => (
-                              <InlineQuizWidget
-                                key={`quiz-${index}-${tcIndex}`}
-                                quizId={tc.result!.quiz_id}
-                                title={tc.result!.title}
-                                description={tc.result!.description}
-                                questions={tc.result!.questions || []}
-                                totalQuestions={tc.result!.total_questions || 0}
-                                quizUrl={tc.result!.quiz_url}
-                              />
+                              <ErrorBoundary key={`quiz-boundary-${index}-${tcIndex}`} fallback={
+                                <div className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded px-3 py-2">
+                                  Failed to load quiz. Please try again later.
+                                </div>
+                              }>
+                                <InlineQuizWidget
+                                  key={`quiz-${index}-${tcIndex}`}
+                                  quizId={tc.result!.quiz_id}
+                                  title={tc.result!.title}
+                                  description={tc.result!.description}
+                                  questions={tc.result!.questions || []}
+                                  totalQuestions={tc.result!.total_questions || 0}
+                                  quizUrl={tc.result!.quiz_url}
+                                />
+                              </ErrorBoundary>
                             ))}
 
                           {/* Story 4.6: Inline podcast players */}
                           {message.toolCalls
                             .filter((tc) => tc.toolName === 'surface_podcast' && tc.result && !tc.result.error)
                             .map((tc, tcIndex) => (
-                              <InlineAudioPlayer
-                                key={`podcast-${index}-${tcIndex}`}
-                                podcastId={tc.result!.podcast_id}
-                                title={tc.result!.title}
-                                audioUrl={tc.result!.audio_url}
-                                durationMinutes={tc.result!.duration_minutes}
-                                transcriptUrl={tc.result!.transcript_url}
-                                status={tc.result!.status}
-                              />
+                              <ErrorBoundary key={`podcast-boundary-${index}-${tcIndex}`} fallback={
+                                <div className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded px-3 py-2">
+                                  Failed to load podcast player. Please try again later.
+                                </div>
+                              }>
+                                <InlineAudioPlayer
+                                  key={`podcast-${index}-${tcIndex}`}
+                                  podcastId={tc.result!.podcast_id}
+                                  title={tc.result!.title}
+                                  audioUrl={tc.result!.audio_url}
+                                  durationMinutes={tc.result!.duration_minutes}
+                                  transcriptUrl={tc.result!.transcript_url}
+                                  status={tc.result!.status}
+                                />
+                              </ErrorBoundary>
                             ))}
 
                           {/* Story 4.5: Module suggestions on completion */}

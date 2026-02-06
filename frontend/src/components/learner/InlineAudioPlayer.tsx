@@ -15,6 +15,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Play, Pause, Headphones } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -40,21 +41,36 @@ export function InlineAudioPlayer({
   status,
 }: InlineAudioPlayerProps) {
   const { t } = useTranslation()
+  const router = useRouter()
   const audioRef = useRef<HTMLAudioElement>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
-  const [playbackSpeed, setPlaybackSpeed] = useState(1)
+  const [playbackSpeed, setPlaybackSpeed] = useState(() => {
+    // Restore playback speed from localStorage
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('podcast-playback-speed')
+      return saved ? parseFloat(saved) : 1
+    }
+    return 1
+  })
+  const [isLoadingMetadata, setIsLoadingMetadata] = useState(true)
 
   const isReady = status === 'completed'
 
-  // Update progress
+  // Update progress and handle metadata loading
   useEffect(() => {
     const audio = audioRef.current
     if (!audio) return
 
+    // Apply saved playback speed on mount
+    audio.playbackRate = playbackSpeed
+
     const updateTime = () => setCurrentTime(audio.currentTime)
-    const updateDuration = () => setDuration(audio.duration)
+    const updateDuration = () => {
+      setDuration(audio.duration)
+      setIsLoadingMetadata(false)
+    }
     const handleEnded = () => setIsPlaying(false)
 
     audio.addEventListener('timeupdate', updateTime)
@@ -66,7 +82,7 @@ export function InlineAudioPlayer({
       audio.removeEventListener('loadedmetadata', updateDuration)
       audio.removeEventListener('ended', handleEnded)
     }
-  }, [])
+  }, [playbackSpeed])
 
   const handlePlayPause = () => {
     const audio = audioRef.current
@@ -87,12 +103,17 @@ export function InlineAudioPlayer({
 
     audio.playbackRate = speed
     setPlaybackSpeed(speed)
+    // Persist speed preference to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('podcast-playback-speed', speed.toString())
+    }
   }
 
   const handleViewTranscript = (e: React.MouseEvent) => {
     e.preventDefault()
     if (transcriptUrl) {
-      window.location.href = transcriptUrl
+      // Use Next.js router for client-side navigation
+      router.push(transcriptUrl)
     }
   }
 
@@ -168,7 +189,11 @@ export function InlineAudioPlayer({
 
             {/* Time display */}
             <span className="text-xs text-muted-foreground">
-              {formatTime(currentTime)} / {formatTime(duration || durationMinutes * 60)}
+              {isLoadingMetadata ? (
+                <span className="animate-pulse">Loading...</span>
+              ) : (
+                `${formatTime(currentTime)} / ${formatTime(duration || durationMinutes * 60)}`
+              )}
             </span>
           </div>
 
