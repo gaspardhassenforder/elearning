@@ -2,6 +2,7 @@
 
 /**
  * Story 4.1: Learner Chat Interface & SSE Streaming
+ * Story 5.1: Collapsible Sources Panel with Badge Notifications
  *
  * Two-panel layout for learner module conversation:
  * - Left panel (1/3): Sources with tabs (Sources, Artifacts, Progress)
@@ -12,21 +13,29 @@
  * - Company-scoped access control
  * - SSE streaming with token-by-token rendering
  * - Proactive AI teacher greeting
+ * - Story 5.1: Collapsible sources panel with badge notifications
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from 'react-resizable-panels'
-import { ArrowLeft, BookOpen } from 'lucide-react'
+import {
+  PanelGroup as ResizablePanelGroup,
+  Panel as ResizablePanel,
+  PanelResizeHandle as ResizableHandle,
+  type ImperativePanelHandle
+} from 'react-resizable-panels'
+import { ArrowLeft, BookOpen, GripVertical } from 'lucide-react'
 import { AxiosError } from 'axios'
 import { Button } from '@/components/ui/button'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { useToast } from '@/lib/hooks/use-toast'
 import { useLearnerModule } from '@/lib/hooks/use-learner-modules'
+import { useLearnerStore } from '@/lib/stores/learner-store'
 import { SourcesPanel } from '@/components/learner/SourcesPanel'
 import { ChatPanel } from '@/components/learner/ChatPanel'
 import { AmbientProgressBar } from '@/components/learner/AmbientProgressBar'
+import { CollapsedPanelIndicator } from '@/components/learner/CollapsedPanelIndicator'
 
 export default function ModuleConversationPage() {
   const { t } = useTranslation()
@@ -54,6 +63,30 @@ export default function ModuleConversationPage() {
   }
 
   const [panelSizes] = useState(getStoredPanelSizes)
+
+  // Story 5.1: Panel ref for imperative collapse/expand
+  const sourcesPanelRef = useRef<ImperativePanelHandle>(null)
+
+  // Story 5.1: Track collapsed state from store
+  const sourcesPanelExpanded = useLearnerStore((state) => state.sourcesPanelExpanded)
+  const setSourcesPanelExpanded = useLearnerStore((state) => state.setSourcesPanelExpanded)
+
+  // Story 5.1: Handle collapse callback from resize
+  const handlePanelCollapse = useCallback(() => {
+    setSourcesPanelExpanded(false)
+  }, [setSourcesPanelExpanded])
+
+  // Story 5.1: Handle expand callback from resize
+  const handlePanelExpand = useCallback(() => {
+    setSourcesPanelExpanded(true)
+    useLearnerStore.getState().clearBadgeCount()
+  }, [setSourcesPanelExpanded])
+
+  // Story 5.1: Handle expand from collapsed indicator click
+  const handleExpandFromIndicator = useCallback(() => {
+    sourcesPanelRef.current?.expand()
+    setSourcesPanelExpanded(true)
+  }, [setSourcesPanelExpanded])
 
   // Validate learner access to this module
   const { data: module, error: accessError, isLoading: accessLoading } = useLearnerModule(moduleId)
@@ -147,17 +180,29 @@ export default function ModuleConversationPage() {
           }}
         >
           {/* Left Panel: Sources (1/3 default, restored from localStorage) */}
+          {/* Story 5.1: Collapsible panel with badge indicator when collapsed */}
           <ResizablePanel
+            ref={sourcesPanelRef}
             defaultSize={panelSizes[0]}
-            minSize={20}
+            minSize={15}
             maxSize={50}
-            className="p-4"
+            collapsible={true}
+            collapsedSize={0}
+            onCollapse={handlePanelCollapse}
+            onExpand={handlePanelExpand}
+            className={sourcesPanelExpanded ? 'p-4' : ''}
           >
-            <SourcesPanel notebookId={moduleId} />
+            {sourcesPanelExpanded ? (
+              <SourcesPanel notebookId={moduleId} />
+            ) : (
+              <CollapsedPanelIndicator onExpand={handleExpandFromIndicator} />
+            )}
           </ResizablePanel>
 
           {/* Resizable Divider */}
-          <ResizableHandle withHandle className="bg-border hover:bg-primary/20 transition-colors" />
+          <ResizableHandle className="w-2 bg-border hover:bg-primary/20 transition-colors flex items-center justify-center">
+            <GripVertical className="h-4 w-4 text-muted-foreground" />
+          </ResizableHandle>
 
           {/* Right Panel: Chat (2/3 default, restored from localStorage) */}
           <ResizablePanel

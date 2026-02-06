@@ -15,12 +15,13 @@ from fastapi.responses import FileResponse, Response
 from loguru import logger
 from surreal_commands import execute_command_sync
 
-from api.auth import get_current_user, require_admin
+from api.auth import get_current_user, get_current_learner, LearnerContext, require_admin
 from open_notebook.domain.user import User
 from api.command_service import CommandService
 from api.models import (
     AssetModel,
     CreateSourceInsightRequest,
+    SourceContentResponse,
     SourceCreate,
     SourceInsightResponse,
     SourceListResponse,
@@ -1000,3 +1001,136 @@ async def create_source_insight(source_id: str, request: CreateSourceInsightRequ
     except Exception as e:
         logger.error(f"Error creating insight for source {source_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error creating insight: {str(e)}")
+
+
+# ==============================================================================
+# Story 5.1: Learner Source Content Endpoint
+# ==============================================================================
+
+
+async def validate_learner_access_to_source(
+    source_id: str, learner_context: LearnerContext
+) -> Source:
+    """Validate learner has access to a source via their company's module assignment.
+
+    Story 5.1: Company-scoped access control for source content.
+
+    Validates:
+    1. Source exists
+    2. Source belongs to at least one notebook assigned to learner's company
+    3. That notebook is published and not locked
+
+    Args:
+        source_id: Source record ID
+        learner_context: Authenticated learner context with company_id
+
+    Returns:
+        Source instance if access is granted
+
+    Raises:
+        HTTPException 403: Access denied (not assigned, locked, or unpublished)
+    """
+    # Single query to validate source access through notebook assignment
+    # Checks: source exists, linked to notebook, notebook assigned to company,
+    #         notebook is published, assignment is not locked
+    result = await repo_query(
+        """
+        SELECT source.*, notebook.id AS notebook_id, notebook.published, assignment.is_locked
+        FROM source
+        JOIN reference ON reference.in = source.id
+        JOIN notebook ON notebook.id = reference.out
+        JOIN module_assignment AS assignment ON assignment.notebook_id = notebook.id
+        WHERE source.id = $source_id
+        AND assignment.company_id = $company_id
+        AND notebook.published = true
+        AND assignment.is_locked = false
+        LIMIT 1
+        """,
+        {"source_id": ensure_record_id(source_id), "company_id": learner_context.company_id},
+    )
+
+    if not result:
+        # Either source doesn't exist OR not accessible to this company
+        # Use consistent 403 to avoid leaking existence info
+        logger.warning(
+            f"Learner {learner_context.user.id} attempted to access non-existent or unauthorized source {source_id}"
+        )
+        raise HTTPException(
+            status_code=403, detail="You do not have access to this document"
+        )
+
+    # Load full source object
+    source = await Source.get(source_id)
+    if not source:
+        raise HTTPException(
+            status_code=403, detail="You do not have access to this document"
+        )
+
+    logger.info(
+        f"Learner {learner_context.user.id} validated access to source {source_id}"
+    )
+    return source
+
+
+@router.get("/sources/{source_id}/content", response_model=SourceContentResponse)
+async def get_source_content(
+    source_id: str,
+    learner: LearnerContext = Depends(get_current_learner),
+) -> SourceContentResponse:
+    """Get full document content for a source.
+
+    Story 5.1: Sources Panel with Document Browsing.
+
+    Returns the complete extracted text content for a source document.
+    Used by the DocumentCard component when a learner expands a document
+    in the Sources panel.
+
+    Company scoping: Validates source belongs to a notebook assigned to
+    the learner's company, is published, and is not locked.
+
+    Args:
+        source_id: Source record ID (e.g., "source:abc123")
+        learner: Authenticated learner context (injected via dependency)
+
+    Returns:
+        SourceContentResponse with full document content and metadata
+
+    Raises:
+        HTTPException 403: Source not accessible (not assigned, locked, unpublished)
+    """
+    try:
+        # Validate learner access to this source via company assignment
+        source = await validate_learner_access_to_source(source_id, learner)
+
+        # Extract content - may be None for sources still processing
+        content = source.full_text or ""
+
+        # Calculate word and character counts
+        word_count = len(content.split()) if content else 0
+        character_count = len(content) if content else 0
+
+        # Determine file type from asset if available
+        file_type = None
+        if source.asset:
+            if source.asset.file_path:
+                # Extract extension from file path
+                file_type = Path(source.asset.file_path).suffix.lstrip(".").upper()
+            elif source.asset.url:
+                file_type = "URL"
+
+        return SourceContentResponse(
+            id=source.id or source_id,
+            title=source.title,
+            content=content,
+            file_type=file_type,
+            word_count=word_count,
+            character_count=character_count,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching content for source {source_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail="Error fetching document content"
+        )

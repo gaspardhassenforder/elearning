@@ -1,13 +1,14 @@
 import type { AxiosResponse } from 'axios'
 
 import apiClient from './client'
-import { 
-  SourceListResponse, 
-  SourceDetailResponse, 
+import {
+  SourceListResponse,
+  SourceDetailResponse,
   SourceResponse,
   SourceStatusResponse,
-  CreateSourceRequest, 
-  UpdateSourceRequest 
+  SourceContentResponse,
+  CreateSourceRequest,
+  UpdateSourceRequest
 } from '@/lib/types/api'
 
 export const sourcesApi = {
@@ -104,5 +105,16 @@ export const sourcesApi = {
     return apiClient.get(`/sources/${id}/download`, {
       responseType: 'blob',
     })
+  },
+
+  /**
+   * Story 5.1: Get full document content for a source
+   *
+   * Returns the complete extracted text content for learner document browsing.
+   * Used by DocumentCard expand functionality.
+   */
+  getContent: async (id: string): Promise<SourceContentResponse> => {
+    const response = await apiClient.get<SourceContentResponse>(`/sources/${id}/content`)
+    return response.data
   },
 }

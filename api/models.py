@@ -766,6 +766,18 @@ class RegenerateArtifactResponse(BaseModel):
     )
 
 
+# Async artifact generation models (Story 4.7)
+class ArtifactGenerationResult(BaseModel):
+    """Result from generate_artifact tool."""
+
+    job_id: str = Field(..., description="Command job ID (command:xyz format)")
+    artifact_ids: List[str] = Field(..., description="List of artifact tracker IDs created")
+    artifact_type: str = Field(..., description="Type of artifact (podcast, quiz, etc.)")
+    status: str = Field(..., description="Job status (submitted, completed, error)")
+    message: str = Field(..., description="User-friendly acknowledgment message")
+    topic: Optional[str] = Field(None, description="Topic or title of the artifact")
+
+
 # Learning Objectives API models (Story 3.3)
 class LearningObjectiveCreate(BaseModel):
     """Create a new learning objective."""
@@ -898,6 +910,22 @@ class SuggestedModule(BaseModel):
     description: str = ""
 
 
+# ==============================================================================
+# Story 5.1: Sources Panel with Document Browsing
+# ==============================================================================
+
+
+class SourceContentResponse(BaseModel):
+    """Full document content response for learner document browsing."""
+
+    id: str
+    title: Optional[str] = None
+    content: str  # Full extracted text
+    file_type: Optional[str] = None
+    word_count: int
+    character_count: int
+
+
 class ObjectiveCheckOffResult(BaseModel):
     """Result of check_off_objective tool invocation."""
 
@@ -911,3 +939,17 @@ class ObjectiveCheckOffResult(BaseModel):
         default_factory=list,
         description="Suggested next modules when all objectives complete (Story 4.5)"
     )
+
+
+# ==============================================================================
+# Story 5.2: Artifacts Browsing in Side Panel
+# ==============================================================================
+
+
+class ArtifactListResponse(BaseModel):
+    """Artifact item for learner artifact list (Story 5.2)."""
+
+    id: str
+    artifact_type: Literal["quiz", "podcast", "summary", "transformation"]
+    title: str
+    created: str  # ISO timestamp

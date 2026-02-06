@@ -55,6 +55,16 @@ export interface SourceStatusResponse {
   command_id?: string
 }
 
+// Story 5.1: Source content response for document browsing
+export interface SourceContentResponse {
+  id: string
+  title: string | null
+  content: string
+  file_type: string | null
+  word_count: number
+  character_count: number
+}
+
 export interface SettingsResponse {
   default_content_processing_engine_doc?: string
   default_content_processing_engine_url?: string
@@ -436,4 +446,19 @@ export interface ObjectiveCheckOffResult {
   total_objectives: number
   all_complete: boolean
   suggested_modules: SuggestedModule[]
+}
+
+// Story 4.7: Async Job Status (Commands API)
+export interface CommandJobStatusResponse {
+  job_id: string
+  status: 'pending' | 'processing' | 'completed' | 'error'
+  result?: Record<string, any> | null
+  error_message?: string | null
+  created?: string | null
+  updated?: string | null
+  progress?: {
+    current?: number
+    total?: number
+    percentage?: number
+  } | null
 }

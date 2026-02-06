@@ -2,6 +2,7 @@
  * Story 4.1: Learner Store
  * Story 4.3: Document Snippet Scroll State
  * Story 4.7: Async Job Tracking
+ * Story 5.1: Document Expansion and Badge Notifications
  *
  * Zustand store for learner UI state (NOT server data).
  * Handles:
@@ -10,6 +11,7 @@
  * - UI preferences
  * - Sources panel expansion and scroll targets (Story 4.3)
  * - Active async job tracking (Story 4.7)
+ * - Document expansion (accordion behavior) and badge notifications (Story 5.1)
  *
  * Note: Server data (modules, chat messages) uses TanStack Query, not Zustand.
  */
@@ -40,6 +42,10 @@ interface LearnerState {
   // Story 4.7: Active async job tracking
   activeJob: ActiveJob | null
 
+  // Story 5.1: Document expansion and badge notifications
+  expandedSourceId: string | null // Currently expanded document (accordion behavior)
+  pendingBadgeCount: number // Badge count when panel is collapsed
+
   // Actions
   setPanelSizes: (notebookId: string, sizes: number[]) => void
   getPanelSizes: (notebookId: string) => number[] | undefined
@@ -54,6 +60,11 @@ interface LearnerState {
   // Story 4.7: Async job actions
   setActiveJob: (job: ActiveJob | null) => void
   clearActiveJob: () => void
+
+  // Story 5.1: Document expansion and badge actions
+  setExpandedSourceId: (sourceId: string | null) => void
+  incrementBadgeCount: () => void
+  clearBadgeCount: () => void
 }
 
 export const useLearnerStore = create<LearnerState>()(
@@ -66,6 +77,9 @@ export const useLearnerStore = create<LearnerState>()(
       panelManuallyCollapsed: false,
       // Story 4.7: No active job by default
       activeJob: null,
+      // Story 5.1: Document expansion and badge defaults
+      expandedSourceId: null,
+      pendingBadgeCount: 0,
 
       setPanelSizes: (notebookId, sizes) =>
         set((state) => ({
@@ -98,9 +112,9 @@ export const useLearnerStore = create<LearnerState>()(
       expandAndScrollToSource: (sourceId) => {
         const state = get()
 
-        // If panel collapsed, expand it first
+        // If panel collapsed, expand it first and clear badge
         if (!state.sourcesPanelExpanded) {
-          set({ sourcesPanelExpanded: true })
+          set({ sourcesPanelExpanded: true, pendingBadgeCount: 0 })
         }
 
         // Set scroll target
@@ -110,6 +124,12 @@ export const useLearnerStore = create<LearnerState>()(
       // Story 4.7: Async job actions
       setActiveJob: (job) => set({ activeJob: job }),
       clearActiveJob: () => set({ activeJob: null }),
+
+      // Story 5.1: Document expansion and badge actions
+      setExpandedSourceId: (sourceId) => set({ expandedSourceId: sourceId }),
+      incrementBadgeCount: () =>
+        set((state) => ({ pendingBadgeCount: state.pendingBadgeCount + 1 })),
+      clearBadgeCount: () => set({ pendingBadgeCount: 0 }),
     }),
     {
       name: 'learner-ui-storage',

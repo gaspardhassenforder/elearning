@@ -1167,7 +1167,7 @@ export const frFR = {
     documentCompleted: "Terminé",
     documentError: "Erreur",
     retryUpload: "Réessayer",
-    removeDocument: "Retirer",
+    removeUploadedDocument: "Retirer",
     noDocuments: "Aucun document",
     addDocuments: "Ajouter des documents à ce module",
     nextStep: "Suivant",
@@ -1336,6 +1336,19 @@ export const frFR = {
       processing: "Traitement",
       error: "Erreur",
       ready: "Prêt",
+      // Story 5.1: Développer/réduire les documents
+      expandDocument: "Développer le document",
+      collapseDocument: "Réduire le document",
+      loadingContent: "Chargement du contenu...",
+      contentError: "Échec du chargement du contenu",
+      retry: "Réessayer",
+      words: "mots",
+      noContent: "Aucun contenu disponible",
+    },
+    // Story 5.1: Réduction du panneau
+    panel: {
+      collapsed: "Afficher les sources",
+      newDocuments: "{count} nouveaux documents référencés",
     },
     tabs: {
       sources: "Sources",
@@ -1345,6 +1358,21 @@ export const frFR = {
     artifacts: {
       comingSoon: "Artefacts à venir",
       comingSoonDesc: "Les quiz et podcasts seront bientôt disponibles ici.",
+      // Story 5.2: Navigation des artefacts
+      title: "Artefacts",
+      description: "{count} artefacts disponibles",
+      noArtifacts: "Aucun artefact pour le moment",
+      noArtifactsDesc: "Votre professeur IA pourra générer des quiz et des résumés au fil de votre apprentissage.",
+      quiz: "Quiz",
+      podcast: "Podcast",
+      summary: "Résumé",
+      transformation: "Transformation",
+      loadingPreview: "Chargement de l'aperçu...",
+      previewError: "Échec du chargement de l'aperçu",
+      retry: "Réessayer",
+      expand: "Développer",
+      collapse: "Réduire",
+      createdAt: "Créé {time}",
     },
     progress: {
       comingSoon: "Suivi des progrès à venir",

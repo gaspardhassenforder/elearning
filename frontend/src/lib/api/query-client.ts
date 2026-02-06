@@ -44,4 +44,9 @@ export const QUERY_KEYS = {
   learnerModule: (notebookId: string) => ['learner-modules', notebookId] as const,
   // Story 4.4: Learner objectives progress
   learnerObjectivesProgress: (notebookId: string) => ['learning-objectives', 'progress', notebookId] as const,
+  // Story 5.1: Source content for document browsing
+  sourceContent: (sourceId: string) => ['sources', sourceId, 'content'] as const,
+  // Story 5.2: Learner artifacts browsing
+  learnerArtifacts: (notebookId: string) => ['learner-artifacts', notebookId] as const,
+  learnerArtifactPreview: (artifactId: string) => ['learner-artifacts', 'preview', artifactId] as const,
 }
