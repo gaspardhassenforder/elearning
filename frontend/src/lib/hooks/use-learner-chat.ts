@@ -42,12 +42,16 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
   const [lastObjectiveChecked, setLastObjectiveChecked] = useState<ObjectiveCheckedData | null>(null)
 
   // Story 4.3: Access scroll actions from store
-  const { scrollToSourceId: setScrollToSourceId, panelManuallyCollapsed } = useLearnerStore(
-    (state) => ({
-      scrollToSourceId: state.setScrollToSourceId,
-      panelManuallyCollapsed: state.panelManuallyCollapsed,
-    })
-  )
+  // Story 4.7: Access job tracking actions from store
+  const {
+    setScrollToSourceId,
+    panelManuallyCollapsed,
+    setActiveJob,
+  } = useLearnerStore((state) => ({
+    setScrollToSourceId: state.setScrollToSourceId,
+    panelManuallyCollapsed: state.panelManuallyCollapsed,
+    setActiveJob: state.setActiveJob,
+  }))
 
   // For now, we don't persist chat history (Story 4.8 will add this)
   // This query is a placeholder for future chat history loading
@@ -126,6 +130,20 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
             const toolCall = toolCallsMap.get(event.toolResult.id)
             if (toolCall) {
               toolCall.result = event.toolResult.result
+
+              // Story 4.7: Detect async artifact generation (tool result with job_id)
+              if (
+                toolCall.toolName === 'generate_artifact' &&
+                event.toolResult.result?.job_id &&
+                event.toolResult.result?.artifact_type
+              ) {
+                // Store active job in learner store to trigger AsyncStatusBar
+                setActiveJob({
+                  jobId: event.toolResult.result.job_id,
+                  artifactType: event.toolResult.result.artifact_type,
+                  notebookId,
+                })
+              }
             }
           } else if (event.type === 'objective_checked' && event.objectiveChecked) {
             // Story 4.4: Objective was checked off - update progress
@@ -296,4 +314,25 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
     greetingRequested,
     lastObjectiveChecked,  // Story 4.4: Expose for inline confirmation
   }
+}
+
+/**
+ * Hook for loading chat history
+ *
+ * Story 4.8: Loads previous conversation messages for persistent chat.
+ * Used to initialize Thread component with historical messages on page load.
+ *
+ * @param notebookId - Notebook/module ID
+ * @returns Query result with chat history
+ */
+export function useChatHistory(notebookId: string) {
+  return useQuery({
+    queryKey: ['learner-chat-history', notebookId],
+    queryFn: async () => {
+      const { getChatHistory } = await import('../api/learner-chat')
+      return getChatHistory(notebookId)
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes - history doesn't change frequently
+    retry: 1, // Retry once on failure
+  })
 }

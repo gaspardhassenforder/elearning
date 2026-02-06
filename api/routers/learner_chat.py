@@ -32,6 +32,24 @@ router = APIRouter()
 # ============================================================================
 
 
+class ChatHistoryMessage(BaseModel):
+    """Single message in chat history."""
+
+    id: str = Field(..., description="Message ID")
+    role: str = Field(..., description="Message role: 'assistant' or 'user'")
+    content: str = Field(..., description="Message content")
+    createdAt: str = Field(..., description="ISO 8601 timestamp")
+
+
+class ChatHistoryResponse(BaseModel):
+    """Response model for chat history endpoint."""
+
+    messages: list[ChatHistoryMessage] = Field(..., description="List of historical messages")
+    thread_id: str = Field(..., description="Thread ID for this conversation")
+    has_more: bool = Field(default=False, description="Whether more messages available (pagination)")
+
+
+
 class LearnerChatRequest(BaseModel):
     """Request body for learner chat message."""
 
@@ -79,6 +97,151 @@ class SSEObjectiveCheckedEvent(BaseModel):
     total_completed: int
     total_objectives: int
     all_complete: bool
+
+
+# ============================================================================
+# Chat History Endpoint (Story 4.8)
+# ============================================================================
+
+
+@router.get("/chat/learner/{notebook_id}/history", response_model=ChatHistoryResponse)
+async def get_chat_history(
+    notebook_id: str,
+    learner: LearnerContext = Depends(get_current_learner),
+) -> ChatHistoryResponse:
+    """Load chat history for learner's conversation in this module.
+
+    Story 4.8: Persistent chat history endpoint.
+    Returns all previous messages from the thread checkpoint for this
+    user/notebook combination. Used by frontend to initialize Thread component
+    with historical messages on page load.
+
+    Args:
+        notebook_id: Notebook/module record ID
+        learner: Authenticated learner context (auto-injected)
+
+    Returns:
+        ChatHistoryResponse with messages array and thread ID
+
+    Raises:
+        HTTPException 403: Learner does not have access to notebook
+        HTTPException 404: Notebook not found
+    """
+    logger.info(
+        f"Loading chat history for user {learner.user.id} in notebook {notebook_id}"
+    )
+
+    try:
+        # 1. Validate learner has access to this notebook
+        await validate_learner_access_to_notebook(
+            notebook_id=notebook_id, learner_context=learner
+        )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions (403/404) from validation
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error validating learner access to notebook {notebook_id}: {e}"
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to validate notebook access"
+        )
+
+    # 2. Construct thread ID (same pattern as chat endpoint)
+    thread_id = f"user:{learner.user.id}:notebook:{notebook_id}"
+    logger.debug(f"Loading history for thread_id: {thread_id}")
+
+    # 3. Load checkpoint from SqliteSaver
+    try:
+        checkpoint_config = {"configurable": {"thread_id": thread_id}}
+        checkpoint_tuple = chat_memory.get(checkpoint_config)
+
+        if not checkpoint_tuple:
+            logger.info(f"No history found for thread {thread_id} (first visit)")
+            return ChatHistoryResponse(
+                messages=[],
+                thread_id=thread_id,
+                has_more=False
+            )
+
+        # Extract messages from checkpoint (handle dict structure from SqliteSaver)
+        messages = []
+        if isinstance(checkpoint_tuple, dict):
+            # SqliteSaver returns dict
+            if "channel_values" in checkpoint_tuple and "messages" in checkpoint_tuple["channel_values"]:
+                messages = checkpoint_tuple["channel_values"]["messages"]
+            elif "messages" in checkpoint_tuple:
+                messages = checkpoint_tuple["messages"]
+        elif hasattr(checkpoint_tuple, "checkpoint"):
+            # CheckpointTuple object
+            checkpoint_data = checkpoint_tuple.checkpoint
+            if isinstance(checkpoint_data, dict) and "channel_values" in checkpoint_data:
+                messages = checkpoint_data["channel_values"].get("messages", [])
+
+        if not messages:
+            logger.info(f"Empty message history for thread {thread_id}")
+            return ChatHistoryResponse(
+                messages=[],
+                thread_id=thread_id,
+                has_more=False
+            )
+
+        # 4. Transform messages to frontend format (assistant-ui compatible)
+        import uuid
+        from datetime import datetime
+
+        formatted_messages = []
+        for msg in messages:
+            # Determine role
+            from langchain_core.messages import AIMessage
+
+            role = "assistant" if isinstance(msg, AIMessage) else "user"
+
+            # Extract content (handle structured content)
+            content = msg.content
+            if isinstance(content, list):
+                # Structured content: extract text from blocks
+                text_parts = []
+                for item in content:
+                    if isinstance(item, dict) and "text" in item:
+                        text_parts.append(item["text"])
+                content = "\n".join(text_parts) if text_parts else str(content)
+            elif not isinstance(content, str):
+                content = str(content)
+
+            # Create message ID if not present
+            message_id = getattr(msg, "id", None) or str(uuid.uuid4())
+
+            # Extract timestamp
+            created_at = getattr(msg, "additional_kwargs", {}).get(
+                "timestamp", datetime.now().isoformat()
+            )
+            if not isinstance(created_at, str):
+                created_at = datetime.now().isoformat()
+
+            formatted_messages.append(
+                ChatHistoryMessage(
+                    id=message_id,
+                    role=role,
+                    content=content,
+                    createdAt=created_at,
+                )
+            )
+
+        logger.info(f"Loaded {len(formatted_messages)} messages for thread {thread_id}")
+
+        return ChatHistoryResponse(
+            messages=formatted_messages,
+            thread_id=thread_id,
+            has_more=False  # TODO: Implement pagination in Task 9
+        )
+
+    except Exception as e:
+        logger.error(f"Error loading chat history for thread {thread_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail="Failed to load chat history"
+        )
 
 
 # ============================================================================

@@ -82,6 +82,20 @@ export interface ObjectiveCheckedData {
   all_complete: boolean
 }
 
+// Story 4.8: Chat history response types
+export interface ChatHistoryMessage {
+  id: string
+  role: 'assistant' | 'user'
+  content: string
+  createdAt: string  // ISO 8601 timestamp
+}
+
+export interface ChatHistoryResponse {
+  messages: ChatHistoryMessage[]
+  thread_id: string
+  has_more: boolean
+}
+
 // Story 4.3: Extended stream event for tracking tool calls
 // Story 4.4: Added objective_checked event type
 export interface StreamEvent {
@@ -201,4 +215,22 @@ export async function* parseLearnerChatStream(
   } finally {
     reader.releaseLock()
   }
+}
+
+/**
+ * Get chat history for a notebook
+ *
+ * Story 4.8: Load previous conversation history for persistent chat.
+ * Returns all messages from the learner's conversation thread with this module.
+ *
+ * @param notebookId - Notebook/module ID
+ * @returns Chat history response with messages array
+ */
+export async function getChatHistory(
+  notebookId: string
+): Promise<ChatHistoryResponse> {
+  const response = await apiClient.get<ChatHistoryResponse>(
+    `/chat/learner/${notebookId}/history`
+  )
+  return response.data
 }
