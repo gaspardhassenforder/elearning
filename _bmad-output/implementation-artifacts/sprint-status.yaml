@@ -75,7 +75,7 @@ development_status:
   4-5-adaptive-teaching-and-fast-track-for-advanced-learners: done  # Code review complete: 14 issues found (8 HIGH + 4 MEDIUM + 2 LOW), all HIGH issues fixed (API model extension, type safety, test coverage, frontend tests). Adaptive teaching via prompt engineering, multiple objective check-offs, module suggestions, 10 backend + 5 frontend tests passing.
   4-6-ai-surfaces-artifacts-in-conversation: in-progress  # Comprehensive story created: InlineQuizWidget (interactive quiz preview), InlineAudioPlayer (audio playback controls), surface_quiz/surface_podcast LangGraph tools, artifact context in prompts, company-scoped artifact endpoints
   4-7-async-task-handling-in-chat: in-progress
-  4-8-persistent-chat-history: ready-for-dev  # Comprehensive story created: Thread isolation, history loading, re-engagement message generation, assistant-ui integration, 22+ tests
+  4-8-persistent-chat-history: in-progress  # Implementation started: Thread isolation, history loading, re-engagement message generation, assistant-ui integration, 22+ tests
   epic-4-retrospective: optional
 
   # Epic 5: Content Browsing & Learning Progress

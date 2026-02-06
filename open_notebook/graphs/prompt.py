@@ -320,3 +320,270 @@ Avoid technical AI terminology unless explaining it.
 {% endif %}
 ```
 """
+
+
+# ==============================================================================
+# Story 4.8: Persistent Chat History & Re-engagement Messages
+# ==============================================================================
+
+
+async def generate_re_engagement_greeting(
+    thread_id: str,
+    learner_profile: dict,
+    objectives_with_status: list[dict],
+    notebook_id: str,
+) -> str:
+    """Generate contextual welcome-back message for returning learners.
+
+    Story 4.8: Re-engagement message generation.
+    Analyzes recent conversation history from checkpoint to generate a personalized
+    greeting that references previous topics discussed and learning progress.
+
+    Args:
+        thread_id: Thread ID for checkpoint lookup
+        learner_profile: Dict with 'name', 'role', 'job_description' (optional)
+        objectives_with_status: List of dicts with 'text' and 'status' for progress context
+        notebook_id: Notebook/module record ID for context
+
+    Returns:
+        Contextual greeting string (under 3 sentences)
+
+    Example Output:
+        "Welcome back! Last time we were discussing AI applications in project management,
+        and you had great insights on automation. Ready to continue, or would you like
+        to explore a different application?"
+    """
+    logger.info(f"Generating re-engagement greeting for thread {thread_id}")
+
+    # Import chat_memory here to avoid circular dependency
+    from open_notebook.graphs.chat import memory as chat_memory
+
+    # Load checkpoint history
+    try:
+        config = {"configurable": {"thread_id": thread_id}}
+        checkpoint_tuple = chat_memory.get(config)
+
+        if not checkpoint_tuple:
+            logger.warning(f"No checkpoint found for thread {thread_id}, falling back to standard greeting")
+            # Fallback to standard greeting from Story 4.2
+            return await generate_proactive_greeting(
+                notebook_id=notebook_id,
+                learner_profile=learner_profile,
+                objectives_with_status=objectives_with_status
+            )
+
+        # Extract messages from checkpoint
+        # SqliteSaver returns dict, not CheckpointTuple class
+        if isinstance(checkpoint_tuple, dict):
+            checkpoint_data = checkpoint_tuple
+            if "channel_values" in checkpoint_data and "messages" in checkpoint_data["channel_values"]:
+                messages = checkpoint_data["channel_values"]["messages"]
+            else:
+                messages = checkpoint_data.get("messages", [])
+        else:
+            # If it's a tuple/object with .checkpoint attribute
+            checkpoint_data = checkpoint_tuple.checkpoint if hasattr(checkpoint_tuple, "checkpoint") else checkpoint_tuple
+            if isinstance(checkpoint_data, dict):
+                if "channel_values" in checkpoint_data:
+                    messages = checkpoint_data["channel_values"].get("messages", [])
+                else:
+                    messages = checkpoint_data.get("messages", [])
+            else:
+                messages = []
+
+        if not messages:
+            logger.warning(f"Empty message history for thread {thread_id}, falling back to standard greeting")
+            return await generate_proactive_greeting(
+                notebook_id=notebook_id,
+                learner_profile=learner_profile,
+                objectives_with_status=objectives_with_status
+            )
+
+        # Get last 3-5 messages for topic analysis
+        recent_messages = messages[-5:] if len(messages) >= 5 else messages
+
+        # Extract conversation topics from recent messages
+        conversation_summary = await _analyze_conversation_topics(recent_messages)
+
+        # Count completed objectives for progress context
+        completed_count = sum(1 for obj in objectives_with_status if obj.get("status") == "completed")
+        total_count = len(objectives_with_status)
+
+        # Generate re-engagement prompt
+        learner_name = learner_profile.get("name", "there")
+        learner_role = learner_profile.get("role", "")
+
+        prompt_template = """Generate a warm, personalized welcome-back message for a returning learner.
+
+**Learner Context:**
+- Name: {{ learner_name }}
+- Role: {{ learner_role }}
+- Learning progress: {{ completed_count }}/{{ total_count }} objectives completed
+
+**Previous Conversation:**
+{{ conversation_summary }}
+
+**Guidelines:**
+1. Reference specific topic from last conversation (be concrete, not generic)
+2. Acknowledge their progress made (if progress > 0)
+3. Invite them to continue OR shift focus (give them agency)
+4. Keep under 3 sentences, conversational and warm tone
+5. Use their name once at the beginning
+
+**Examples of good re-engagement messages:**
+- "Welcome back, Alice! Last time we were discussing AI applications in logistics, specifically around predictive shipping. You had some great insights on automation. Ready to continue where we left off?"
+- "Hi again, Bob! We were talking about natural language processing for meeting notes last session. You've completed 5 of 12 objectives so far—nice progress! Want to dive deeper into NLP, or explore something new?"
+- "Great to see you back! Last time we covered the basics of neural networks, and you seemed particularly interested in image recognition. Ready to continue?"
+
+Now generate the welcome-back message:
+"""
+
+        prompt_context = {
+            "learner_name": learner_name,
+            "learner_role": learner_role,
+            "completed_count": completed_count,
+            "total_count": total_count,
+            "conversation_summary": conversation_summary,
+        }
+
+        rendered_prompt = Template(prompt_template).render(prompt_context)
+
+        # Use fast small model for cost optimization (re-engagement greeting doesn't need premium model)
+        model = await provision_langchain_model(
+            rendered_prompt,
+            model_name="gpt-4o-mini",  # Fast, cheap for greetings
+            model_type="chat",
+            max_tokens=150,  # Keep it short
+        )
+
+        response = await model.ainvoke([SystemMessage(content=rendered_prompt)])
+
+        # Extract greeting text from response
+        greeting = extract_text_from_response(response.content)
+
+        logger.info(f"Generated re-engagement greeting ({len(greeting)} chars)")
+        return greeting.strip()
+
+    except Exception as e:
+        logger.error(f"Error generating re-engagement greeting: {e}", exc_info=True)
+        # Fallback to standard greeting on error
+        logger.warning("Falling back to standard greeting due to error")
+        return await generate_proactive_greeting(
+            notebook_id=notebook_id,
+            learner_profile=learner_profile,
+            objectives_with_status=objectives_with_status
+        )
+
+
+async def _analyze_conversation_topics(messages: list) -> str:
+    """Extract main topics/concepts discussed from recent conversation messages.
+
+    Analyzes message content to identify key topics for re-engagement context.
+
+    Args:
+        messages: List of LangChain message objects (HumanMessage, AIMessage)
+
+    Returns:
+        Summary string of discussed topics (1-2 sentences)
+    """
+    logger.debug(f"Analyzing {len(messages)} messages for conversation topics")
+
+    # Extract text content from messages
+    message_texts = []
+    for msg in messages:
+        if hasattr(msg, "content"):
+            content = msg.content
+            # Handle structured content (list of content blocks)
+            if isinstance(content, list):
+                text_parts = []
+                for item in content:
+                    if isinstance(item, dict) and "text" in item:
+                        text_parts.append(item["text"])
+                content = " ".join(text_parts)
+            elif not isinstance(content, str):
+                content = str(content)
+
+            message_texts.append(content)
+
+    if not message_texts:
+        return "general discussion about the module content"
+
+    # Join recent messages for topic extraction
+    conversation_text = "\n\n".join(message_texts[-3:])  # Last 3 messages most relevant
+
+    # Use fast model for topic extraction (optimization)
+    extraction_prompt = f"""Analyze this conversation and extract the main topic in 1-2 sentences.
+Be specific about what concepts or applications were discussed.
+
+Conversation excerpt:
+{conversation_text}
+
+Topic summary (1-2 sentences):"""
+
+    try:
+        model = await provision_langchain_model(
+            extraction_prompt,
+            model_name="gpt-4o-mini",
+            model_type="chat",
+            max_tokens=100,
+        )
+
+        response = await model.ainvoke([SystemMessage(content=extraction_prompt)])
+        topic_summary = extract_text_from_response(response.content).strip()
+
+        logger.debug(f"Extracted topic summary: {topic_summary}")
+        return topic_summary
+
+    except Exception as e:
+        logger.error(f"Error extracting conversation topics: {e}")
+        # Fallback to generic summary
+        return "discussing the module content and learning objectives"
+
+
+async def generate_proactive_greeting(
+    notebook_id: str,
+    learner_profile: dict,
+    objectives_with_status: list[dict],
+) -> str:
+    """Generate proactive greeting for first-time visitors.
+
+    Story 4.2: Original greeting generation for new conversations.
+    Used as fallback if re-engagement greeting generation fails.
+
+    Args:
+        notebook_id: Notebook/module record ID
+        learner_profile: Dict with 'name', 'role', 'job_description'
+        objectives_with_status: List of dicts with 'text' and 'status'
+
+    Returns:
+        Personalized greeting string introducing the module
+    """
+    logger.info(f"Generating proactive greeting for notebook {notebook_id}")
+
+    learner_name = learner_profile.get("name", "there")
+    learner_role = learner_profile.get("role", "your role")
+
+    # Get first 3 objectives as preview
+    preview_objectives = objectives_with_status[:3] if objectives_with_status else []
+    objectives_preview = "\n".join([f"- {obj.get('text', '')}" for obj in preview_objectives])
+
+    greeting_template = """Hi {{ learner_name }}! I'm your AI teaching assistant for this module.
+
+I see you're {{ learner_role }}. We'll be exploring these learning objectives together:
+
+{{ objectives_preview }}
+
+I'm here to guide you through the material, answer questions, and help you apply these concepts to your work. Feel free to ask anything!
+
+Where would you like to start?"""
+
+    context = {
+        "learner_name": learner_name,
+        "learner_role": learner_role,
+        "objectives_preview": objectives_preview if objectives_preview else "the module content"
+    }
+
+    greeting = Template(greeting_template).render(context)
+    logger.debug(f"Generated proactive greeting ({len(greeting)} chars)")
+
+    return greeting.strip()
