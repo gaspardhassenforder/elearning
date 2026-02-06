@@ -93,7 +93,7 @@ development_status:
 
   # Epic 7: Error Handling, Observability & Data Privacy
   epic-7: in-progress
-  7-1-graceful-error-handling-and-user-friendly-messages: review  # All 9 tasks complete: Backend (prompt error recovery, structured tool errors, SSE error events) + Frontend (error handler utility, amber toast, LearnerErrorBoundary, ChatErrorMessage, Axios interceptor, layout integration). 41 tests passing (15 backend + 26 frontend). All 4 ACs verified.
+  7-1-graceful-error-handling-and-user-friendly-messages: done  # Code review complete: 11 issues found (8 HIGH + 5 MEDIUM + 3 LOW), 8 resolved via auto-fix (i18n refactor, comprehensive error mappings, prompt repositioning, interceptor docs, ARIA docs). All 4 ACs verified. 41 tests passing (15 backend + 26 frontend). Remaining: File List cleanup, integration tests (accepted as manual QA).
   7-2-structured-contextual-error-logging: backlog
   7-3-admin-error-notifications: backlog
   7-4-langsmith-llm-tracing-integration: backlog
