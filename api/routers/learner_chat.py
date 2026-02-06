@@ -212,6 +212,7 @@ async def stream_learner_chat(
             user_message = HumanMessage(content=request.message)
 
             # Stream events from chat graph with assembled system prompt
+            # Story 4.4: Pass user_id for objective progress tracking
             async for event in chat_graph.astream_events(
                 {
                     "messages": [user_message],
@@ -220,8 +221,14 @@ async def stream_learner_chat(
                     "context_config": None,
                     "model_override": None,  # Use default model
                     "system_prompt_override": system_prompt,  # Story 4.1: Use assembled prompt
+                    "user_id": learner.user.id,  # Story 4.4: For check_off_objective tool
                 },
-                config={"configurable": {"thread_id": thread_id}},
+                config={
+                    "configurable": {
+                        "thread_id": thread_id,
+                        "user_id": learner.user.id,  # Story 4.4: Pass to tools
+                    }
+                },
                 version="v2",
             ):
                 event_type = event.get("event")

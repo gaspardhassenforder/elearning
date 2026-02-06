@@ -13,7 +13,7 @@ from typing_extensions import TypedDict
 from open_notebook.ai.provision import provision_langchain_model
 from open_notebook.config import LANGGRAPH_CHECKPOINT_FILE
 from open_notebook.domain.notebook import Notebook
-from open_notebook.graphs.tools import surface_document
+from open_notebook.graphs.tools import surface_document, check_off_objective
 from open_notebook.utils import clean_thinking_content
 
 
@@ -24,6 +24,7 @@ class ThreadState(TypedDict):
     context_config: Optional[dict]
     model_override: Optional[str]
     system_prompt_override: Optional[str]  # Story 4.1: For learner chat with assembled prompts
+    user_id: Optional[str]  # Story 4.4: For objective progress tracking
 
 
 def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict:
@@ -38,6 +39,14 @@ def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict
     model_id = config.get("configurable", {}).get("model_id") or state.get(
         "model_override"
     )
+
+    # Story 4.4: Pass user_id through config for check_off_objective tool
+    # Extract from state if present, or from existing config
+    user_id = state.get("user_id") or config.get("configurable", {}).get("user_id")
+    if user_id:
+        # Update config to include user_id for tool access
+        configurable = config.get("configurable", {})
+        configurable["user_id"] = user_id
 
     # Handle async model provisioning from sync context
     def run_in_new_loop():
@@ -54,6 +63,14 @@ def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict
             new_loop.close()
             asyncio.set_event_loop(None)
 
+    # Determine which tools to bind based on context
+    # Story 4.3: surface_document for document references
+    # Story 4.4: check_off_objective for progress tracking (learner chat only)
+    tools = [surface_document]
+    if user_id:
+        # Only bind check_off_objective for learner chat (has user_id)
+        tools.append(check_off_objective)
+
     try:
         # Try to get the current event loop
         asyncio.get_running_loop()
@@ -64,8 +81,8 @@ def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict
             future = executor.submit(run_in_new_loop)
             model = future.result()
 
-        # Story 4.3: Bind surface_document tool to the model
-        model_with_tools = model.bind_tools([surface_document])
+        # Story 4.3 + 4.4: Bind tools to the model
+        model_with_tools = model.bind_tools(tools)
     except RuntimeError:
         # No event loop running, safe to use asyncio.run()
         model = asyncio.run(
@@ -77,9 +94,8 @@ def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict
             )
         )
 
-        # Story 4.3: Bind surface_document tool to the model
-        # This allows the AI to reference source documents inline in chat
-        model_with_tools = model.bind_tools([surface_document])
+        # Story 4.3 + 4.4: Bind tools to the model
+        model_with_tools = model.bind_tools(tools)
 
     ai_message = model_with_tools.invoke(payload)
 

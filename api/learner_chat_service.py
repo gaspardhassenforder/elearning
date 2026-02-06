@@ -16,8 +16,92 @@ from api.auth import LearnerContext
 from open_notebook.domain.notebook import Notebook
 from open_notebook.domain.module_assignment import ModuleAssignment
 from open_notebook.domain.learning_objective import LearningObjective
+from open_notebook.domain.learner_objective_progress import LearnerObjectiveProgress
 from open_notebook.graphs.prompt import assemble_system_prompt
 from open_notebook.ai.provision import provision_langchain_model
+
+
+async def get_learner_objectives_with_status(
+    notebook_id: str, user_id: str
+) -> list[dict]:
+    """Load learning objectives with learner's completion status.
+
+    Story 4.4: Fetches objectives with progress status for prompt injection.
+    Uses LEFT JOIN to include objectives with no progress (not_started).
+
+    Args:
+        notebook_id: Notebook/module record ID
+        user_id: Learner's user record ID
+
+    Returns:
+        List of dicts with 'text', 'status', 'order', 'completed_at', 'evidence'
+        Status is: 'not_started', 'in_progress', or 'completed'
+    """
+    from open_notebook.database.repository import repo_query
+
+    # Ensure IDs have correct format
+    if not notebook_id.startswith("notebook:"):
+        notebook_id = f"notebook:{notebook_id}"
+    if not user_id.startswith("user:"):
+        user_id = f"user:{user_id}"
+
+    try:
+        # Single JOIN query to load objectives with progress (Story 4.4)
+        # Prevents N+1 by fetching all data in one query
+        result = await repo_query(
+            """
+            SELECT
+                lo.id AS objective_id,
+                lo.text,
+                lo.order,
+                lo.auto_generated,
+                lop.status AS progress_status,
+                lop.completed_at,
+                lop.evidence
+            FROM learning_objective AS lo
+            LEFT JOIN learner_objective_progress AS lop
+                ON lop.objective_id = lo.id AND lop.user_id = $user_id
+            WHERE lo.notebook_id = $notebook_id
+            ORDER BY lo.order ASC
+            """,
+            {"notebook_id": notebook_id, "user_id": user_id},
+        )
+
+        objectives_with_status = []
+        for row in result:
+            objectives_with_status.append({
+                "id": row.get("objective_id"),
+                "text": row.get("text", ""),
+                "order": row.get("order", 0),
+                "status": row.get("progress_status") or "not_started",
+                "completed_at": row.get("completed_at"),
+                "evidence": row.get("evidence"),
+            })
+
+        logger.debug(
+            f"Loaded {len(objectives_with_status)} objectives for user {user_id} in notebook {notebook_id}"
+        )
+        return objectives_with_status
+
+    except Exception as e:
+        logger.error(f"Error loading objectives with progress: {e}")
+        # Fallback to objectives without progress on error
+        try:
+            objectives = await LearningObjective.get_for_notebook(notebook_id)
+            return [
+                {
+                    "id": obj.id,
+                    "text": obj.text,
+                    "order": obj.order,
+                    "status": "not_started",
+                    "completed_at": None,
+                    "evidence": None,
+                }
+                for obj in objectives
+            ]
+        except Exception as e2:
+            logger.error(f"Fallback objectives load also failed: {e2}")
+            return []
 
 
 async def validate_learner_access_to_notebook(
@@ -148,29 +232,17 @@ async def prepare_chat_context(
 
     logger.debug(f"Learner profile: {learner_profile}")
 
-    # 2. Load learning objectives with completion status
-    # Story 4.2: Load learning objectives for this module
-    # Story 4.4 will add LearnerObjectiveProgress tracking for actual completion status
+    # 2. Load learning objectives with completion status (Story 4.4)
+    # Load actual progress from LearnerObjectiveProgress table
     try:
-        objectives = await LearningObjective.list_by_notebook(notebook_id)
-        objectives_with_status = [
-            {
-                "text": obj.text,
-                "status": "not_started",  # Story 4.4 will load actual progress
-                "order": obj.order,
-            }
-            for obj in objectives
-        ]
-        logger.debug(f"Loaded {len(objectives_with_status)} learning objectives")
+        objectives_with_status = await get_learner_objectives_with_status(
+            notebook_id=notebook_id,
+            user_id=learner.user.id
+        )
+        logger.debug(f"Loaded {len(objectives_with_status)} learning objectives with progress")
     except Exception as e:
         logger.warning(f"Failed to load learning objectives for notebook {notebook_id}: {e}")
         objectives_with_status = []
-
-    # TODO Story 4.4: Replace "not_started" with actual learner progress
-    # objectives_with_status = await get_learner_objectives_with_status(
-    #     notebook_id=notebook_id,
-    #     user_id=learner.user.id
-    # )
 
     # 3. Assemble system prompt (global + per-module from Story 3.4)
     try:

@@ -46,13 +46,13 @@ so that my progress is tracked without formal testing.
   - [x] Test tool invocation with 5+ test cases (valid, duplicate, invalid objective, error handling)
   - Note: Tool requires user_id from session context - full implementation pending Task 3 integration
 
-- [ ] Task 3: Backend - Extend Chat Graph for Objective Tracking (AC: 1, 2)
-  - [ ] Modify graphs/chat.py: inject learning objectives with completion status into prompt context
-  - [ ] Load all objectives for current notebook
-  - [ ] JOIN with learner_objective_progress for current user (LEFT JOIN, handle no progress)
-  - [ ] Add objectives + progress to prompt assembly in two-layer system
-  - [ ] Bind check_off_objective tool to model (follow surface_document pattern from Story 4.3)
-  - [ ] Test prompt includes objectives with status (3+ test cases)
+- [x] Task 3: Backend - Extend Chat Graph for Objective Tracking (AC: 1, 2)
+  - [x] Modify graphs/chat.py: inject learning objectives with completion status into prompt context
+  - [x] Load all objectives for current notebook
+  - [x] JOIN with learner_objective_progress for current user (LEFT JOIN, handle no progress)
+  - [x] Add objectives + progress to prompt assembly in two-layer system
+  - [x] Bind check_off_objective tool to model (follow surface_document pattern from Story 4.3)
+  - [x] Test prompt includes objectives with status (3+ test cases)
 
 - [ ] Task 4: Backend - Learning Objectives API with Progress (AC: 2, 3)
   - [ ] Extend GET /learning-objectives endpoint in api/routers/learning_objectives.py

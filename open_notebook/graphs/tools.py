@@ -1,8 +1,67 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from langchain.tools import tool
 from loguru import logger
+
+
+async def _fetch_suggested_modules(user_id: str, current_notebook_id: str) -> List[dict]:
+    """Fetch suggested modules for learner on module completion.
+
+    Queries available modules for learner's company, excluding the current module.
+    Returns up to 3 suggested modules with id, title, and description.
+
+    Args:
+        user_id: Learner's user ID
+        current_notebook_id: Current notebook ID to exclude
+
+    Returns:
+        List of suggested module dicts with id, title, description
+    """
+    from open_notebook.database.repository import repo_query
+    from open_notebook.domain.user import User
+
+    try:
+        # Get learner's company_id
+        user = await User.get(user_id)
+        if not user or not user.company_id:
+            logger.warning(f"User {user_id} has no company_id - cannot suggest modules")
+            return []
+
+        # Query available modules for learner's company
+        # Filter: published + unlocked + assigned to company + exclude current module
+        query = """
+            SELECT notebook.id, notebook.title, notebook.description
+            FROM notebook
+            JOIN module_assignment ON module_assignment.notebook_id = notebook.id
+            WHERE module_assignment.company_id = $company_id
+              AND module_assignment.is_locked = false
+              AND notebook.published = true
+              AND notebook.id != $current_notebook_id
+            ORDER BY notebook.created DESC
+            LIMIT 3
+        """
+
+        results = await repo_query(
+            query,
+            {"company_id": user.company_id, "current_notebook_id": current_notebook_id},
+        )
+
+        # Format results
+        suggestions = []
+        for row in results:
+            suggestions.append({
+                "id": row.get("id"),
+                "title": row.get("title", "Untitled Module"),
+                "description": row.get("description", ""),
+            })
+
+        logger.info(f"Found {len(suggestions)} suggested modules for user {user_id}")
+        return suggestions
+
+    except Exception as e:
+        logger.error(f"Error fetching suggested modules: {e}")
+        return []
 
 
 # todo: turn this into a system prompt variable
@@ -96,7 +155,11 @@ async def surface_document(source_id: str, excerpt_text: str, relevance_reason: 
 
 
 @tool
-async def check_off_objective(objective_id: str, evidence_text: str) -> dict:
+async def check_off_objective(
+    objective_id: str,
+    evidence_text: str,
+    config: Optional[dict] = None,
+) -> dict:
     """Check off a learning objective when learner demonstrates understanding.
 
     Use this tool when you assess that the learner has demonstrated comprehension
@@ -107,17 +170,15 @@ async def check_off_objective(objective_id: str, evidence_text: str) -> dict:
         objective_id: The record ID of the learning objective (e.g., "learning_objective:abc123")
         evidence_text: Your reasoning explaining why this objective is now complete
             (e.g., "Learner correctly explained the difference between supervised and unsupervised learning")
+        config: RunnableConfig containing user_id (injected by chat graph)
 
     Returns:
         dict: Progress data including completion counts and all_complete flag
 
     Security Note:
-        Currently relies on API-layer access control via notebook assignment.
+        Relies on API-layer access control via notebook assignment.
         The learner chat endpoint validates notebook assignment before invoking this tool.
-
-        TODO (Story 7.5): Add defense-in-depth validation to verify objective belongs to
-        the notebook in the current chat session. Requires passing notebook_id and user_id
-        via RunnableConfig.
+        User ID is passed via RunnableConfig from the authenticated session.
     """
     from open_notebook.domain.learning_objective import LearningObjective
     from open_notebook.domain.learner_objective_progress import (
@@ -136,59 +197,64 @@ async def check_off_objective(objective_id: str, evidence_text: str) -> dict:
             logger.warning(f"Learning objective not found: {objective_id}")
             return {"error": "Learning objective not found", "objective_id": objective_id}
 
-        # TODO (Story 7.5): Extract user_id from RunnableConfig context
-        # For now, this tool is only callable from learner chat context where
-        # user_id is available in the graph state. This is a temporary limitation.
-        # The learner_chat_service.py should inject user_id into config or state.
+        # Extract user_id from config (passed by learner chat service)
+        # Config is injected via RunnableConfig in chat graph
+        user_id = None
+        if config:
+            configurable = config.get("configurable", {})
+            user_id = configurable.get("user_id")
 
-        # Since we don't have user_id in tool context yet, we'll return a structured
-        # error that the API layer can detect and handle by extracting user_id from
-        # the session context. This is a known limitation that will be fixed in Story 7.5.
+        if not user_id:
+            logger.warning("check_off_objective called without user_id in config")
+            return {
+                "error": "User context not available",
+                "objective_id": objective_id,
+                "objective_text": objective.text,
+                "evidence": evidence_text,
+                "note": "Ensure user_id is passed via RunnableConfig"
+            }
 
-        # TEMPORARY: Return error indicating missing user context
-        # The API layer (learner_chat_service.py) will need to handle this by
-        # injecting user_id before tool invocation or extracting from JWT token.
-        return {
-            "error": "User context not available in tool",
+        # Create or retrieve progress record (handles duplicates gracefully)
+        progress = await LearnerObjectiveProgress.create(
+            user_id=user_id,
+            objective_id=objective_id,
+            status=ProgressStatus.COMPLETED,
+            completed_via=CompletedVia.CONVERSATION,
+            evidence=evidence_text,
+        )
+
+        # Count total completed vs total objectives for this notebook
+        total_completed = await LearnerObjectiveProgress.count_completed_for_notebook(
+            user_id=user_id, notebook_id=objective.notebook_id
+        )
+        total_objectives = await LearningObjective.count_for_notebook(objective.notebook_id)
+
+        # Determine if all objectives are complete
+        all_complete = total_completed >= total_objectives
+
+        result = {
             "objective_id": objective_id,
             "objective_text": objective.text,
             "evidence": evidence_text,
-            "note": "This tool requires user_id from session context (Story 4.4 limitation, fix in Story 7.5)"
+            "total_completed": total_completed,
+            "total_objectives": total_objectives,
+            "all_complete": all_complete,
         }
 
-        # NOTE: The code below is the intended implementation once user_id is available:
-        #
-        # # Create or retrieve progress record (handles duplicates gracefully)
-        # progress = await LearnerObjectiveProgress.create(
-        #     user_id=user_id,  # From RunnableConfig or graph state
-        #     objective_id=objective_id,
-        #     status=ProgressStatus.COMPLETED,
-        #     completed_via=CompletedVia.CONVERSATION,
-        #     evidence=evidence_text,
-        # )
-        #
-        # # Count total completed vs total objectives for this notebook
-        # total_completed = await LearnerObjectiveProgress.count_completed_for_notebook(
-        #     user_id=user_id, notebook_id=objective.notebook_id
-        # )
-        # total_objectives = await LearningObjective.count_for_notebook(objective.notebook_id)
-        #
-        # # Determine if all objectives are complete
-        # all_complete = total_completed >= total_objectives
-        #
-        # result = {
-        #     "objective_id": objective_id,
-        #     "objective_text": objective.text,
-        #     "evidence": evidence_text,
-        #     "total_completed": total_completed,
-        #     "total_objectives": total_objectives,
-        #     "all_complete": all_complete,
-        # }
-        #
-        # logger.info(
-        #     f"Checked off objective {objective_id}: {total_completed}/{total_objectives} complete"
-        # )
-        # return result
+        # Story 4.5: When all objectives complete, suggest next modules
+        if all_complete:
+            suggested_modules = await _fetch_suggested_modules(
+                user_id=user_id, current_notebook_id=objective.notebook_id
+            )
+            result["suggested_modules"] = suggested_modules
+            logger.info(f"Module completion: suggested {len(suggested_modules)} modules")
+        else:
+            result["suggested_modules"] = []
+
+        logger.info(
+            f"Checked off objective {objective_id}: {total_completed}/{total_objectives} complete"
+        )
+        return result
 
     except Exception as e:
         logger.error(f"Error in check_off_objective tool for objective {objective_id}: {e}")

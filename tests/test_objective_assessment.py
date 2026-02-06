@@ -329,3 +329,119 @@ class TestCheckOffObjectiveTool:
 
         assert hasattr(check_off_objective, "ainvoke")
         assert check_off_objective.name == "check_off_objective"
+
+
+# ============================================================================
+# TEST SUITE 3: Prompt Context with Objectives (Task 3)
+# ============================================================================
+
+
+class TestPromptWithObjectives:
+    """Test suite for prompt assembly with objectives status."""
+
+    @pytest.mark.asyncio
+    async def test_get_learner_objectives_with_status(self):
+        """Test loading objectives with progress status via JOIN."""
+        from api.learner_chat_service import get_learner_objectives_with_status
+
+        with patch("open_notebook.database.repository.repo_query") as mock_query:
+            # Simulate JOIN result with mixed completion status
+            mock_query.return_value = [
+                {
+                    "objective_id": "learning_objective:obj1",
+                    "text": "Understand supervised learning",
+                    "order": 0,
+                    "auto_generated": False,
+                    "progress_status": "completed",
+                    "completed_at": "2024-01-15T10:00:00",
+                    "evidence": "Explained concept correctly",
+                },
+                {
+                    "objective_id": "learning_objective:obj2",
+                    "text": "Explain overfitting",
+                    "order": 1,
+                    "auto_generated": False,
+                    "progress_status": None,  # Not started
+                    "completed_at": None,
+                    "evidence": None,
+                },
+                {
+                    "objective_id": "learning_objective:obj3",
+                    "text": "Apply regularization",
+                    "order": 2,
+                    "auto_generated": True,
+                    "progress_status": None,
+                    "completed_at": None,
+                    "evidence": None,
+                },
+            ]
+
+            objectives = await get_learner_objectives_with_status(
+                notebook_id="notebook:module1", user_id="user:learner1"
+            )
+
+            assert len(objectives) == 3
+            assert objectives[0]["status"] == "completed"
+            assert objectives[0]["evidence"] == "Explained concept correctly"
+            assert objectives[1]["status"] == "not_started"
+            assert objectives[2]["status"] == "not_started"
+
+    @pytest.mark.asyncio
+    async def test_objectives_included_in_prompt_context(self):
+        """Test that objectives with status are injected into system prompt."""
+        from open_notebook.graphs.prompt import assemble_system_prompt
+
+        # This test verifies the template receives objectives
+        # The actual rendering is tested by prompt assembly tests
+        objectives_with_status = [
+            {"text": "Understand ML basics", "status": "completed", "order": 0},
+            {"text": "Apply algorithms", "status": "not_started", "order": 1},
+        ]
+
+        with patch("open_notebook.graphs.prompt.Path.exists", return_value=True), \
+             patch("builtins.open", create=True) as mock_open, \
+             patch("open_notebook.graphs.prompt.ModulePrompt.get_by_notebook", return_value=None):
+            # Mock template file content
+            mock_open.return_value.__enter__.return_value.read.return_value = """
+# AI Teacher Prompt
+{% for obj in objectives %}
+- {{ obj.text }}: {{ obj.status }}
+{% endfor %}
+"""
+
+            prompt = await assemble_system_prompt(
+                notebook_id="notebook:test",
+                learner_profile={"role": "developer"},
+                objectives_with_status=objectives_with_status,
+            )
+
+            # Verify objectives are in the rendered prompt
+            assert "Understand ML basics: completed" in prompt
+            assert "Apply algorithms: not_started" in prompt
+
+    @pytest.mark.asyncio
+    async def test_focus_objective_auto_selected(self):
+        """Test that first incomplete objective becomes focus."""
+        from open_notebook.graphs.prompt import assemble_system_prompt
+
+        objectives_with_status = [
+            {"text": "Completed objective", "status": "completed", "order": 0},
+            {"text": "First incomplete", "status": "not_started", "order": 1},
+            {"text": "Second incomplete", "status": "not_started", "order": 2},
+        ]
+
+        with patch("open_notebook.graphs.prompt.Path.exists", return_value=True), \
+             patch("builtins.open", create=True) as mock_open, \
+             patch("open_notebook.graphs.prompt.ModulePrompt.get_by_notebook", return_value=None):
+            # Mock template with current_focus_objective
+            mock_open.return_value.__enter__.return_value.read.return_value = """
+Focus on: {{ current_focus_objective }}
+"""
+
+            prompt = await assemble_system_prompt(
+                notebook_id="notebook:test",
+                objectives_with_status=objectives_with_status,
+            )
+
+            # First incomplete objective should be focus
+            assert "First incomplete" in prompt
