@@ -33,6 +33,7 @@ import { ChatErrorMessage } from './ChatErrorMessage'
 import { useJobStatus } from '@/lib/hooks/use-job-status'
 import { useLearnerStore } from '@/lib/stores/learner-store'
 import { useToast } from '@/lib/hooks/use-toast'
+import { learnerToast } from '@/lib/utils/learner-toast'
 import { useVoiceInput } from '@/lib/hooks/use-voice-input'
 import type { SuggestedModule } from '@/lib/types/api'
 
@@ -82,12 +83,15 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
     isListening,
     isSupported,
     transcript,
+    isRequestingPermission,
     startListening,
     stopListening,
+    clearTranscript,
     error: voiceError
   } = useVoiceInput()
 
   const inputRef = useRef<HTMLInputElement>(null)
+  const [userHasEdited, setUserHasEdited] = useState(false)
 
   // Story 4.8: Merge history with current messages (history first, then new messages)
   const allMessages = historyLoaded && historyData?.messages
@@ -142,12 +146,19 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
     }
   }, [messages, isStreaming, isUserScrolledUp])
 
-  // Story 6.2: Update input field when voice transcript changes
+  // Story 6.2: Update input field when voice transcript changes (only if user hasn't edited)
   useEffect(() => {
-    if (transcript && inputRef.current) {
+    if (transcript && inputRef.current && !userHasEdited) {
       inputRef.current.value = transcript
     }
-  }, [transcript])
+  }, [transcript, userHasEdited])
+
+  // Story 6.2: Reset edit flag when recording starts
+  useEffect(() => {
+    if (isListening) {
+      setUserHasEdited(false)
+    }
+  }, [isListening])
 
   // Story 6.2: Show error toasts for voice input errors
   useEffect(() => {
@@ -177,13 +188,10 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
           description = t.learner.chat.voiceInput.errorDesc
       }
 
-      toast({
-        title,
-        description,
-        variant: 'destructive',
-      })
+      // Story 7.1: Use amber-styled learner toast (never red)
+      learnerToast.error(title, { description })
     }
-  }, [voiceError, t, toast])
+  }, [voiceError, t])
 
   // Story 4.7: Poll job status when active job exists
   const { status, progress, error: jobError } = useJobStatus(
@@ -197,11 +205,11 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
         })
       },
       onError: (errorMsg) => {
-        toast({
-          title: t.asyncStatus.artifactFailed.replace('{type}', activeJob?.artifactType || 'artifact'),
-          description: errorMsg,
-          variant: 'destructive',
-        })
+        // Story 7.1: Use amber-styled learner toast (never red)
+        learnerToast.error(
+          t.asyncStatus.artifactFailed.replace('{type}', activeJob?.artifactType || 'artifact'),
+          { description: errorMsg }
+        )
       },
     }
   )
@@ -442,26 +450,37 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
                   if (input.value.trim()) {
                     sendMessage(input.value)
                     input.value = ''
+                    clearTranscript()  // Story 6.2: Clear voice transcript after send
+                    setUserHasEdited(false)  // Reset edit flag
                   }
                 }}
                 className="flex gap-2"
               >
                 {/* Story 6.2: Voice Input Button - Only show if supported */}
                 {isSupported && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={isListening ? stopListening : startListening}
-                    aria-label={isListening ? t.learner.chat.voiceInput.stopRecording : t.learner.chat.voiceInput.startRecording}
-                    className={isListening ? 'text-red-500 animate-pulse' : ''}
-                  >
-                    {isListening ? (
-                      <MicOff className="h-4 w-4" />
-                    ) : (
-                      <Mic className="h-4 w-4" />
+                  <>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={isListening ? stopListening : startListening}
+                      disabled={isRequestingPermission}
+                      aria-label={isListening ? t.learner.chat.voiceInput.stopRecording : t.learner.chat.voiceInput.startRecording}
+                      className={(isListening || isRequestingPermission) ? 'text-red-500 animate-pulse' : ''}
+                    >
+                      {isListening ? (
+                        <MicOff className="h-4 w-4" />
+                      ) : (
+                        <Mic className="h-4 w-4" />
+                      )}
+                    </Button>
+                    {/* Screen reader status announcement */}
+                    {isListening && (
+                      <span className="sr-only" role="status" aria-live="polite">
+                        {t.learner.chat.voiceInput.listening}
+                      </span>
                     )}
-                  </Button>
+                  </>
                 )}
 
                 <input
@@ -471,6 +490,10 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
                   placeholder={t.learner.chat.placeholder}
                   className="flex-1 px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                   autoComplete="off"
+                  onChange={() => {
+                    // Story 6.2: Track manual edits to prevent race condition with voice transcript
+                    if (!userHasEdited) setUserHasEdited(true)
+                  }}
                 />
                 <button
                   type="submit"

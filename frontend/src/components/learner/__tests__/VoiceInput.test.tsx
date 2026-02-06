@@ -17,6 +17,8 @@ vi.mock('@/lib/hooks/use-translation', () => ({
           voiceInput: {
             startRecording: 'Start voice input',
             stopRecording: 'Stop recording',
+            listening: 'Listening...',
+            transcribing: 'Transcribing...',
             microphoneError: 'Microphone access denied',
             microphoneErrorDesc: 'Please allow microphone access in your browser settings to use voice input.',
             noSpeech: 'No speech detected',
@@ -78,6 +80,17 @@ vi.mock('@/lib/hooks/use-toast', () => ({
   }),
 }))
 
+// Story 7.1: Mock learner toast (amber-styled, used for voice errors)
+const mockLearnerToastError = vi.fn()
+vi.mock('@/lib/utils/learner-toast', () => ({
+  learnerToast: {
+    error: (...args: unknown[]) => mockLearnerToastError(...args),
+    success: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
+  },
+}))
+
 // Mock voice input hook - will be modified per test
 vi.mock('@/lib/hooks/use-voice-input', () => ({
   useVoiceInput: vi.fn(() => ({
@@ -111,8 +124,10 @@ describe('ChatPanel Voice Input Integration', () => {
       isListening: false,
       isSupported: true,
       transcript: '',
+      isRequestingPermission: false,
       startListening: vi.fn(),
       stopListening: vi.fn(),
+      clearTranscript: vi.fn(),
       error: null,
     })
   })
@@ -180,8 +195,10 @@ describe('ChatPanel Voice Input Integration', () => {
       isListening: true,
       isSupported: true,
       transcript: '',
+      isRequestingPermission: false,
       startListening: vi.fn(),
       stopListening: vi.fn(),
+      clearTranscript: vi.fn(),
       error: null,
     })
 
@@ -235,8 +252,10 @@ describe('ChatPanel Voice Input Integration', () => {
       isListening: false,
       isSupported: true,
       transcript: 'Hello from voice input',
+      isRequestingPermission: false,
       startListening: vi.fn(),
       stopListening: vi.fn(),
+      clearTranscript: vi.fn(),
       error: null,
     })
 
@@ -270,12 +289,12 @@ describe('ChatPanel Voice Input Integration', () => {
       </QueryClientProvider>
     )
 
+    // Story 7.1: Voice errors now use learnerToast.error() with amber styling
     await waitFor(() => {
-      expect(mockToastFn).toHaveBeenCalledWith({
-        title: 'Microphone access denied',
-        description: 'Please allow microphone access in your browser settings to use voice input.',
-        variant: 'destructive',
-      })
+      expect(mockLearnerToastError).toHaveBeenCalledWith(
+        'Microphone access denied',
+        { description: 'Please allow microphone access in your browser settings to use voice input.' }
+      )
     })
   })
 
@@ -297,11 +316,10 @@ describe('ChatPanel Voice Input Integration', () => {
     )
 
     await waitFor(() => {
-      expect(mockToastFn).toHaveBeenCalledWith({
-        title: 'Network error',
-        description: 'Voice recognition requires an internet connection.',
-        variant: 'destructive',
-      })
+      expect(mockLearnerToastError).toHaveBeenCalledWith(
+        'Network error',
+        { description: 'Voice recognition requires an internet connection.' }
+      )
     })
   })
 
@@ -323,11 +341,10 @@ describe('ChatPanel Voice Input Integration', () => {
     )
 
     await waitFor(() => {
-      expect(mockToastFn).toHaveBeenCalledWith({
-        title: 'No speech detected',
-        description: 'Please speak clearly into your microphone and try again.',
-        variant: 'destructive',
-      })
+      expect(mockLearnerToastError).toHaveBeenCalledWith(
+        'No speech detected',
+        { description: 'Please speak clearly into your microphone and try again.' }
+      )
     })
   })
 
@@ -349,11 +366,10 @@ describe('ChatPanel Voice Input Integration', () => {
     )
 
     await waitFor(() => {
-      expect(mockToastFn).toHaveBeenCalledWith({
-        title: 'No microphone found',
-        description: 'Please connect a microphone to use voice input.',
-        variant: 'destructive',
-      })
+      expect(mockLearnerToastError).toHaveBeenCalledWith(
+        'No microphone found',
+        { description: 'Please connect a microphone to use voice input.' }
+      )
     })
   })
 
@@ -375,11 +391,10 @@ describe('ChatPanel Voice Input Integration', () => {
     )
 
     await waitFor(() => {
-      expect(mockToastFn).toHaveBeenCalledWith({
-        title: 'Voice input error',
-        description: 'Something went wrong with voice input.',
-        variant: 'destructive',
-      })
+      expect(mockLearnerToastError).toHaveBeenCalledWith(
+        'Voice input error',
+        { description: 'Something went wrong with voice input.' }
+      )
     })
   })
 
@@ -401,8 +416,10 @@ describe('ChatPanel Voice Input Integration', () => {
       isListening: true,
       isSupported: true,
       transcript: '',
+      isRequestingPermission: false,
       startListening: vi.fn(),
       stopListening: vi.fn(),
+      clearTranscript: vi.fn(),
       error: null,
     })
 
@@ -414,5 +431,55 @@ describe('ChatPanel Voice Input Integration', () => {
 
     const micButton = screen.getByLabelText('Stop recording')
     expect(micButton).toHaveAttribute('aria-label', 'Stop recording')
+  })
+
+  it('should show screen reader status when listening', async () => {
+    const { useVoiceInput } = await import('@/lib/hooks/use-voice-input')
+    vi.mocked(useVoiceInput).mockReturnValue({
+      isListening: true,
+      isSupported: true,
+      transcript: '',
+      isRequestingPermission: false,
+      startListening: vi.fn(),
+      stopListening: vi.fn(),
+      clearTranscript: vi.fn(),
+      error: null,
+    })
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ChatPanel notebookId="test-notebook" />
+      </QueryClientProvider>
+    )
+
+    // Check for screen reader status element
+    const statusElement = screen.getByRole('status')
+    expect(statusElement).toBeInTheDocument()
+    expect(statusElement).toHaveTextContent('Listening...')
+    expect(statusElement).toHaveAttribute('aria-live', 'polite')
+  })
+
+  it('should disable button when requesting permission', async () => {
+    const { useVoiceInput } = await import('@/lib/hooks/use-voice-input')
+    vi.mocked(useVoiceInput).mockReturnValue({
+      isListening: false,
+      isSupported: true,
+      transcript: '',
+      isRequestingPermission: true,
+      startListening: vi.fn(),
+      stopListening: vi.fn(),
+      clearTranscript: vi.fn(),
+      error: null,
+    })
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ChatPanel notebookId="test-notebook" />
+      </QueryClientProvider>
+    )
+
+    const micButton = screen.getByLabelText('Start voice input')
+    expect(micButton).toBeDisabled()
+    expect(micButton).toHaveClass('animate-pulse')
   })
 })

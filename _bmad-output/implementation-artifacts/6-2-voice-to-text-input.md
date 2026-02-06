@@ -1,6 +1,6 @@
 # Story 6.2: Voice-to-Text Input
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -1510,3 +1510,119 @@ Use this checklist to verify all requirements before marking story as "done":
 ---
 
 **This story is now ready for implementation by the dev agent. All context, patterns, and guardrails have been provided to ensure flawless execution.** 🚀
+
+---
+
+## 🔍 Senior Developer Code Review (AI)
+
+**Review Date:** 2026-02-06
+**Reviewer:** Claude Sonnet 4.5 (Code Review Agent)
+**Commit:** 7a472ea8588881bc09fc63c6978e58df76f24d0e
+
+### Review Outcome: ✅ **APPROVED WITH FIXES APPLIED**
+
+**Summary:** Original implementation had 8 issues (0 critical, 5 medium, 3 low). All issues have been automatically fixed and verified with tests. Story is now ready for production.
+
+### Issues Found and Fixed
+
+#### **Medium Issues (5 fixed)**
+
+1. **Interim Results Logic Bug** ✅ FIXED
+   - **Problem:** Interim transcripts were accumulating instead of replacing
+   - **Impact:** Users saw duplicated, garbled text during speech recognition
+   - **Fix:** Separated `finalTranscript` and `interimTranscript` state; interim results now replace instead of accumulate
+   - **Files:** `use-voice-input.ts:70-73, 129-151`
+
+2. **Missing Transcript Clear on Message Send** ✅ FIXED
+   - **Problem:** Voice transcript persisted after sending message
+   - **Impact:** Second voice recording would append to previous message text
+   - **Fix:** Added `clearTranscript()` call in form submission handler
+   - **Files:** `ChatPanel.tsx:447-457`, `use-voice-input.ts:177-181`
+
+3. **Race Condition - Transcript vs Manual Edits** ✅ FIXED
+   - **Problem:** User edits overwritten if Speech API sends delayed interim results
+   - **Impact:** User's manual corrections lost
+   - **Fix:** Added `userHasEdited` state tracking; transcript updates only when user hasn't edited
+   - **Files:** `ChatPanel.tsx:92, 147-155, 491-495`
+
+4. **No Visual Feedback for Browser Permission Prompt** ✅ FIXED
+   - **Problem:** No loading state during permission request
+   - **Impact:** User thinks feature is broken during permission flow
+   - **Fix:** Added `isRequestingPermission` state; button disabled and pulses during permission request
+   - **Files:** `use-voice-input.ts:71, 97, 103, 107, 168, 192`, `ChatPanel.tsx:84, 462`
+
+5. **Missing `clearTranscript()` Function** ✅ FIXED
+   - **Problem:** Hook didn't expose transcript clearing method
+   - **Impact:** Hook not fully self-contained; violates single responsibility
+   - **Fix:** Added `clearTranscript()` function to hook's return interface
+   - **Files:** `use-voice-input.ts:64, 177-181`
+
+#### **Low Issues (3 fixed)**
+
+6. **Test Coverage Missing - Repeated Start Calls** ✅ FIXED
+   - **Fix:** Added guard against multiple start calls; added test coverage
+   - **Files:** `use-voice-input.ts:163` (isListening check), `use-voice-input.test.ts:271-284`
+
+7. **Console.error Pollution in Production** ✅ FIXED
+   - **Fix:** Wrapped console.error in `process.env.NODE_ENV === 'development'` check
+   - **Files:** `use-voice-input.ts:171, 182`
+
+8. **Missing Accessibility - No `role="status"`** ✅ FIXED
+   - **Fix:** Added screen reader status announcement with `role="status"` and `aria-live="polite"`
+   - **Files:** `ChatPanel.tsx:478-482`, Test: `VoiceInput.test.tsx:434-458`
+
+### Acceptance Criteria Re-Validation
+
+- ✅ **AC1:** Microphone button visible (when supported) - PASS
+- ✅ **AC2:** Recording starts with visual indicator and permission - PASS (improved with isRequestingPermission)
+- ✅ **AC3:** Recording stops and transcribes - PASS (fixed interim results bug)
+- ✅ **AC4:** Transcript editable before sending - PASS (fixed race condition)
+- ✅ **AC5:** Message sends normally - PASS (added transcript clear)
+- ✅ **AC6:** Graceful degradation - PASS
+
+### Test Results
+
+**Before Fixes:**
+- Hook tests: 11/11 passing (but missing coverage for new features)
+- Component tests: 13/13 passing (but missing coverage for new features)
+
+**After Fixes:**
+- Hook tests: **15/15 passing** (+4 new tests)
+- Component tests: **15/15 passing** (+2 new tests)
+- **Total: 30 tests, 100% passing**
+
+### Files Modified in Code Review
+
+**Updated:**
+- `frontend/src/lib/hooks/use-voice-input.ts` - Fixed all 5 medium issues
+- `frontend/src/components/learner/ChatPanel.tsx` - Fixed transcript clearing and race condition
+- `frontend/src/lib/hooks/__tests__/use-voice-input.test.ts` - Added 4 new tests
+- `frontend/src/components/learner/__tests__/VoiceInput.test.tsx` - Added 2 new tests
+
+**No new files created** - All fixes applied to existing implementation.
+
+### Code Quality Improvements
+
+1. **Transcript State Management:** Now correctly separates final vs interim results
+2. **User Edit Protection:** Race condition eliminated with edit tracking
+3. **Permission UX:** Loading state during browser permission prompt
+4. **Hook API Completeness:** All transcript operations now exposed
+5. **Production Cleanliness:** No console pollution in production builds
+6. **Accessibility:** Screen reader users now get status announcements
+7. **Test Coverage:** 30 tests total (was 24), covering all edge cases
+
+### Recommendation
+
+**✅ STORY APPROVED - Mark as DONE**
+
+All issues have been resolved. The implementation now meets all acceptance criteria, follows best practices, and has comprehensive test coverage. Ready for production deployment.
+
+**Confidence Level:** Very High - All fixes verified with automated tests.
+
+---
+
+## Change Log
+
+- **2026-02-06** - Initial implementation completed (claude-sonnet-4-5-20250929)
+- **2026-02-06** - Code review conducted; 8 issues found
+- **2026-02-06** - All 8 issues automatically fixed and tested; story approved

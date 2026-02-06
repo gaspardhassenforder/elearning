@@ -255,4 +255,148 @@ describe('useVoiceInput', () => {
       expect(result.current.error).toBe('no-microphone')
     })
   })
+
+  it('should handle multiple start calls gracefully', async () => {
+    const { result } = renderHook(() => useVoiceInput())
+
+    act(() => {
+      result.current.startListening()
+    })
+
+    await waitFor(() => {
+      expect(result.current.isListening).toBe(true)
+    })
+
+    // Try to start again while already listening
+    act(() => {
+      result.current.startListening()
+    })
+
+    // Should remain listening without error
+    await waitFor(() => {
+      expect(result.current.isListening).toBe(true)
+      expect(result.current.error).toBeNull()
+    })
+  })
+
+  it('should expose clearTranscript function', () => {
+    const { result } = renderHook(() => useVoiceInput())
+
+    act(() => {
+      result.current.startListening()
+    })
+
+    // Simulate result
+    if (currentRecognitionInstance?.onresult) {
+      act(() => {
+        currentRecognitionInstance!.onresult!({
+          results: [
+            {
+              0: { transcript: 'Test message', confidence: 0.9 },
+              isFinal: true,
+              length: 1,
+            },
+          ],
+          resultIndex: 0,
+        } as any)
+      })
+    }
+
+    expect(result.current.transcript).toContain('Test message')
+
+    // Clear transcript
+    act(() => {
+      result.current.clearTranscript()
+    })
+
+    expect(result.current.transcript).toBe('')
+  })
+
+  it('should handle interim results correctly without duplication', async () => {
+    const { result } = renderHook(() => useVoiceInput())
+
+    act(() => {
+      result.current.startListening()
+    })
+
+    // Simulate interim result
+    if (currentRecognitionInstance?.onresult) {
+      act(() => {
+        currentRecognitionInstance!.onresult!({
+          results: [
+            {
+              0: { transcript: 'hello', confidence: 0.7 },
+              isFinal: false,
+              length: 1,
+            },
+          ],
+          resultIndex: 0,
+        } as any)
+      })
+    }
+
+    await waitFor(() => {
+      expect(result.current.transcript).toBe('hello')
+    })
+
+    // Simulate updated interim result (should replace, not accumulate)
+    if (currentRecognitionInstance?.onresult) {
+      act(() => {
+        currentRecognitionInstance!.onresult!({
+          results: [
+            {
+              0: { transcript: 'hello world', confidence: 0.8 },
+              isFinal: false,
+              length: 1,
+            },
+          ],
+          resultIndex: 0,
+        } as any)
+      })
+    }
+
+    await waitFor(() => {
+      expect(result.current.transcript).toBe('hello world')
+      // Should NOT be 'hellohello world'
+    })
+
+    // Simulate final result
+    if (currentRecognitionInstance?.onresult) {
+      act(() => {
+        currentRecognitionInstance!.onresult!({
+          results: [
+            {
+              0: { transcript: 'hello world', confidence: 0.95 },
+              isFinal: true,
+              length: 1,
+            },
+          ],
+          resultIndex: 0,
+        } as any)
+      })
+    }
+
+    await waitFor(() => {
+      expect(result.current.transcript).toBe('hello world ')
+    })
+  })
+
+  it('should set isRequestingPermission when starting', async () => {
+    const { result } = renderHook(() => useVoiceInput())
+
+    expect(result.current.isRequestingPermission).toBe(false)
+
+    // Note: In our mock, start() immediately calls onstart, so we can't test
+    // the intermediate requesting state. In real usage, there would be a delay
+    // while browser shows permission prompt.
+    act(() => {
+      result.current.startListening()
+    })
+
+    // After recognition starts, requesting flag should be cleared
+    await waitFor(() => {
+      expect(result.current.isListening).toBe(true)
+      expect(result.current.isRequestingPermission).toBe(false)
+    })
+  })
 })

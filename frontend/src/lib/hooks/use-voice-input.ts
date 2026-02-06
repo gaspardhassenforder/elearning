@@ -60,15 +60,19 @@ interface UseVoiceInputReturn {
   isListening: boolean
   isSupported: boolean
   transcript: string
+  isRequestingPermission: boolean
   startListening: () => void
   stopListening: () => void
+  clearTranscript: () => void
   error: string | null
 }
 
 export function useVoiceInput(): UseVoiceInputReturn {
   const [isListening, setIsListening] = useState(false)
   const [isSupported, setIsSupported] = useState(false)
-  const [transcript, setTranscript] = useState('')
+  const [isRequestingPermission, setIsRequestingPermission] = useState(false)
+  const [finalTranscript, setFinalTranscript] = useState('')
+  const [interimTranscript, setInterimTranscript] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   const recognitionRef = useRef<SpeechRecognition | null>(null)
@@ -96,15 +100,18 @@ export function useVoiceInput(): UseVoiceInputReturn {
     // Event handlers
     recognition.onstart = () => {
       setIsListening(true)
+      setIsRequestingPermission(false)
       setError(null)
     }
 
     recognition.onend = () => {
       setIsListening(false)
+      setIsRequestingPermission(false)
     }
 
     recognition.onerror = (event) => {
       setIsListening(false)
+      setIsRequestingPermission(false)
 
       // Map error codes to user-friendly messages
       switch (event.error) {
@@ -127,26 +134,26 @@ export function useVoiceInput(): UseVoiceInputReturn {
     }
 
     recognition.onresult = (event) => {
-      let finalTranscript = ''
-      let interimTranscript = ''
+      let newFinal = ''
+      let newInterim = ''
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i]
         const transcriptText = result[0].transcript
 
         if (result.isFinal) {
-          finalTranscript += transcriptText + ' '
+          newFinal += transcriptText + ' '
         } else {
-          interimTranscript += transcriptText
+          newInterim += transcriptText
         }
       }
 
-      // Update state with final or interim transcript
-      if (finalTranscript) {
-        setTranscript(prev => prev + finalTranscript)
-      } else if (interimTranscript) {
-        // Show interim results for real-time feedback
-        setTranscript(prev => prev + interimTranscript)
+      // Update state correctly: accumulate finals, replace interim
+      if (newFinal) {
+        setFinalTranscript(prev => prev + newFinal)
+        setInterimTranscript('')  // Clear interim when final arrives
+      } else if (newInterim) {
+        setInterimTranscript(newInterim)  // Replace interim, don't accumulate
       }
     }
 
@@ -161,17 +168,22 @@ export function useVoiceInput(): UseVoiceInputReturn {
   }, [])
 
   const startListening = useCallback(() => {
-    if (!recognitionRef.current || !isSupported) return
+    if (!recognitionRef.current || !isSupported || isListening || isRequestingPermission) return
 
     try {
       setError(null)
-      setTranscript('')  // Clear previous transcript
+      setFinalTranscript('')  // Clear previous transcript
+      setInterimTranscript('')
+      setIsRequestingPermission(true)
       recognitionRef.current.start()
     } catch (err) {
-      console.error('Failed to start speech recognition:', err)
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Failed to start speech recognition:', err)
+      }
       setError('failed-to-start')
+      setIsRequestingPermission(false)
     }
-  }, [isSupported])
+  }, [isSupported, isListening, isRequestingPermission])
 
   const stopListening = useCallback(() => {
     if (!recognitionRef.current) return
@@ -179,16 +191,29 @@ export function useVoiceInput(): UseVoiceInputReturn {
     try {
       recognitionRef.current.stop()
     } catch (err) {
-      console.error('Failed to stop speech recognition:', err)
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Failed to stop speech recognition:', err)
+      }
     }
   }, [])
+
+  const clearTranscript = useCallback(() => {
+    setFinalTranscript('')
+    setInterimTranscript('')
+    setError(null)
+  }, [])
+
+  // Combine final and interim for return value
+  const transcript = finalTranscript + interimTranscript
 
   return {
     isListening,
     isSupported,
     transcript,
+    isRequestingPermission,
     startListening,
     stopListening,
+    clearTranscript,
     error,
   }
 }
