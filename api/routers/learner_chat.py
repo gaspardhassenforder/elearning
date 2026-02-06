@@ -21,6 +21,7 @@ from api.learner_chat_service import (
     prepare_chat_context,
     validate_learner_access_to_notebook,
 )
+from open_notebook.graphs.prompt import generate_re_engagement_greeting
 from open_notebook.graphs.chat import graph as chat_graph, memory as chat_memory
 
 router = APIRouter()
@@ -159,32 +160,72 @@ async def stream_learner_chat(
             thread_id = f"user:{learner.user.id}:notebook:{notebook_id}"
             logger.info(f"Using thread_id: {thread_id}")
 
-            # Story 4.2: Check if this is first visit (no messages in checkpoint)
+            # Story 4.2 + 4.8: Check if this is first visit or returning user
             is_first_visit = False
+            is_returning_user = False
             try:
                 # Get thread state from checkpoint
                 thread_state = chat_memory.get({"configurable": {"thread_id": thread_id}})
 
-                # First visit if no state OR messages list is empty
-                if thread_state is None or not thread_state.values.get("messages"):
+                # Extract messages from checkpoint (handle dict structure from SqliteSaver)
+                messages = []
+                if thread_state:
+                    if isinstance(thread_state, dict):
+                        # SqliteSaver returns dict
+                        if "channel_values" in thread_state and "messages" in thread_state["channel_values"]:
+                            messages = thread_state["channel_values"]["messages"]
+                        elif "messages" in thread_state:
+                            messages = thread_state["messages"]
+                    elif hasattr(thread_state, "checkpoint"):
+                        # CheckpointTuple object
+                        checkpoint_data = thread_state.checkpoint
+                        if isinstance(checkpoint_data, dict) and "channel_values" in checkpoint_data:
+                            messages = checkpoint_data["channel_values"].get("messages", [])
+
+                # Determine user status
+                if not thread_state or not messages:
                     is_first_visit = True
                     logger.info(f"First visit detected for thread {thread_id}")
                 else:
-                    logger.info(f"Continuing conversation for thread {thread_id}")
+                    is_returning_user = True
+                    logger.info(f"Returning user detected for thread {thread_id} ({len(messages)} messages in history)")
             except Exception as e:
                 logger.warning(f"Could not check thread state, assuming first visit: {e}")
                 is_first_visit = True
 
-            # Story 4.2: Generate and stream proactive greeting on first visit
+            # Story 4.2 + 4.8: Generate and stream greeting (proactive or re-engagement)
             # Greeting is sent BEFORE processing user's first message
-            if is_first_visit:
-                logger.info("Generating proactive greeting...")
+            if is_first_visit or is_returning_user:
+                greeting_type = "re-engagement" if is_returning_user else "proactive"
+                logger.info(f"Generating {greeting_type} greeting...")
                 try:
-                    greeting = await generate_proactive_greeting(
-                        notebook_id=notebook_id,
-                        learner_profile=learner_profile_dict,
-                        notebook=notebook,
-                    )
+                    if is_returning_user:
+                        # Story 4.8: Re-engagement greeting for returning users
+                        # Get learning objectives with status for progress context
+                        from open_notebook.domain.learning_objective import LearningObjective
+                        objectives = await LearningObjective.get_by_notebook(notebook_id)
+                        objectives_with_status = [
+                            {
+                                "id": str(obj.id),
+                                "text": obj.text,
+                                "status": obj.status if hasattr(obj, "status") else "not_started"
+                            }
+                            for obj in objectives
+                        ]
+
+                        greeting = await generate_re_engagement_greeting(
+                            thread_id=thread_id,
+                            learner_profile=learner_profile_dict,
+                            objectives_with_status=objectives_with_status,
+                            notebook_id=notebook_id,
+                        )
+                    else:
+                        # Story 4.2: Proactive greeting for first-time visitors
+                        greeting = await generate_proactive_greeting(
+                            notebook_id=notebook_id,
+                            learner_profile=learner_profile_dict,
+                            notebook=notebook,
+                        )
 
                     # Stream greeting token-by-token for smooth UX
                     # Split into words for token-like streaming effect
@@ -199,19 +240,20 @@ async def stream_learner_chat(
                         metadata={
                             "thread_id": thread_id,
                             "notebook_id": notebook_id,
-                            "type": "proactive_greeting",
+                            "type": greeting_type + "_greeting",  # "proactive_greeting" or "re-engagement_greeting"
+                            "is_returning_user": is_returning_user,
                         },
                     )
                     yield f"event: message_complete\ndata: {greeting_complete_event.model_dump_json()}\n\n"
 
-                    logger.info("Proactive greeting sent successfully")
+                    logger.info(f"{greeting_type.capitalize()} greeting sent successfully")
 
                 except Exception as e:
-                    logger.error(f"Failed to generate proactive greeting: {e}")
+                    logger.error(f"Failed to generate {greeting_type} greeting: {e}")
                     # Continue with normal chat flow if greeting fails
 
-            # Story 4.2: If greeting-only request, return after sending greeting
-            if request.request_greeting_only or (is_first_visit and not request.message.strip()):
+            # Story 4.2 + 4.8: If greeting-only request, return after sending greeting
+            if request.request_greeting_only or ((is_first_visit or is_returning_user) and not request.message.strip()):
                 logger.info("Greeting-only request completed")
                 return
 
