@@ -15,6 +15,10 @@ from fastapi.responses import JSONResponse
 from loguru import logger
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+# Configure structured logging (Story 7.2)
+# Import early to ensure logging is configured before any log statements
+from open_notebook.observability import structured_logger  # noqa: F401
+
 from api.routers import (
     admin_chat,
     artifacts,
@@ -143,6 +147,12 @@ app = FastAPI(
 # Auth is now per-endpoint via Depends(get_current_user), not global middleware.
 # Public endpoints: /auth/login, /auth/register, /auth/status, /health, /docs, /openapi.json, /redoc
 
+# Add Request Logging Middleware (Story 7.2)
+# IMPORTANT: Must be registered BEFORE CORS middleware to ensure context is available
+from api.middleware.request_logging import RequestLoggingMiddleware
+
+app.add_middleware(RequestLoggingMiddleware)
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -162,7 +172,6 @@ from open_notebook.observability.request_context import (
     get_request_context,
     context_buffer as context_buffer_var,
 )
-import traceback
 
 
 async def send_error_notification(
@@ -189,6 +198,7 @@ async def send_error_notification(
             context_snippet = [
                 f"{op.get('type', 'unknown')}: {op.get('details', {})}"
                 for op in recent_ops
+                if isinstance(op, dict)  # Validate op is dict before calling .get()
             ]
 
         # Extract stack trace preview if exception provided
