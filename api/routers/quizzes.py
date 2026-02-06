@@ -5,7 +5,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from api.auth import get_current_user, require_admin
+from api.auth import get_current_user, require_admin, LearnerContext
 from open_notebook.domain.user import User
 from api import quiz_service
 
@@ -71,16 +71,46 @@ async def get_notebook_quizzes(notebook_id: str):
 
 
 @router.get("/quizzes/{quiz_id}")
-async def get_quiz(quiz_id: str):
-    """Get a specific quiz with all questions."""
+async def get_quiz(quiz_id: str, user: User = Depends(get_current_user)):
+    """
+    Get a specific quiz with all questions.
+
+    Story 4.6: Company scoping for learners - validates notebook assignment.
+    Admins can access any quiz; learners can only access quizzes from assigned modules.
+    """
     from loguru import logger
-    
+    from open_notebook.database.repository import repo_query
+
     quiz = await quiz_service.get_quiz(quiz_id)
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
-    
-    logger.info(f"Quiz {quiz_id} has {len(quiz.questions)} questions, completed={quiz.completed}")
-    
+
+    # Story 4.6: Company scoping for learners
+    if user.role == "learner":
+        # Validate quiz's notebook is assigned to learner's company
+        if not user.company_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # Check module_assignment for company access
+        result = await repo_query(
+            """
+            SELECT VALUE true
+            FROM module_assignment
+            WHERE notebook_id = $notebook_id
+              AND company_id = $company_id
+            LIMIT 1
+            """,
+            {"notebook_id": quiz.notebook_id, "company_id": user.company_id},
+        )
+
+        if not result:
+            logger.warning(
+                f"Learner {user.id} attempted to access quiz {quiz_id} from unassigned notebook {quiz.notebook_id}"
+            )
+            raise HTTPException(status_code=403, detail="Quiz not accessible")
+
+    logger.info(f"Quiz {quiz_id} accessed by {user.role} user {user.id}: {len(quiz.questions)} questions")
+
     response = {
         "id": quiz.id,
         "title": quiz.title,
@@ -102,20 +132,56 @@ async def get_quiz(quiz_id: str):
         "user_answers": quiz.user_answers,
         "last_score": quiz.last_score,
     }
-    
+
     return response
 
 
 @router.post("/quizzes/{quiz_id}/check")
-async def check_quiz_answers(quiz_id: str, request: QuizAnswersRequest):
+async def check_quiz_answers(quiz_id: str, request: QuizAnswersRequest, user: User = Depends(get_current_user)):
     """
     Check user answers against a quiz.
-    
+
+    Story 4.6: Company scoping for learners - validates notebook assignment.
     Returns score, percentage, and per-question results with explanations.
     """
+    from loguru import logger
+    from open_notebook.database.repository import repo_query
+
     try:
+        # Fetch quiz first to validate access
+        quiz = await quiz_service.get_quiz(quiz_id)
+        if not quiz:
+            raise HTTPException(status_code=404, detail="Quiz not found")
+
+        # Story 4.6: Company scoping for learners
+        if user.role == "learner":
+            # Validate quiz's notebook is assigned to learner's company
+            if not user.company_id:
+                raise HTTPException(status_code=403, detail="Access denied")
+
+            # Check module_assignment for company access
+            result = await repo_query(
+                """
+                SELECT VALUE true
+                FROM module_assignment
+                WHERE notebook_id = $notebook_id
+                  AND company_id = $company_id
+                LIMIT 1
+                """,
+                {"notebook_id": quiz.notebook_id, "company_id": user.company_id},
+            )
+
+            if not result:
+                logger.warning(
+                    f"Learner {user.id} attempted to check quiz {quiz_id} from unassigned notebook {quiz.notebook_id}"
+                )
+                raise HTTPException(status_code=403, detail="Quiz not accessible")
+
+        # Proceed with answer checking
         result = await quiz_service.check_quiz_answers(quiz_id, request.answers)
         return result
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:

@@ -7,8 +7,9 @@ from fastapi.responses import FileResponse
 from loguru import logger
 from pydantic import BaseModel
 
-from api.auth import get_current_user, require_admin
+from api.auth import get_current_user, require_admin, LearnerContext
 from open_notebook.domain.user import User
+from open_notebook.domain.podcast import Podcast
 from api.podcast_service import (
     PodcastGenerationRequest,
     PodcastGenerationResponse,
@@ -265,3 +266,174 @@ async def delete_podcast_episode(episode_id: str, admin: User = Depends(require_
         raise HTTPException(
             status_code=500, detail="Failed to delete episode"
         )
+
+
+# ==============================================================================
+# Story 4.6: Podcast Artifact Endpoints (for surface_podcast tool)
+# ==============================================================================
+
+
+@router.get("/podcasts/{podcast_id}")
+async def get_podcast(podcast_id: str, user: User = Depends(get_current_user)):
+    """
+    Get a specific podcast artifact by ID.
+
+    Story 4.6: Company scoping for learners - validates notebook assignment.
+    Used by InlineAudioPlayer component for artifact surfacing in chat.
+    """
+    from open_notebook.database.repository import repo_query
+
+    try:
+        podcast = await Podcast.get(podcast_id)
+    except Exception as e:
+        logger.error(f"Error fetching podcast {podcast_id}: {e}")
+        raise HTTPException(status_code=404, detail="Podcast not found")
+
+    if not podcast:
+        raise HTTPException(status_code=404, detail="Podcast not found")
+
+    # Story 4.6: Company scoping for learners
+    if user.role == "learner":
+        # Validate podcast's notebook is assigned to learner's company
+        if not user.company_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # Check module_assignment for company access
+        result = await repo_query(
+            """
+            SELECT VALUE true
+            FROM module_assignment
+            WHERE notebook_id = $notebook_id
+              AND company_id = $company_id
+            LIMIT 1
+            """,
+            {"notebook_id": podcast.notebook_id, "company_id": user.company_id},
+        )
+
+        if not result:
+            logger.warning(
+                f"Learner {user.id} attempted to access podcast {podcast_id} from unassigned notebook {podcast.notebook_id}"
+            )
+            raise HTTPException(status_code=403, detail="Podcast not accessible")
+
+    logger.info(f"Podcast {podcast_id} accessed by {user.role} user {user.id}")
+
+    return {
+        "id": podcast.id,
+        "title": podcast.title,
+        "topic": podcast.topic,
+        "length": podcast.length,
+        "speaker_format": podcast.speaker_format,
+        "audio_file_path": podcast.audio_file_path,
+        "transcript": podcast.transcript,
+        "is_overview": podcast.is_overview,
+        "created_by": podcast.created_by,
+        "status": podcast.status,
+        "duration_minutes": podcast.duration_minutes,
+        "is_ready": podcast.is_ready,
+        "created": podcast.created,
+    }
+
+
+@router.get("/podcasts/{podcast_id}/audio")
+async def stream_podcast_audio(podcast_id: str, user: User = Depends(get_current_user)):
+    """
+    Stream the audio file for a podcast artifact.
+
+    Story 4.6: Company scoping for learners - validates notebook assignment.
+    """
+    from open_notebook.database.repository import repo_query
+
+    try:
+        podcast = await Podcast.get(podcast_id)
+    except Exception as e:
+        logger.error(f"Error fetching podcast {podcast_id} for audio: {e}")
+        raise HTTPException(status_code=404, detail="Podcast not found")
+
+    if not podcast:
+        raise HTTPException(status_code=404, detail="Podcast not found")
+
+    # Story 4.6: Company scoping for learners
+    if user.role == "learner":
+        if not user.company_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        result = await repo_query(
+            """
+            SELECT VALUE true
+            FROM module_assignment
+            WHERE notebook_id = $notebook_id
+              AND company_id = $company_id
+            LIMIT 1
+            """,
+            {"notebook_id": podcast.notebook_id, "company_id": user.company_id},
+        )
+
+        if not result:
+            logger.warning(
+                f"Learner {user.id} attempted to access podcast audio {podcast_id} from unassigned notebook"
+            )
+            raise HTTPException(status_code=403, detail="Podcast not accessible")
+
+    if not podcast.audio_file_path:
+        raise HTTPException(status_code=404, detail="Podcast has no audio file")
+
+    audio_path = Path(podcast.audio_file_path)
+    if not audio_path.exists():
+        raise HTTPException(status_code=404, detail="Audio file not found on disk")
+
+    return FileResponse(
+        audio_path,
+        media_type="audio/mpeg",
+        filename=audio_path.name,
+    )
+
+
+@router.get("/podcasts/{podcast_id}/transcript")
+async def get_podcast_transcript(podcast_id: str, user: User = Depends(get_current_user)):
+    """
+    Get the transcript for a podcast artifact.
+
+    Story 4.6: Company scoping for learners - validates notebook assignment.
+    """
+    from open_notebook.database.repository import repo_query
+
+    try:
+        podcast = await Podcast.get(podcast_id)
+    except Exception as e:
+        logger.error(f"Error fetching podcast {podcast_id} for transcript: {e}")
+        raise HTTPException(status_code=404, detail="Podcast not found")
+
+    if not podcast:
+        raise HTTPException(status_code=404, detail="Podcast not found")
+
+    # Story 4.6: Company scoping for learners
+    if user.role == "learner":
+        if not user.company_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        result = await repo_query(
+            """
+            SELECT VALUE true
+            FROM module_assignment
+            WHERE notebook_id = $notebook_id
+              AND company_id = $company_id
+            LIMIT 1
+            """,
+            {"notebook_id": podcast.notebook_id, "company_id": user.company_id},
+        )
+
+        if not result:
+            logger.warning(
+                f"Learner {user.id} attempted to access podcast transcript {podcast_id} from unassigned notebook"
+            )
+            raise HTTPException(status_code=403, detail="Podcast not accessible")
+
+    if not podcast.transcript:
+        raise HTTPException(status_code=404, detail="Podcast has no transcript")
+
+    return {
+        "podcast_id": podcast.id,
+        "title": podcast.title,
+        "transcript": podcast.transcript,
+    }

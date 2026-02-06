@@ -22,6 +22,8 @@ import { useLearnerChat } from '@/lib/hooks/use-learner-chat'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { DocumentSnippetCard } from './DocumentSnippetCard'
 import { ModuleSuggestionCard } from './ModuleSuggestionCard'
+import { InlineQuizWidget } from './InlineQuizWidget'
+import { InlineAudioPlayer } from './InlineAudioPlayer'
 import type { SuggestedModule } from '@/lib/types/api'
 
 interface ChatPanelProps {
@@ -142,7 +144,7 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
                         )}
                       </p>
 
-                      {/* Story 4.3: Render document snippet cards for tool calls */}
+                      {/* Story 4.3, 4.6: Render artifact cards for tool calls */}
                       {message.role === 'assistant' && message.toolCalls && message.toolCalls.length > 0 && (
                         <div className="mt-2 space-y-2">
                           {/* Successful document snippets */}
@@ -156,6 +158,36 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
                                 excerpt={tc.result!.excerpt}
                                 sourceType={tc.result!.source_type}
                                 relevance={tc.result!.relevance}
+                              />
+                            ))}
+
+                          {/* Story 4.6: Inline quiz widgets */}
+                          {message.toolCalls
+                            .filter((tc) => tc.toolName === 'surface_quiz' && tc.result && !tc.result.error)
+                            .map((tc, tcIndex) => (
+                              <InlineQuizWidget
+                                key={`quiz-${index}-${tcIndex}`}
+                                quizId={tc.result!.quiz_id}
+                                title={tc.result!.title}
+                                description={tc.result!.description}
+                                questions={tc.result!.questions || []}
+                                totalQuestions={tc.result!.total_questions || 0}
+                                quizUrl={tc.result!.quiz_url}
+                              />
+                            ))}
+
+                          {/* Story 4.6: Inline podcast players */}
+                          {message.toolCalls
+                            .filter((tc) => tc.toolName === 'surface_podcast' && tc.result && !tc.result.error)
+                            .map((tc, tcIndex) => (
+                              <InlineAudioPlayer
+                                key={`podcast-${index}-${tcIndex}`}
+                                podcastId={tc.result!.podcast_id}
+                                title={tc.result!.title}
+                                audioUrl={tc.result!.audio_url}
+                                durationMinutes={tc.result!.duration_minutes}
+                                transcriptUrl={tc.result!.transcript_url}
+                                status={tc.result!.status}
                               />
                             ))}
 

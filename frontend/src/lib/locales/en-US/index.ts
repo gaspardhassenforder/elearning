@@ -1343,6 +1343,35 @@ export const enUS = {
     progress: {
       comingSoon: "Progress Tracking Coming Soon",
       comingSoonDesc: "Your learning progress and objectives will be tracked here.",
+      // Story 4.4: Learning Objectives Progress
+      title: "Learning Objectives",
+      complete: "complete",
+      completedAt: "Completed on {date}",
+      evidence: "Evidence",
+      loadError: "Failed to load progress",
+      loadErrorDesc: "Unable to load your learning objectives. Please try again.",
+      noObjectives: "No Learning Objectives",
+      noObjectivesDesc: "Learning objectives will appear here once configured by your instructor.",
+      allComplete: "Congratulations! You've completed all learning objectives!",
+    },
+    // Story 4.6: Quiz Widget
+    quiz: {
+      noQuestions: "No questions available",
+      submitAnswer: "Submit Answer",
+      submitting: "Submitting...",
+      viewFullQuiz: "View Full Quiz",
+      question: "question",
+      questions: "questions",
+      submissionError: "Unable to submit answer. Please try again.",
+    },
+    // Story 4.6: Podcast Player
+    podcast: {
+      play: "Play",
+      pause: "Pause",
+      speed: "Speed",
+      minutes: "minutes",
+      viewTranscript: "View Transcript",
+      generating: "Podcast is currently being generated. Please check back later.",
     },
   },
 }

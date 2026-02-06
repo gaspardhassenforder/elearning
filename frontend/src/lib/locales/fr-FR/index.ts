@@ -1338,6 +1338,35 @@ export const frFR = {
     progress: {
       comingSoon: "Suivi des progrès à venir",
       comingSoonDesc: "Vos progrès d'apprentissage et objectifs seront suivis ici.",
+      // Story 4.4: Suivi de la progression des objectifs d'apprentissage
+      title: "Objectifs d'apprentissage",
+      complete: "terminé",
+      completedAt: "Terminé le {date}",
+      evidence: "Preuve",
+      loadError: "Échec du chargement de la progression",
+      loadErrorDesc: "Impossible de charger vos objectifs d'apprentissage. Veuillez réessayer.",
+      noObjectives: "Aucun objectif d'apprentissage",
+      noObjectivesDesc: "Les objectifs d'apprentissage apparaîtront ici une fois configurés par votre instructeur.",
+      allComplete: "Félicitations ! Vous avez terminé tous les objectifs d'apprentissage !",
+    },
+    // Story 4.6: Widget de quiz
+    quiz: {
+      noQuestions: "Aucune question disponible",
+      submitAnswer: "Soumettre la réponse",
+      submitting: "Envoi en cours...",
+      viewFullQuiz: "Voir le quiz complet",
+      question: "question",
+      questions: "questions",
+      submissionError: "Impossible de soumettre la réponse. Veuillez réessayer.",
+    },
+    // Story 4.6: Lecteur de podcast
+    podcast: {
+      play: "Lecture",
+      pause: "Pause",
+      speed: "Vitesse",
+      minutes: "minutes",
+      viewTranscript: "Voir la transcription",
+      generating: "Le podcast est en cours de génération. Veuillez revenir plus tard.",
     },
   },
 }
