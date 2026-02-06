@@ -82,7 +82,7 @@ development_status:
   epic-5: in-progress
   5-1-sources-panel-with-document-browsing: done  # Code review complete: All HIGH and MEDIUM issues fixed (accordion comment, File List updated with cross-story dependencies), all ACs met, 10 backend + 30 frontend tests passing
   5-2-artifacts-browsing-in-side-panel: done  # Code review complete: 7 issues fixed (backend integration tests, cache invalidation, error state UI, i18n). All 3 ACs met, 32 backend tests + 37 frontend tests passing.
-  5-3-learning-progress-display: review  # All 3 tasks complete: Warm glow animation (3s ring pulse), Progress tab verification, 5 frontend tests passing (11/11 total). Frontend-only changes to ObjectiveProgressList + use-learner-chat hook. NO BACKEND CHANGES.
+  5-3-learning-progress-display: done  # Code review complete: 8 issues found (3 HIGH + 3 MEDIUM + 2 LOW), 6 fixed (greeting bug, type safety, timer cleanup, test quality). All ACs met, 11/11 tests passing warning-free.
   epic-5-retrospective: optional
 
   # Epic 6: Platform Navigation & Voice Input
@@ -93,7 +93,7 @@ development_status:
 
   # Epic 7: Error Handling, Observability & Data Privacy
   epic-7: in-progress
-  7-1-graceful-error-handling-and-user-friendly-messages: in-progress
+  7-1-graceful-error-handling-and-user-friendly-messages: review  # All 9 tasks complete: Backend (prompt error recovery, structured tool errors, SSE error events) + Frontend (error handler utility, amber toast, LearnerErrorBoundary, ChatErrorMessage, Axios interceptor, layout integration). 41 tests passing (15 backend + 26 frontend). All 4 ACs verified.
   7-2-structured-contextual-error-logging: backlog
   7-3-admin-error-notifications: backlog
   7-4-langsmith-llm-tracing-integration: backlog

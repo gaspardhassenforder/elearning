@@ -13,6 +13,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { sendLearnerChatMessage, parseLearnerChatStream, LearnerChatMessage, ToolCall, ObjectiveCheckedData, SSEErrorData } from '../api/learner-chat'
 import { useToast } from './use-toast'
+import { learnerToast } from '../utils/learner-toast'
 import { useLearnerStore } from '../stores/learner-store'
 import { learningObjectivesKeys } from './use-learning-objectives'
 
@@ -245,11 +246,10 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
       })
       setIsStreaming(false)
 
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to send message',
-        variant: 'destructive',
-      })
+      // Story 7.1: Use amber-styled learner toast (never red)
+      learnerToast.error(
+        error instanceof Error ? error.message : 'Failed to send message'
+      )
     },
   })
 
@@ -296,18 +296,20 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
           setMessages([greetingMessage])
 
           // Stream parsing
-          for await (const delta of parseLearnerChatStream(response)) {
-            greetingContent += delta
+          for await (const event of parseLearnerChatStream(response)) {
+            if (event.type === 'text' && event.delta) {
+              greetingContent += event.delta
 
-            // Update greeting message with accumulated content
-            setMessages((prev) => {
-              const updated = [...prev]
-              const lastMessage = updated[updated.length - 1]
-              if (lastMessage && lastMessage.role === 'assistant') {
-                lastMessage.content = greetingContent
-              }
-              return updated
-            })
+              // Update greeting message with accumulated content
+              setMessages((prev) => {
+                const updated = [...prev]
+                const lastMessage = updated[updated.length - 1]
+                if (lastMessage && lastMessage.role === 'assistant') {
+                  lastMessage.content = greetingContent
+                }
+                return updated
+              })
+            }
           }
         } catch (err) {
           console.error('Failed to fetch greeting:', err)

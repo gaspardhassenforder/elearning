@@ -4,7 +4,7 @@
  * Tests for learning objectives progress display in the Progress tab.
  */
 
-import { render, screen } from '@testing-library/react'
+import { render, screen, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ObjectiveProgressList } from '../ObjectiveProgressList'
 import type { ObjectiveWithProgress } from '@/lib/types/api'
@@ -315,23 +315,20 @@ describe('ObjectiveProgressList', () => {
         error: null,
       })
 
-      const { container } = render(<ObjectiveProgressList notebookId="notebook:123" />)
+      render(<ObjectiveProgressList notebookId="notebook:123" />)
 
-      // Dispatch objective_checked event
-      const event = new CustomEvent('objective_checked', {
-        detail: { objective_id: 'learning_objective:abc123' }
+      // Dispatch objective_checked event wrapped in act()
+      act(() => {
+        window.dispatchEvent(new CustomEvent('objective_checked', {
+          detail: { objective_id: 'learning_objective:abc123' }
+        }))
       })
-      window.dispatchEvent(event)
 
-      // Wait for React to process state updates
-      await vi.waitFor(() => {
-        // Find the container div with the styling (parent of text)
-        const textElement = screen.getByText('Understand gradient descent')
-        const containerDiv = textElement.closest('.flex.items-start.gap-3')
-        expect(containerDiv).toHaveClass('ring-2')
-        expect(containerDiv).toHaveClass('ring-primary/50')
-        expect(containerDiv).toHaveClass('animate-pulse')
-      })
+      // Find the container div via data-testid
+      const containerDiv = screen.getByTestId('objective-item-learning_objective:abc123')
+      expect(containerDiv).toHaveClass('ring-2')
+      expect(containerDiv).toHaveClass('ring-primary/50')
+      expect(containerDiv).toHaveClass('animate-pulse')
     })
 
     it('removes warm glow after 3 seconds', async () => {
@@ -362,32 +359,29 @@ describe('ObjectiveProgressList', () => {
 
       render(<ObjectiveProgressList notebookId="notebook:123" />)
 
-      // Dispatch event
-      window.dispatchEvent(new CustomEvent('objective_checked', {
-        detail: { objective_id: 'learning_objective:abc123' }
-      }))
-
-      // Wait for glow to be applied
-      await vi.waitFor(() => {
-        const textElement = screen.getByText('Understand gradient descent')
-        const containerDiv = textElement.closest('.flex.items-start.gap-3')
-        expect(containerDiv).toHaveClass('ring-2')
+      // Dispatch event wrapped in act()
+      act(() => {
+        window.dispatchEvent(new CustomEvent('objective_checked', {
+          detail: { objective_id: 'learning_objective:abc123' }
+        }))
       })
+
+      // Verify glow is applied
+      const containerDiv = screen.getByTestId('objective-item-learning_objective:abc123')
+      expect(containerDiv).toHaveClass('ring-2')
 
       // Fast-forward 3 seconds
-      vi.advanceTimersByTime(3000)
-
-      // Wait for React to process state updates and glow to be removed
-      await vi.waitFor(() => {
-        const textElement = screen.getByText('Understand gradient descent')
-        const containerDiv = textElement.closest('.flex.items-start.gap-3')
-        expect(containerDiv).not.toHaveClass('ring-2')
+      act(() => {
+        vi.advanceTimersByTime(3000)
       })
+
+      // Verify glow is removed
+      expect(containerDiv).not.toHaveClass('ring-2')
 
       vi.useRealTimers()
     })
 
-    it('supports multiple objectives glowing simultaneously', async () => {
+    it('supports multiple objectives glowing simultaneously', () => {
       const objectives: ObjectiveWithProgress[] = [
         {
           id: 'learning_objective:obj1',
@@ -423,21 +417,21 @@ describe('ObjectiveProgressList', () => {
 
       render(<ObjectiveProgressList notebookId="notebook:123" />)
 
-      // Check off two objectives quickly
-      window.dispatchEvent(new CustomEvent('objective_checked', {
-        detail: { objective_id: 'learning_objective:obj1' }
-      }))
-      window.dispatchEvent(new CustomEvent('objective_checked', {
-        detail: { objective_id: 'learning_objective:obj2' }
-      }))
-
-      // Wait for both glows to be applied
-      await vi.waitFor(() => {
-        const objective1 = screen.getByText('Objective 1').closest('.flex.items-start.gap-3')
-        const objective2 = screen.getByText('Objective 2').closest('.flex.items-start.gap-3')
-        expect(objective1).toHaveClass('ring-2')
-        expect(objective2).toHaveClass('ring-2')
+      // Check off two objectives quickly, wrapped in act()
+      act(() => {
+        window.dispatchEvent(new CustomEvent('objective_checked', {
+          detail: { objective_id: 'learning_objective:obj1' }
+        }))
+        window.dispatchEvent(new CustomEvent('objective_checked', {
+          detail: { objective_id: 'learning_objective:obj2' }
+        }))
       })
+
+      // Verify both glows are applied via data-testid
+      const objective1 = screen.getByTestId('objective-item-learning_objective:obj1')
+      const objective2 = screen.getByTestId('objective-item-learning_objective:obj2')
+      expect(objective1).toHaveClass('ring-2')
+      expect(objective2).toHaveClass('ring-2')
     })
 
     it('does not glow objectives that were already completed', () => {
@@ -466,8 +460,8 @@ describe('ObjectiveProgressList', () => {
 
       render(<ObjectiveProgressList notebookId="notebook:123" />)
 
-      // Verify no glow on mount (only completed status styling)
-      const completedObjective = screen.getByText('Already Completed Objective').closest('.flex.items-start.gap-3')
+      // Verify no glow on mount (only completed status styling) via data-testid
+      const completedObjective = screen.getByTestId('objective-item-learning_objective:old')
       expect(completedObjective).toHaveClass('bg-green-50')
       expect(completedObjective).not.toHaveClass('ring-2')
     })

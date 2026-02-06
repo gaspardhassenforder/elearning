@@ -15,7 +15,7 @@
  * - Story 5.3: Warm glow animation for newly checked objectives (3s duration)
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { CheckCircle2, Circle, Target, Loader2 } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -30,6 +30,7 @@ import {
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { useLearnerObjectivesProgress } from '@/lib/hooks/use-learning-objectives'
 import type { ObjectiveWithProgress } from '@/lib/types/api'
+import type { ObjectiveCheckedData } from '@/lib/api/learner-chat'
 import { cn } from '@/lib/utils'
 
 // Story 5.3: Duration for warm glow animation
@@ -51,6 +52,7 @@ function ObjectiveItem({ objective, t, hasWarmGlow = false }: ObjectiveItemProps
 
   const content = (
     <div
+      data-testid={`objective-item-${objective.id}`}
       className={cn(
         'flex items-start gap-3 p-3 rounded-lg transition-all duration-150',
         isCompleted
@@ -119,11 +121,12 @@ export function ObjectiveProgressList({ notebookId }: ObjectiveProgressListProps
   // Story 5.3: Track recently checked objectives with timestamps
   const [recentlyCheckedObjectiveIds, setRecentlyCheckedObjectiveIds] =
     useState<Map<string, number>>(new Map())
+  const glowTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
 
   // Story 5.3: Listen for objective_checked SSE events
   useEffect(() => {
     const handleObjectiveChecked = (event: Event) => {
-      const customEvent = event as CustomEvent<{ objective_id: string }>
+      const customEvent = event as CustomEvent<ObjectiveCheckedData>
       const { objective_id } = customEvent.detail
 
       // Add to recently checked map
@@ -132,13 +135,15 @@ export function ObjectiveProgressList({ notebookId }: ObjectiveProgressListProps
       )
 
       // Auto-remove after GLOW_DURATION_MS
-      setTimeout(() => {
+      const timerId = setTimeout(() => {
+        glowTimersRef.current.delete(timerId)
         setRecentlyCheckedObjectiveIds((prev) => {
           const next = new Map(prev)
           next.delete(objective_id)
           return next
         })
       }, GLOW_DURATION_MS)
+      glowTimersRef.current.add(timerId)
     }
 
     // Subscribe to objective_checked events
@@ -146,6 +151,9 @@ export function ObjectiveProgressList({ notebookId }: ObjectiveProgressListProps
 
     return () => {
       window.removeEventListener('objective_checked', handleObjectiveChecked)
+      // Clear all pending glow timers on unmount
+      glowTimersRef.current.forEach((id) => clearTimeout(id))
+      glowTimersRef.current.clear()
     }
   }, [])
 
