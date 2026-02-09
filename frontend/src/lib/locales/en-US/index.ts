@@ -1381,6 +1381,17 @@ export const enUS = {
         notSupportedDesc: "Your browser doesn't support voice input. Please use Chrome, Edge, or Safari.",
       },
     },
+    // Story 7.8: Learner Transparency - Details View
+    details: {
+      show: "Details",
+      hide: "Hide details",
+      toolCall: "Tool Call",
+      inputs: "Inputs",
+      outputs: "Outputs",
+      sources: "Sources",
+      reasoning: "Thinking Process",
+      executionOrder: "Execution Order",
+    },
     sources: {
       title: "Documents",
       description: "{count} documents available",

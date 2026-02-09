@@ -30,6 +30,8 @@ import { InlineQuizWidget } from './InlineQuizWidget'
 import { InlineAudioPlayer } from './InlineAudioPlayer'
 import { AsyncStatusBar } from './AsyncStatusBar'
 import { ChatErrorMessage } from './ChatErrorMessage'
+import { DetailsToggle } from './DetailsToggle'
+import { ToolCallDetails } from './ToolCallDetails'
 import { useJobStatus } from '@/lib/hooks/use-job-status'
 import { useLearnerStore } from '@/lib/stores/learner-store'
 import { useToast } from '@/lib/hooks/use-toast'
@@ -92,6 +94,9 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
 
   const inputRef = useRef<HTMLInputElement>(null)
   const [userHasEdited, setUserHasEdited] = useState(false)
+
+  // Story 7.8: Track which messages have details expanded
+  const [expandedDetailsMessageIds, setExpandedDetailsMessageIds] = useState<Set<number>>(new Set())
 
   // Story 4.8: Merge history with current messages (history first, then new messages)
   const allMessages = historyLoaded && historyData?.messages
@@ -416,6 +421,42 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
                             recoverable={message.sseError.recoverable ?? false}
                             className="text-xs"
                           />
+                        </div>
+                      )}
+
+                      {/* Story 7.8: Details toggle for assistant messages with tool calls */}
+                      {message.role === 'assistant' && message.toolCalls && message.toolCalls.length > 0 && (
+                        <div className="mt-2">
+                          <DetailsToggle
+                            message={message}
+                            isExpanded={expandedDetailsMessageIds.has(index)}
+                            onToggle={() => {
+                              setExpandedDetailsMessageIds((prev) => {
+                                const newSet = new Set(prev)
+                                if (newSet.has(index)) {
+                                  newSet.delete(index)
+                                } else {
+                                  newSet.add(index)
+                                }
+                                return newSet
+                              })
+                            }}
+                          />
+
+                          {/* Story 7.8: Tool call details when expanded */}
+                          {expandedDetailsMessageIds.has(index) && (
+                            <ToolCallDetails
+                              toolCalls={message.toolCalls}
+                              onSourceSelect={(sourceId) => {
+                                // Reuse existing source selection logic from ChatPanel
+                                // This triggers the sources panel to open and scroll to source
+                                const sourceElement = document.querySelector(`[data-source-id="${sourceId}"]`)
+                                if (sourceElement) {
+                                  sourceElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                                }
+                              }}
+                            />
+                          )}
                         </div>
                       )}
                     </div>

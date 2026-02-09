@@ -12,6 +12,7 @@ export interface LearnerChatMessage {
   timestamp?: string
   toolCalls?: ToolCall[]  // Story 4.3: Track tool calls for document snippets
   sseError?: SSEErrorData  // Story 7.1: Inline error from SSE stream
+  toolCallSequence?: { order: number; toolCall: ToolCall }[]  // Story 7.8: Execution order of tool calls
 }
 
 // Story 4.3: Tool call tracking

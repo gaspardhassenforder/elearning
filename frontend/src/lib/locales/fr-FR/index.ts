@@ -1381,6 +1381,17 @@ export const frFR = {
         notSupportedDesc: "Votre navigateur ne prend pas en charge la saisie vocale. Veuillez utiliser Chrome, Edge ou Safari.",
       },
     },
+    // Story 7.8: Transparence de l'apprenant - Vue des détails
+    details: {
+      show: "Détails",
+      hide: "Masquer les détails",
+      toolCall: "Appel d'outil",
+      inputs: "Entrées",
+      outputs: "Sorties",
+      sources: "Sources",
+      reasoning: "Processus de réflexion",
+      executionOrder: "Ordre d'exécution",
+    },
     sources: {
       title: "Documents",
       description: "{count} documents disponibles",
