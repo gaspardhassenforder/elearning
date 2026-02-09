@@ -153,7 +153,126 @@ User documentation is at @docs/
 
 ---
 
-## Important Quirks & Gotchas
+## Security Patterns
+
+### Per-Company Data Isolation (Story 7.5)
+
+**CRITICAL:** All learner-scoped endpoints MUST enforce per-company data isolation to prevent cross-company data leakage.
+
+#### Pattern 1: Learner-Only Endpoints (Preferred)
+
+For endpoints accessible **only to learners**, use `get_current_learner()` dependency:
+
+```python
+# api/routers/learner.py
+from api.auth import get_current_learner, LearnerContext
+
+@router.get("/learner/modules")
+async def list_modules(learner: LearnerContext = Depends(get_current_learner)):
+    """List modules assigned to learner's company."""
+    return await module_service.get_assigned_modules(
+        company_id=learner.company_id,  # Automatically extracted from JWT
+        user_id=learner.user.id,
+    )
+```
+
+**Key Points:**
+- `get_current_learner()` automatically extracts `company_id` from authenticated user
+- Raises 403 if user is not a learner or has no company assignment
+- Service layer MUST pass `company_id` to domain queries
+- Domain queries MUST include `WHERE company_id = $company_id` filter
+
+#### Pattern 2: Mixed Admin/Learner Endpoints (Quiz/Podcast Pattern)
+
+For endpoints accessible to **both admins and learners**, use `get_current_user()` with manual role check:
+
+```python
+# api/routers/quizzes.py
+from api.auth import get_current_user
+from open_notebook.domain.user import User
+
+@router.get("/quizzes/{quiz_id}")
+async def get_quiz(quiz_id: str, user: User = Depends(get_current_user)):
+    """
+    Get quiz details.
+
+    Story 7.5: Mixed admin/learner endpoint - manual company validation.
+    Admins can access any quiz; learners only quizzes from assigned modules.
+    """
+    from open_notebook.database.repository import repo_query
+
+    quiz = await quiz_service.get_quiz(quiz_id)
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+
+    # Manual role-based company scoping
+    if user.role == "learner":
+        # Validate quiz's notebook is assigned to learner's company
+        if not user.company_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # Check module_assignment for company access
+        result = await repo_query(
+            """
+            SELECT VALUE true
+            FROM module_assignment
+            WHERE notebook_id = $notebook_id
+              AND company_id = $company_id
+            LIMIT 1
+            """,
+            {"notebook_id": quiz.notebook_id, "company_id": user.company_id},
+        )
+
+        if not result:
+            raise HTTPException(status_code=403, detail="Quiz not accessible")
+
+    # Admin bypasses company check - can access any quiz
+    return quiz
+```
+
+**When to Use This Pattern:**
+- Endpoint serves both admin AND learner roles
+- Admin needs unrestricted access to all data
+- Learner needs company-scoped access
+
+**Current Usage:**
+- `GET /quizzes/{quiz_id}` - Quiz details
+- `POST /quizzes/{quiz_id}/check` - Quiz answer checking
+- `GET /podcasts/{podcast_id}` - Podcast details
+- `GET /podcasts/{podcast_id}/audio` - Podcast audio streaming
+- `GET /podcasts/{podcast_id}/transcript` - Podcast transcript
+
+#### Pattern 3: Admin-Only Endpoints
+
+For endpoints accessible **only to admins**, use `require_admin()` dependency:
+
+```python
+# api/routers/admin.py
+from api.auth import require_admin
+from open_notebook.domain.user import User
+
+@router.get("/admin/modules")
+async def list_all_modules(admin: User = Depends(require_admin)):
+    """List ALL modules from all companies (admin-only)."""
+    return await module_service.get_all_modules()  # No company filter
+```
+
+**Key Points:**
+- Admin endpoints NEVER filter by company_id
+- Admin sees data from all companies
+- Use for management, reporting, and configuration endpoints
+
+### Security Best Practices
+
+1. **Consistent 403 for unauthorized access** - Don't leak resource existence with 404
+2. **Always validate company access first** - Check assignment before loading resource
+3. **Log security events** - Audit trail for access denials with company_id context
+4. **Test cross-company isolation** - Regression tests for every learner endpoint
+5. **Document mixed patterns** - Add comments explaining why admin bypasses company check
+
+---
+
+## Important Quirks & Gotchs
 
 ### Learning Platform Specifics
 - **User roles**: Admin can create/edit notebooks; Learners are read-only
