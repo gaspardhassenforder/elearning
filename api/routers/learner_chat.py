@@ -24,6 +24,7 @@ from api.learner_chat_service import (
 from open_notebook.graphs.prompt import generate_re_engagement_greeting
 from open_notebook.graphs.chat import graph as chat_graph, memory as chat_memory
 from open_notebook.observability.langsmith_handler import get_langsmith_callback
+from open_notebook.observability.langgraph_context_callback import ContextLoggingCallback
 
 router = APIRouter()
 
@@ -468,8 +469,13 @@ async def stream_learner_chat(
                 run_name=f"chat:{thread_id}",
             )
 
-            # Build callbacks list (empty if LangSmith not configured)
-            callbacks = [langsmith_callback] if langsmith_callback else []
+            # Story 7.2: Add context logging callback for error diagnostics
+            context_callback = ContextLoggingCallback()
+
+            # Build callbacks list (Story 7.2 + Story 7.4)
+            callbacks = [context_callback]
+            if langsmith_callback:
+                callbacks.append(langsmith_callback)
 
             # Stream events from chat graph with assembled system prompt
             # Story 4.4: Pass user_id for objective progress tracking

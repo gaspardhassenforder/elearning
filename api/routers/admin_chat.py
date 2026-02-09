@@ -15,6 +15,7 @@ from open_notebook.domain.module_prompt import ModulePrompt
 from open_notebook.graphs.chat import graph as chat_graph
 from open_notebook.domain.user import User
 from open_notebook.observability.langsmith_handler import get_langsmith_callback
+from open_notebook.observability.langgraph_context_callback import ContextLoggingCallback
 
 
 router = APIRouter(dependencies=[Depends(require_admin)])
@@ -129,8 +130,13 @@ async def admin_chat(
             run_name=f"admin_assistant:{admin_user.id}:{request.notebook_id}",
         )
 
-        # Build callbacks list (empty if LangSmith not configured)
-        callbacks = [langsmith_callback] if langsmith_callback else []
+        # Story 7.2: Add context logging callback for error diagnostics
+        context_callback = ContextLoggingCallback()
+
+        # Build callbacks list (Story 7.2 + Story 7.4)
+        callbacks = [context_callback]
+        if langsmith_callback:
+            callbacks.append(langsmith_callback)
 
         # Invoke chat graph
         result = chat_graph.invoke(

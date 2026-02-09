@@ -35,6 +35,7 @@ from api.routers import (
     learner,
     learner_chat,
     learning_objectives,
+    logs,
     models,
     module_assignments,
     module_prompts,
@@ -208,6 +209,7 @@ app.include_router(learning_objectives.learner_router, prefix="/api", tags=["lea
 app.include_router(module_prompts.router, prefix="/api", tags=["module-prompts"])
 app.include_router(admin_chat.router, prefix="/api", tags=["admin-chat"])
 app.include_router(debug.router, prefix="/api", tags=["debug"])
+app.include_router(logs.router, prefix="/api", tags=["logs"])
 
 
 @app.get("/")

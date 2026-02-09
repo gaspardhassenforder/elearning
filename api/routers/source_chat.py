@@ -17,6 +17,7 @@ from open_notebook.exceptions import (
     NotFoundError,
 )
 from open_notebook.graphs.source_chat import source_chat_graph as source_chat_graph
+from open_notebook.observability.langgraph_context_callback import ContextLoggingCallback
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 
@@ -430,11 +431,15 @@ async def stream_source_chat_response(
         user_event = {"type": "user_message", "content": message, "timestamp": None}
         yield f"data: {json.dumps(user_event)}\n\n"
 
+        # Story 7.2: Add context logging callback for error diagnostics
+        context_callback = ContextLoggingCallback()
+
         # Execute source chat graph synchronously (like notebook chat does)
         result = source_chat_graph.invoke(
             input=state_values,  # type: ignore[arg-type]
             config=RunnableConfig(
-                configurable={"thread_id": session_id, "model_id": model_override}
+                configurable={"thread_id": session_id, "model_id": model_override},
+                callbacks=[context_callback],  # Story 7.2: Context logging
             ),
         )
 
