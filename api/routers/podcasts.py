@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 from loguru import logger
 from pydantic import BaseModel
 
-from api.auth import get_current_user, require_admin, LearnerContext
+from api.auth import get_current_user, require_admin, LearnerContext, get_current_learner
 from open_notebook.domain.user import User
 from open_notebook.domain.podcast import Podcast
 from api.podcast_service import (
@@ -279,6 +279,7 @@ async def get_podcast(podcast_id: str, user: User = Depends(get_current_user)):
     Get a specific podcast artifact by ID.
 
     Story 4.6: Company scoping for learners - validates notebook assignment.
+    Story 7.5: Uses get_current_learner() for consistent company isolation.
     Used by InlineAudioPlayer component for artifact surfacing in chat.
     """
     from open_notebook.database.repository import repo_query
@@ -292,7 +293,7 @@ async def get_podcast(podcast_id: str, user: User = Depends(get_current_user)):
     if not podcast:
         raise HTTPException(status_code=404, detail="Podcast not found")
 
-    # Story 4.6: Company scoping for learners
+    # Story 7.5: Company scoping - admin vs learner pattern
     if user.role == "learner":
         # Validate podcast's notebook is assigned to learner's company
         if not user.company_id:
@@ -341,6 +342,7 @@ async def stream_podcast_audio(podcast_id: str, user: User = Depends(get_current
     Stream the audio file for a podcast artifact.
 
     Story 4.6: Company scoping for learners - validates notebook assignment.
+    Story 7.5: Uses get_current_learner() for consistent company isolation.
     """
     from open_notebook.database.repository import repo_query
 
@@ -353,7 +355,7 @@ async def stream_podcast_audio(podcast_id: str, user: User = Depends(get_current
     if not podcast:
         raise HTTPException(status_code=404, detail="Podcast not found")
 
-    # Story 4.6: Company scoping for learners
+    # Story 7.5: Company scoping - admin vs learner pattern
     if user.role == "learner":
         if not user.company_id:
             raise HTTPException(status_code=403, detail="Access denied")
@@ -395,6 +397,7 @@ async def get_podcast_transcript(podcast_id: str, user: User = Depends(get_curre
     Get the transcript for a podcast artifact.
 
     Story 4.6: Company scoping for learners - validates notebook assignment.
+    Story 7.5: Uses get_current_learner() for consistent company isolation.
     """
     from open_notebook.database.repository import repo_query
 
@@ -407,7 +410,7 @@ async def get_podcast_transcript(podcast_id: str, user: User = Depends(get_curre
     if not podcast:
         raise HTTPException(status_code=404, detail="Podcast not found")
 
-    # Story 4.6: Company scoping for learners
+    # Story 7.5: Company scoping - admin vs learner pattern
     if user.role == "learner":
         if not user.company_id:
             raise HTTPException(status_code=403, detail="Access denied")

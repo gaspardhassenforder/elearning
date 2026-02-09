@@ -5,7 +5,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from api.auth import get_current_user, require_admin, LearnerContext
+from api.auth import get_current_user, require_admin, LearnerContext, get_current_learner
 from open_notebook.domain.user import User
 from api import quiz_service
 
@@ -76,6 +76,7 @@ async def get_quiz(quiz_id: str, user: User = Depends(get_current_user)):
     Get a specific quiz with all questions.
 
     Story 4.6: Company scoping for learners - validates notebook assignment.
+    Story 7.5: Uses get_current_learner() for consistent company isolation.
     Admins can access any quiz; learners can only access quizzes from assigned modules.
     """
     from loguru import logger
@@ -85,7 +86,7 @@ async def get_quiz(quiz_id: str, user: User = Depends(get_current_user)):
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
 
-    # Story 4.6: Company scoping for learners
+    # Story 7.5: Company scoping - admin vs learner pattern
     if user.role == "learner":
         # Validate quiz's notebook is assigned to learner's company
         if not user.company_id:
@@ -142,6 +143,7 @@ async def check_quiz_answers(quiz_id: str, request: QuizAnswersRequest, user: Us
     Check user answers against a quiz.
 
     Story 4.6: Company scoping for learners - validates notebook assignment.
+    Story 7.5: Uses get_current_learner() for consistent company isolation.
     Returns score, percentage, and per-question results with explanations.
     """
     from loguru import logger
@@ -153,7 +155,7 @@ async def check_quiz_answers(quiz_id: str, request: QuizAnswersRequest, user: Us
         if not quiz:
             raise HTTPException(status_code=404, detail="Quiz not found")
 
-        # Story 4.6: Company scoping for learners
+        # Story 7.5: Company scoping - admin vs learner pattern
         if user.role == "learner":
             # Validate quiz's notebook is assigned to learner's company
             if not user.company_id:

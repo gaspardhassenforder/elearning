@@ -97,8 +97,8 @@ development_status:
   7-2-structured-contextual-error-logging: done  # All ACs verified met. Exception handlers with structured logging + context buffer flushing implemented and tested (12/12 tests passing). Middleware registered. Infrastructure complete. Tasks 8-9 (frontend/admin endpoints) deferred to separate stories.
   7-3-admin-error-notifications: done  # Code review complete: 7 HIGH + 4 MEDIUM issues fixed (task checkboxes, CONFIGURATION.md docs, duplicate import, context buffer validation, integration tests, aiosmtplib check). All 10 tasks complete, all 3 ACs verified, 41 tests passing (100%), documentation updated.
   7-4-langsmith-llm-tracing-integration: review  # All 7 tasks complete: LangSmith callback handler (8 unit tests passing), 9 workflows instrumented (chat, navigation, source processing, transformations, objectives, notes, search), configuration docs enhanced, 13 tests passing (8 unit + 5 integration), all ACs verified
-  7-5-per-company-data-isolation-audit: backlog
-  7-6-user-and-company-data-deletion: ready-for-dev
+  7-5-per-company-data-isolation-audit: review  # All 7 tasks complete: Comprehensive audit of 10 learner endpoints, 11 regression tests passing (100%), zero security gaps found, Story 7.5 documentation added to quiz/podcast endpoints, all ACs verified
+  7-6-user-and-company-data-deletion: in-progress
   7-7-token-usage-tracking: backlog
   7-8-learner-transparency-details-view: backlog
   epic-7-retrospective: optional
