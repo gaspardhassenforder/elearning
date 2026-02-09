@@ -48,6 +48,7 @@ from api.routers import (
     source_chat,
     sources,
     speaker_profiles,
+    token_usage,
     transformations,
     users,
 )
@@ -210,6 +211,7 @@ app.include_router(module_prompts.router, prefix="/api", tags=["module-prompts"]
 app.include_router(admin_chat.router, prefix="/api", tags=["admin-chat"])
 app.include_router(debug.router, prefix="/api", tags=["debug"])
 app.include_router(logs.router, prefix="/api", tags=["logs"])
+app.include_router(token_usage.router, prefix="/api", tags=["token-usage"])
 
 
 @app.get("/")

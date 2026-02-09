@@ -1,0 +1,24 @@
+-- Migration 26: Token Usage Tracking
+-- Story 7.7: Token Usage Tracking
+-- Date: 2026-02-09
+
+-- Create token_usage table
+DEFINE TABLE IF NOT EXISTS token_usage SCHEMAFULL;
+
+-- Define fields
+DEFINE FIELD IF NOT EXISTS user_id ON TABLE token_usage TYPE option<record<user>>;
+DEFINE FIELD IF NOT EXISTS company_id ON TABLE token_usage TYPE option<record<company>>;
+DEFINE FIELD IF NOT EXISTS notebook_id ON TABLE token_usage TYPE option<record<notebook>>;
+DEFINE FIELD IF NOT EXISTS model_provider ON TABLE token_usage TYPE string;
+DEFINE FIELD IF NOT EXISTS model_name ON TABLE token_usage TYPE string;
+DEFINE FIELD IF NOT EXISTS input_tokens ON TABLE token_usage TYPE int;
+DEFINE FIELD IF NOT EXISTS output_tokens ON TABLE token_usage TYPE int;
+DEFINE FIELD IF NOT EXISTS operation_type ON TABLE token_usage TYPE string;
+DEFINE FIELD IF NOT EXISTS timestamp ON TABLE token_usage TYPE datetime DEFAULT time::now();
+DEFINE FIELD IF NOT EXISTS cost_estimate ON TABLE token_usage TYPE option<float>;
+
+-- Define indexes for efficient queries
+DEFINE INDEX IF NOT EXISTS company_timestamp_idx ON TABLE token_usage COLUMNS company_id, timestamp;
+DEFINE INDEX IF NOT EXISTS notebook_timestamp_idx ON TABLE token_usage COLUMNS notebook_id, timestamp;
+DEFINE INDEX IF NOT EXISTS timestamp_idx ON TABLE token_usage COLUMNS timestamp;
+DEFINE INDEX IF NOT EXISTS operation_type_idx ON TABLE token_usage COLUMNS operation_type;

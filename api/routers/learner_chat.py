@@ -25,6 +25,7 @@ from open_notebook.graphs.prompt import generate_re_engagement_greeting
 from open_notebook.graphs.chat import graph as chat_graph, memory as chat_memory
 from open_notebook.observability.langsmith_handler import get_langsmith_callback
 from open_notebook.observability.langgraph_context_callback import ContextLoggingCallback
+from open_notebook.observability.token_tracking_callback import TokenTrackingCallback
 
 router = APIRouter()
 
@@ -472,8 +473,16 @@ async def stream_learner_chat(
             # Story 7.2: Add context logging callback for error diagnostics
             context_callback = ContextLoggingCallback()
 
-            # Build callbacks list (Story 7.2 + Story 7.4)
-            callbacks = [context_callback]
+            # Story 7.7: Add token tracking callback for usage monitoring
+            token_callback = TokenTrackingCallback(
+                user_id=learner.user.id,
+                company_id=learner.company_id,
+                notebook_id=notebook_id,
+                operation_type="chat",
+            )
+
+            # Build callbacks list (Story 7.2 + Story 7.4 + Story 7.7)
+            callbacks = [context_callback, token_callback]
             if langsmith_callback:
                 callbacks.append(langsmith_callback)
 
