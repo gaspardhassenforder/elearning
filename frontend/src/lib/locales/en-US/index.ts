@@ -1390,7 +1390,7 @@ export const enUS = {
       outputs: "Outputs",
       sources: "Sources",
       reasoning: "Thinking Process",
-      executionOrder: "Execution Order",
+      pending: "Pending result...",
     },
     sources: {
       title: "Documents",

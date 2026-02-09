@@ -133,6 +133,8 @@ vi.mock('../ToolCallDetails', () => ({
 describe('ChatPanel - Details Toggle Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Mock scrollIntoView for jsdom environment
+    Element.prototype.scrollIntoView = vi.fn()
   })
 
   it('renders details toggle for assistant messages with tool calls', () => {

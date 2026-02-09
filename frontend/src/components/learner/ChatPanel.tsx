@@ -447,6 +447,7 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
                           {expandedDetailsMessageIds.has(index) && (
                             <ToolCallDetails
                               toolCalls={message.toolCalls}
+                              messageContent={message.content}
                               onSourceSelect={(sourceId) => {
                                 // Reuse existing source selection logic from ChatPanel
                                 // This triggers the sources panel to open and scroll to source

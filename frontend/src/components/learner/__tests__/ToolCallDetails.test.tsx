@@ -21,7 +21,7 @@ vi.mock('@/lib/hooks/use-translation', () => ({
           outputs: 'Outputs',
           sources: 'Sources',
           reasoning: 'Thinking Process',
-          executionOrder: 'Execution Order',
+          pending: 'Pending result...',
         },
       },
     },
@@ -126,7 +126,8 @@ describe('ToolCallDetails', () => {
     expect(screen.queryByText(/Tool Call/i)).not.toBeInTheDocument()
   })
 
-  it('handles tool calls without results (pending state)', () => {
+  it('handles tool calls without results (pending state)', async () => {
+    const user = userEvent.setup()
     const pendingToolCall: ToolCall = {
       id: 'call_pending',
       toolName: 'generate_artifact',
@@ -138,6 +139,13 @@ describe('ToolCallDetails', () => {
 
     // Should still render the tool call
     expect(screen.getByText(/generate_artifact/i)).toBeInTheDocument()
+
+    // Expand accordion to see pending indicator
+    const trigger = screen.getByText(/generate_artifact/i)
+    await user.click(trigger)
+
+    // Should show pending result text
+    expect(screen.getByText(/pending result/i)).toBeInTheDocument()
   })
 
   it('calls onSourceSelect callback when source link clicked', async () => {
@@ -174,5 +182,33 @@ describe('ToolCallDetails', () => {
 
     expect(mockOnSourceSelect).toHaveBeenCalledWith('doc_123')
     expect(mockOnSourceSelect).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not render source link when tool result has error', async () => {
+    const user = userEvent.setup()
+
+    const toolCallsWithError: ToolCall[] = [
+      {
+        id: 'call_error',
+        toolName: 'surface_document',
+        args: { source_id: 'doc_999' },
+        result: {
+          error: 'Source not found',
+        },
+      },
+    ]
+
+    render(<ToolCallDetails toolCalls={toolCallsWithError} />)
+
+    // Expand accordion
+    const trigger = screen.getByText(/surface_document/i)
+    await user.click(trigger)
+
+    // Should NOT render source link button
+    const sourceLink = screen.queryByRole('button', { name: /doc_999/i })
+    expect(sourceLink).not.toBeInTheDocument()
+
+    // Should show error in outputs
+    expect(screen.getByText(/"error"/i)).toBeInTheDocument()
   })
 })

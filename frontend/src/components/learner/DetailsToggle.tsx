@@ -30,7 +30,8 @@ export function DetailsToggle({ message, isExpanded, onToggle }: DetailsTogglePr
       size="sm"
       onClick={onToggle}
       aria-label={isExpanded ? t.learner.details.hide : t.learner.details.show}
-      className="h-8 px-3 text-xs text-muted-foreground hover:text-foreground transition-colors"
+      aria-expanded={isExpanded}
+      className="min-h-[44px] px-3 text-xs text-muted-foreground hover:text-foreground transition-colors"
     >
       {isExpanded ? (
         <>

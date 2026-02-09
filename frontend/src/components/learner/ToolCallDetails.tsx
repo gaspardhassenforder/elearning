@@ -43,7 +43,7 @@ export function ToolCallDetails({
       )}
 
       {/* Tool calls accordion */}
-      <Accordion type="multiple" className="w-full">
+      <Accordion type="single" collapsible className="w-full">
         {toolCalls.map((toolCall, index) => (
           <AccordionItem key={toolCall.id} value={toolCall.id}>
             <AccordionTrigger className="text-xs font-mono text-left">
@@ -79,13 +79,14 @@ export function ToolCallDetails({
                 {/* Source links (for surface_document tool) */}
                 {toolCall.toolName === 'surface_document' &&
                   toolCall.result &&
-                  !toolCall.result.error && (
+                  !toolCall.result.error &&
+                  'source_id' in toolCall.result && (
                     <div>
                       <p className="text-xs font-medium text-muted-foreground mb-1">
                         {t.learner.details.sources}
                       </p>
                       <button
-                        onClick={() => onSourceSelect?.(toolCall.result!.source_id)}
+                        onClick={() => onSourceSelect?.(toolCall.result.source_id)}
                         className="text-xs text-primary hover:underline cursor-pointer transition-colors"
                       >
                         {toolCall.result.title || toolCall.result.source_id}
@@ -96,7 +97,7 @@ export function ToolCallDetails({
                 {/* Pending state indicator */}
                 {!toolCall.result && (
                   <div className="text-xs text-muted-foreground italic">
-                    Pending result...
+                    {t.learner.details.pending}
                   </div>
                 )}
               </div>
