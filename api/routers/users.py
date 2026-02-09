@@ -7,12 +7,12 @@ from api.auth import require_admin
 from api.models import AdminUserCreate, UserListResponse, UserResponse, UserUpdate
 from api.user_service import (
     create_user_admin,
-    delete_user,
     get_user_by_id,
     list_users,
     update_user,
 )
 from open_notebook.domain.user import User
+from open_notebook.domain.user_deletion import UserDeletionReport, delete_user_cascade
 
 router = APIRouter()
 
@@ -111,16 +111,40 @@ async def update_user_endpoint(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.delete("/users/{user_id}", status_code=204)
-async def delete_user_endpoint(user_id: str, _admin: User = Depends(require_admin)):
-    """Delete a user."""
+@router.delete("/users/{user_id}", response_model=UserDeletionReport)
+async def delete_user_endpoint(user_id: str, admin: User = Depends(require_admin)):
+    """
+    Delete user and cascade to all related data (GDPR-compliant).
+
+    **Deleted Data:**
+    - learner_objective_progress records
+    - LangGraph conversation checkpoints (SQLite)
+    - User-created quizzes
+    - User-created notes
+    - Module assignments where user is assigner
+    - User record
+
+    **Returns:**
+    - 200: UserDeletionReport with counts of deleted records
+    - 404: User not found
+    - 403: Requires admin privileges
+    """
     try:
-        deleted = await delete_user(user_id)
-        if not deleted:
-            raise HTTPException(status_code=404, detail="User not found")
-        return None
-    except HTTPException:
-        raise
+        report = await delete_user_cascade(user_id)
+
+        logger.info(
+            f"User deleted by admin",
+            extra={
+                "user_id": user_id,
+                "admin_id": admin.id,
+                "report": report.model_dump(),
+            },
+        )
+
+        return report
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         logger.error(f"Error deleting user {user_id}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")

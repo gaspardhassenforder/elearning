@@ -1,17 +1,22 @@
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from loguru import logger
 
 from api.auth import require_admin
 from api.company_service import (
     create_company,
-    delete_company,
     get_company,
     list_companies,
     update_company,
 )
 from api.models import CompanyCreate, CompanyResponse, CompanyUpdate
+from open_notebook.domain.company_deletion import (
+    CompanyDeletionReport,
+    CompanyDeletionSummary,
+    delete_company_cascade,
+    get_company_deletion_summary,
+)
 from open_notebook.domain.user import User
 
 router = APIRouter()
@@ -98,21 +103,80 @@ async def update_company_endpoint(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.delete("/companies/{company_id}", status_code=204)
-async def delete_company_endpoint(
+@router.get(
+    "/companies/{company_id}/deletion-summary",
+    response_model=CompanyDeletionSummary,
+)
+async def preview_company_deletion(
     company_id: str, _admin: User = Depends(require_admin)
 ):
-    """Delete company (only if no assigned users or modules)."""
+    """
+    Preview what will be deleted if company is removed (no action taken).
+
+    Returns:
+    - 200: CompanyDeletionSummary with counts and affected resources
+    - 404: Company not found
+    - 403: Requires admin privileges
+    """
     try:
-        deleted = await delete_company(company_id)
-        if not deleted:
-            raise HTTPException(status_code=404, detail="Company not found")
-        return None
+        summary = await get_company_deletion_summary(company_id)
+        return summary
     except ValueError as e:
-        logger.error(f"Company deletion blocked: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except HTTPException:
-        raise
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error getting deletion summary for {company_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.delete("/companies/{company_id}", response_model=CompanyDeletionReport)
+async def delete_company_endpoint(
+    company_id: str,
+    confirm: bool = Query(
+        False, description="Must be true to proceed with deletion"
+    ),
+    admin: User = Depends(require_admin),
+):
+    """
+    Delete company and ALL associated data (users, assignments). Requires confirmation.
+
+    **WARNING: This is a destructive operation!**
+
+    **Deleted Data:**
+    - All member users (via user cascade for each)
+    - All module assignments
+    - Company record
+
+    **Query Parameters:**
+    - confirm: Must be true to proceed (safety check)
+
+    **Returns:**
+    - 200: CompanyDeletionReport with aggregate counts
+    - 400: Confirmation required
+    - 404: Company not found
+    - 403: Requires admin privileges
+    """
+    if not confirm:
+        raise HTTPException(
+            status_code=400,
+            detail="Must confirm deletion with ?confirm=true query parameter",
+        )
+
+    try:
+        report = await delete_company_cascade(company_id)
+
+        logger.warning(
+            f"Company deleted by admin",
+            extra={
+                "company_id": company_id,
+                "admin_id": admin.id,
+                "report": report.model_dump(),
+            },
+        )
+
+        return report
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         logger.error(f"Error deleting company {company_id}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")

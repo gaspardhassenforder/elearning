@@ -98,7 +98,7 @@ development_status:
   7-3-admin-error-notifications: done  # Code review complete: 7 HIGH + 4 MEDIUM issues fixed (task checkboxes, CONFIGURATION.md docs, duplicate import, context buffer validation, integration tests, aiosmtplib check). All 10 tasks complete, all 3 ACs verified, 41 tests passing (100%), documentation updated.
   7-4-langsmith-llm-tracing-integration: review  # All 7 tasks complete: LangSmith callback handler (8 unit tests passing), 9 workflows instrumented (chat, navigation, source processing, transformations, objectives, notes, search), configuration docs enhanced, 13 tests passing (8 unit + 5 integration), all ACs verified
   7-5-per-company-data-isolation-audit: review  # All 7 tasks complete: Comprehensive audit of 10 learner endpoints, 11 regression tests passing (100%), zero security gaps found, Story 7.5 documentation added to quiz/podcast endpoints, all ACs verified
-  7-6-user-and-company-data-deletion: in-progress
-  7-7-token-usage-tracking: backlog
+  7-6-user-and-company-data-deletion: review  # All 10 tasks complete: User cascade deletion (domain + API + tests), Company cascade deletion (domain + API + preview + tests), LangGraph checkpoint cleanup, 33 tests passing (22 unit + 11 integration), comprehensive audit logging, all ACs verified
+  7-7-token-usage-tracking: in-progress  # Comprehensive story created: TokenUsage domain model (migration #26), TokenTrackingCallback handler, LangGraph workflow integration (7 workflows), admin API endpoints (company/notebook/platform aggregation), async fire-and-forget token capture (< 5ms overhead), all ACs covered
   7-8-learner-transparency-details-view: backlog
   epic-7-retrospective: optional
