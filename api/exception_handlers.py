@@ -62,7 +62,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
     return JSONResponse(
         status_code=exc.status_code,
         content={
-            "error": exc.detail,
+            "detail": exc.detail,  # Use "detail" to match FastAPI convention
             "request_id": ctx.get("request_id"),  # Include for user reference
         },
         headers={
@@ -113,7 +113,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     return JSONResponse(
         status_code=500,
         content={
-            "error": "An unexpected error occurred. Please try again.",
+            "detail": "An unexpected error occurred. Please try again.",  # Use "detail" to match FastAPI convention
             "request_id": ctx.get("request_id"),  # Include for user reference
         },
         headers={

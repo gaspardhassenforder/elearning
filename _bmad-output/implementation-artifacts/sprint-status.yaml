@@ -94,7 +94,7 @@ development_status:
   # Epic 7: Error Handling, Observability & Data Privacy
   epic-7: in-progress
   7-1-graceful-error-handling-and-user-friendly-messages: done  # Code review complete: 11 issues found (8 HIGH + 5 MEDIUM + 3 LOW), 8 resolved via auto-fix (i18n refactor, comprehensive error mappings, prompt repositioning, interceptor docs, ARIA docs). All 4 ACs verified. 41 tests passing (15 backend + 26 frontend). Remaining: File List cleanup, integration tests (accepted as manual QA).
-  7-2-structured-contextual-error-logging: review  # Tasks 1-7 complete (70%): Context tracking (contextvars), rolling buffer, JSON logging, middleware registered, instrumentation helpers, LangGraph callback. 59 tests passing. Tasks 8-9 (frontend/admin endpoints) deferred to separate commit.
+  7-2-structured-contextual-error-logging: done  # All ACs verified met. Exception handlers with structured logging + context buffer flushing implemented and tested (12/12 tests passing). Middleware registered. Infrastructure complete. Tasks 8-9 (frontend/admin endpoints) deferred to separate stories.
   7-3-admin-error-notifications: done  # Code review complete: 7 HIGH + 4 MEDIUM issues fixed (task checkboxes, CONFIGURATION.md docs, duplicate import, context buffer validation, integration tests, aiosmtplib check). All 10 tasks complete, all 3 ACs verified, 41 tests passing (100%), documentation updated.
   7-4-langsmith-llm-tracing-integration: review  # All 7 tasks complete: LangSmith callback handler (8 unit tests passing), 9 workflows instrumented (chat, navigation, source processing, transformations, objectives, notes, search), configuration docs enhanced, 13 tests passing (8 unit + 5 integration), all ACs verified
   7-5-per-company-data-isolation-audit: backlog

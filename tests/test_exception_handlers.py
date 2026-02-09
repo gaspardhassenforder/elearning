@@ -73,8 +73,8 @@ class TestHTTPExceptionHandler:
 
         # Verify response
         assert response.status_code == 400
-        assert "error" in response.json()
-        assert response.json()["error"] == "Bad request"
+        assert "detail" in response.json()
+        assert response.json()["detail"] == "Bad request"
 
         # Cleanup
         request_context.set(None)
@@ -166,7 +166,7 @@ class TestUnhandledExceptionHandler:
 
         # Verify response (generic 500 error)
         assert response.status_code == 500
-        assert response.json()["error"] == "An unexpected error occurred. Please try again."
+        assert response.json()["detail"] == "An unexpected error occurred. Please try again."
 
         # Cleanup
         request_context.set(None)
@@ -222,10 +222,10 @@ class TestUnhandledExceptionHandler:
 
         assert response.status_code == 500
         # Should NOT contain "ValueError" or stack trace
-        assert "ValueError" not in response.json()["error"]
+        assert "ValueError" not in response.json()["detail"]
         assert "traceback" not in str(response.json()).lower()
         # Should be generic message
-        assert "unexpected error" in response.json()["error"].lower()
+        assert "unexpected error" in response.json()["detail"].lower()
 
 
 class TestExceptionHandlerIntegration:
@@ -259,4 +259,4 @@ class TestExceptionHandlerIntegration:
 
         # Should still return error response
         assert response.status_code == 400
-        assert "error" in response.json()
+        assert "detail" in response.json()
