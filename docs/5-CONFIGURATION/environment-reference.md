@@ -310,6 +310,115 @@ Each trace includes metadata tags for easy filtering in LangSmith UI:
 
 ---
 
+## Token Usage Tracking
+
+**Story 7.7** - Track AI token consumption per company/notebook for future cost visibility.
+
+Token usage is automatically tracked for all LLM operations (chat, quiz generation, embedding, etc.) with negligible overhead (< 5ms). All tracking happens asynchronously and doesn't block workflows.
+
+### How It Works
+
+- **Automatic Capture**: LangChain callback handler captures token usage from every LLM call
+- **Multi-Provider Support**: Works with OpenAI, Anthropic, Google, Groq, Ollama, and more
+- **Company/Notebook Scoping**: Tracks usage per company, notebook, and user
+- **Operation Type Classification**: Chat, quiz_generation, embedding, transformation, search, navigation, objectives_generation
+- **Async Save**: Fire-and-forget saves don't impact user experience
+
+### Admin API Endpoints
+
+Token usage data is accessible via admin-only API endpoints:
+
+**Company Usage:**
+```bash
+GET /api/admin/token-usage/company/{company_id}?start_date=2026-01-01&end_date=2026-02-09
+```
+
+**Notebook Usage:**
+```bash
+GET /api/admin/token-usage/notebook/{notebook_id}?start_date=2026-01-01&end_date=2026-02-09
+```
+
+**Platform-wide Summary:**
+```bash
+GET /api/admin/token-usage/summary?start_date=2026-01-01&end_date=2026-02-09
+```
+
+**Response Format:**
+```json
+{
+  "company_id": "company:abc123",
+  "company_name": "Acme Corp",
+  "start_date": "2026-01-01T00:00:00Z",
+  "end_date": "2026-02-09T23:59:59Z",
+  "total_input_tokens": 125000,
+  "total_output_tokens": 50000,
+  "total_operations": 450,
+  "breakdown_by_operation_type": {
+    "chat": {"input": 80000, "output": 35000, "count": 320},
+    "quiz_generation": {"input": 30000, "output": 10000, "count": 80},
+    "embedding": {"input": 15000, "output": 5000, "count": 50}
+  },
+  "breakdown_by_model": {
+    "gpt-4-turbo": {"input": 60000, "output": 25000, "count": 200},
+    "claude-3-5-sonnet-20241022": {"input": 50000, "output": 20000, "count": 180},
+    "text-embedding-3-small": {"input": 15000, "output": 5000, "count": 70}
+  }
+}
+```
+
+### Database Schema
+
+Token usage records are stored in the `token_usage` table with the following fields:
+
+- `user_id`: User who initiated operation (optional)
+- `company_id`: Company context (optional)
+- `notebook_id`: Module context (optional)
+- `model_provider`: AI provider (openai, anthropic, google, etc.)
+- `model_name`: Model identifier (gpt-4-turbo, claude-3-5-sonnet, etc.)
+- `input_tokens`: Prompt/input token count
+- `output_tokens`: Completion/output token count
+- `operation_type`: Operation type (chat, quiz_generation, etc.)
+- `timestamp`: When operation completed (timezone-aware)
+- `cost_estimate`: Estimated cost in USD (future enhancement)
+
+Indexes are created on `company_id`, `notebook_id`, `timestamp`, and `operation_type` for efficient aggregation queries.
+
+### Supported Operation Types
+
+| Operation Type | Workflows | Description |
+|---------------|-----------|-------------|
+| `chat` | Learner chat | AI teacher conversations |
+| `quiz_generation` | Quiz generation | Quiz creation from sources |
+| `embedding` | Source processing | Content embedding for search |
+| `transformation` | Transformations | Source insight generation |
+| `search` | Ask workflow | Search + synthesis queries |
+| `navigation` | Navigation assistant | Platform-wide navigation |
+| `objectives_generation` | Learning objectives | Auto-generate objectives |
+
+### Performance Impact
+
+- **Overhead**: < 5ms per operation (token extraction + async task scheduling)
+- **Non-Blocking**: Saves happen in background (asyncio.create_task fire-and-forget)
+- **Database Impact**: Single INSERT per LLM call with indexed queries
+- **Query Performance**: Company aggregation < 100ms for 10K records
+
+### Future Enhancements (Post-MVP)
+
+- **Cost Calculation**: Integrate provider pricing tables for automatic cost estimates
+- **Dashboard UI**: Admin charts for usage over time, top consumers
+- **Usage Alerts**: Email/Slack notifications for budget thresholds
+- **Data Retention**: Auto-archive records older than 1 year
+
+### Technical Notes
+
+- Token tracking callback is registered in `api/routers/learner_chat.py` (and other workflows)
+- Callback priority: ContextLoggingCallback, TokenTrackingCallback, LangSmithTracer
+- Graceful degradation: Missing token metadata logs warning, doesn't fail
+- Provider detection: Pattern matching on model name (gpt → openai, claude → anthropic, etc.)
+- Default date range: Last 30 days if start_date/end_date not specified
+
+---
+
 ## Error Notifications: Admin Alert System
 
 Configure automatic admin notifications when errors occur in production. Supports webhook, Slack, and email backends.
