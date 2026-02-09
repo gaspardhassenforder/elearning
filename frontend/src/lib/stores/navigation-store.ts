@@ -1,99 +1,50 @@
-import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+/**
+ * Navigation Assistant Store (Story 6.1)
+ *
+ * Manages state for the platform-wide navigation assistant overlay.
+ * State includes overlay visibility, loading state.
+ * Message history is loaded from backend via useNavigationHistory hook (not persisted in Zustand).
+ */
+
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 interface NavigationState {
-  returnTo?: {
-    path: string
-    label: string
-    preserveState?: {
-      scrollPosition?: number
-      highlightItemId?: string
-      timestamp?: number
-    }
-  }
-  setReturnTo: (path: string, label: string, preserveState?: object) => void
-  clearReturnTo: () => void
-  getReturnPath: () => string
-  getReturnLabel: () => string
+  isOpen: boolean;
+  isLoading: boolean;
+
+  // Actions
+  openNavigator: () => void;
+  closeNavigator: () => void;
+  setLoading: (loading: boolean) => void;
 }
 
 export const useNavigationStore = create<NavigationState>()(
   persist(
-    (set, get) => ({
-      returnTo: undefined,
+    (set) => ({
+      // State
+      isOpen: false,
+      isLoading: false,
 
-      setReturnTo: (path, label, preserveState) => set({
-        returnTo: {
-          path,
-          label,
-          preserveState: {
-            ...preserveState,
-            timestamp: Date.now()
-          }
-        }
-      }),
-
-      clearReturnTo: () => set({ returnTo: undefined }),
-
-      getReturnPath: () => {
-        const state = get()
-        const returnTo = state.returnTo
-
-        // Check if context is stale (older than 1 hour)
-        if (returnTo?.preserveState?.timestamp) {
-          const isStale = Date.now() - returnTo.preserveState.timestamp > 3600000
-          if (isStale) {
-            set({ returnTo: undefined })
-            return '/sources'
-          }
-        }
-
-        return returnTo?.path || '/sources'
+      // Actions
+      openNavigator: () => {
+        set({ isOpen: true });
       },
 
-      getReturnLabel: () => {
-        const state = get()
-        const returnTo = state.returnTo
+      closeNavigator: () => {
+        set({ isOpen: false });
+      },
 
-        // Check if context is stale (older than 1 hour)
-        if (returnTo?.preserveState?.timestamp) {
-          const isStale = Date.now() - returnTo.preserveState.timestamp > 3600000
-          if (isStale) {
-            set({ returnTo: undefined })
-            return 'Back to Sources'
-          }
-        }
-
-        return returnTo?.label || 'Back to Sources'
-      }
+      setLoading: (loading: boolean) => {
+        set({ isLoading: loading });
+      },
     }),
     {
       name: 'navigation-storage',
-      storage: {
-        getItem: (name: string) => {
-          try {
-            const value = sessionStorage.getItem(name)
-            return value
-          } catch {
-            return null
-          }
-        },
-        setItem: (name: string, value: string) => {
-          try {
-            sessionStorage.setItem(name, value)
-          } catch {
-            // Silently fail if sessionStorage is not available
-          }
-        },
-        removeItem: (name: string) => {
-          try {
-            sessionStorage.removeItem(name)
-          } catch {
-            // Silently fail if sessionStorage is not available
-          }
-        }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any
+      // Only persist isOpen state (not loading or messages)
+      partialize: (state) => ({
+        isOpen: state.isOpen,
+      }),
     }
   )
-)
+);

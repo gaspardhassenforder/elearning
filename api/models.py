@@ -953,3 +953,45 @@ class ArtifactListResponse(BaseModel):
     artifact_type: Literal["quiz", "podcast", "summary", "transformation"]
     title: str
     created: str  # ISO timestamp
+
+
+# ==============================================================================
+# Story 6.1: Platform-Wide AI Navigation Assistant
+# ==============================================================================
+
+
+class ModuleSuggestion(BaseModel):
+    """Module suggestion from navigation search (Story 6.1)."""
+
+    id: str
+    title: str
+    description: str
+    relevance_score: Optional[float] = None
+
+
+class NavigationChatRequest(BaseModel):
+    """Request body for navigation assistant chat message (Story 6.1)."""
+
+    message: str = Field(..., min_length=1, description="Learner's navigation query")
+    current_notebook_id: Optional[str] = Field(
+        None,
+        description="Current notebook ID if learner is in a module conversation (for context-aware search)"
+    )
+
+
+class NavigationChatResponse(BaseModel):
+    """Response from navigation assistant (Story 6.1)."""
+
+    message: str = Field(..., description="Assistant's response message")
+    suggested_modules: List[ModuleSuggestion] = Field(
+        default_factory=list,
+        description="Suggested modules from search (if any)"
+    )
+
+
+class NavigationMessage(BaseModel):
+    """Navigation conversation history message (Story 6.1)."""
+
+    role: Literal["user", "assistant"]
+    content: str
+    timestamp: Optional[str] = None  # ISO timestamp
