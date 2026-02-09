@@ -427,6 +427,14 @@ def create_notification_backend(config: Optional[NotificationConfig] = None) -> 
             return SlackBackend(webhook_url=config.slack_webhook_url)
 
         elif backend_type == "email":
+            # Check aiosmtplib availability BEFORE creating backend
+            if not AIOSMTPLIB_AVAILABLE:
+                logger.warning(
+                    "Email backend selected but aiosmtplib not installed - falling back to NullBackend. "
+                    "Install with: pip install aiosmtplib"
+                )
+                return NullBackend()
+
             if not all([config.smtp_host, config.smtp_user, config.smtp_password, config.admin_email]):
                 logger.warning(
                     "Email backend selected but SMTP configuration incomplete - falling back to NullBackend. "

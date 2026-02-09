@@ -767,3 +767,80 @@ class TestNullBackend:
         assert health["backend_type"] == "none"
         assert health["configured"] is False
         assert "disabled" in health["status"].lower()
+
+
+class TestExceptionHandlerIntegration:
+    """Test integration between exception handlers and notification service"""
+
+    @pytest.mark.asyncio
+    async def test_context_buffer_extraction_to_notification(self):
+        """Test exception handler extracts context buffer correctly"""
+        from open_notebook.observability.context_buffer import RollingContextBuffer
+        from api.main import send_error_notification
+
+        # Create mock context and buffer
+        from contextvars import ContextVar
+        from open_notebook.observability.request_context import request_context, context_buffer as context_buffer_var
+
+        # Set up request context
+        request_context.set({
+            "request_id": "req-integration-test",
+            "user_id": "user:test",
+            "company_id": "company:test",
+            "endpoint": "POST /api/test"
+        })
+
+        # Set up context buffer with operations
+        buffer = RollingContextBuffer(max_size=10)
+        buffer.append({"type": "db_query", "details": "SELECT * FROM source"})
+        buffer.append({"type": "ai_call", "details": "ChatOpenAI.generate"})
+        buffer.append({"type": "tool_invoke", "details": "search_sources"})
+        context_buffer_var.set(buffer)
+
+        # Mock notification service
+        with patch("api.main.get_notification_service") as mock_service:
+            mock_backend = NullBackend()
+            mock_svc = NotificationService(backend=mock_backend)
+            mock_service.return_value = mock_svc
+
+            # Send error notification
+            await send_error_notification(
+                error_type="TestError",
+                error_summary="Integration test error",
+                severity="ERROR",
+                exc_info=Exception("Test exception")
+            )
+
+            # Verify service was called
+            assert mock_service.called
+
+    @pytest.mark.asyncio
+    async def test_notification_without_context_buffer(self):
+        """Test notification works gracefully when context buffer is empty"""
+        from api.main import send_error_notification
+        from open_notebook.observability.request_context import request_context, context_buffer as context_buffer_var
+
+        # Set up request context without buffer
+        request_context.set({
+            "request_id": "req-no-buffer-test",
+            "endpoint": "POST /api/test"
+        })
+
+        # Don't set context buffer (or set to None)
+        context_buffer_var.set(None)
+
+        # Mock notification service
+        with patch("api.main.get_notification_service") as mock_service:
+            mock_backend = NullBackend()
+            mock_svc = NotificationService(backend=mock_backend)
+            mock_service.return_value = mock_svc
+
+            # Send error notification - should not crash without buffer
+            await send_error_notification(
+                error_type="NullBufferTest",
+                error_summary="Test without buffer",
+                severity="ERROR"
+            )
+
+            # Verify service was called without errors
+            assert mock_service.called

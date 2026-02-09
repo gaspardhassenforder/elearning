@@ -310,6 +310,135 @@ Each trace includes metadata tags for easy filtering in LangSmith UI:
 
 ---
 
+## Error Notifications: Admin Alert System
+
+Configure automatic admin notifications when errors occur in production. Supports webhook, Slack, and email backends.
+
+| Variable | Required? | Default | Description |
+|----------|-----------|---------|-------------|
+| `ERROR_NOTIFICATION_BACKEND` | No | none | Notification backend: `none`, `webhook`, `slack`, or `email` |
+| `WEBHOOK_URL` | If backend=webhook | None | Generic webhook endpoint (receives JSON POST) |
+| `SLACK_WEBHOOK_URL` | If backend=slack | None | Slack Incoming Webhook URL (Slack Block Kit format) |
+| `SMTP_HOST` | If backend=email | None | SMTP server hostname (e.g., smtp.gmail.com) |
+| `SMTP_PORT` | If backend=email | 587 | SMTP server port (587 for TLS, 465 for SSL, 25 for plain) |
+| `SMTP_USER` | If backend=email | None | SMTP authentication username |
+| `SMTP_PASSWORD` | If backend=email | None | SMTP authentication password |
+| `SMTP_USE_TLS` | If backend=email | true | Use TLS encryption (recommended) |
+| `ADMIN_EMAIL` | If backend=email | None | Admin email address to receive notifications |
+
+**Setup Guide:**
+
+**Option 1: Webhook (Generic HTTP Endpoint)**
+```bash
+# In your .env file:
+ERROR_NOTIFICATION_BACKEND=webhook
+WEBHOOK_URL=https://your-webhook-endpoint.com/notifications
+```
+
+Webhook receives JSON POST with error details:
+```json
+{
+  "error": {"summary": "...", "type": "...", "severity": "ERROR"},
+  "request": {"id": "...", "endpoint": "...", "timestamp": "..."},
+  "affected": {"user_id": "...", "company_id": "..."},
+  "context": {"recent_operations": [...], "stack_trace_preview": "..."}
+}
+```
+
+**Option 2: Slack (Incoming Webhooks)**
+```bash
+# In your .env file:
+ERROR_NOTIFICATION_BACKEND=slack
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+```
+
+1. Create Slack Incoming Webhook:
+   - Go to https://api.slack.com/messaging/webhooks
+   - Create webhook for your workspace
+   - Copy webhook URL
+2. Notifications sent as rich Slack Block Kit messages with color coding
+
+**Option 3: Email (SMTP)**
+```bash
+# In your .env file:
+ERROR_NOTIFICATION_BACKEND=email
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
+SMTP_USE_TLS=true
+ADMIN_EMAIL=admin@your-domain.com
+```
+
+**Gmail SMTP Setup:**
+1. Enable 2-factor authentication on your Google account
+2. Generate App Password: https://myaccount.google.com/apppasswords
+3. Use App Password as `SMTP_PASSWORD`
+
+**SendGrid SMTP Setup:**
+```bash
+SMTP_HOST=smtp.sendgrid.net
+SMTP_PORT=587
+SMTP_USER=apikey
+SMTP_PASSWORD=your-sendgrid-api-key
+```
+
+**What Gets Notified:**
+
+Notifications are triggered for:
+- **5xx Server Errors** - Unhandled exceptions, database failures
+- **ERROR Severity** - Critical application errors
+- Includes request context (user, company, endpoint)
+- Includes last 3 operations from rolling context buffer
+- Includes stack trace preview (first 500 chars)
+
+**Deduplication:**
+- Duplicate errors within 5-minute window are suppressed
+- Notification includes count of suppressed duplicates
+- Cache size: 100 unique errors (LRU eviction)
+
+**Graceful Failure:**
+- Notification delivery failures never block error handling
+- Failed notifications logged as warnings
+- API continues normally if backend is misconfigured
+
+**Health Check:**
+- Admin endpoint: `GET /api/debug/notification-health`
+- Test notifications: `POST /api/debug/test-notification`
+- Requires admin authentication
+
+**Disable Notifications:**
+```bash
+# Default - no notifications sent
+ERROR_NOTIFICATION_BACKEND=none
+```
+
+**Troubleshooting:**
+
+**Notifications not arriving?**
+- Check `ERROR_NOTIFICATION_BACKEND` is set correctly
+- Verify backend-specific credentials (webhook URL, SMTP password)
+- Test notification: `curl -X POST http://localhost:5055/api/debug/test-notification` (requires admin auth)
+- Check API logs for notification delivery warnings
+
+**Webhook failures?**
+- Verify webhook endpoint is reachable from API server
+- Check webhook endpoint accepts JSON POST
+- Notification retries 4 times with exponential backoff
+
+**Email failures?**
+- Verify SMTP credentials and server settings
+- Check firewall allows outbound SMTP connections
+- Gmail: Use App Password, not regular password
+- Check spam folder if emails not in inbox
+
+**Too many notifications?**
+- Deduplication active (5-minute window)
+- Consider filtering by error type in your backend
+- Review application logs to fix root cause
+
+---
+
 ## Environment Variables by Use Case
 
 ### Minimal Setup (Cloud Provider)
