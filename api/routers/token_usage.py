@@ -41,10 +41,6 @@ async def get_company_usage(
     end_date: Optional[datetime] = Query(
         None, description="End date (ISO 8601). Defaults to now."
     ),
-    operation_type: Optional[str] = Query(
-        None,
-        description="Filter by operation type: chat, quiz_generation, embedding, etc.",
-    ),
     admin: User = Depends(require_admin),
 ):
     """
@@ -60,7 +56,6 @@ async def get_company_usage(
             company_id=company_id,
             start_date=start_date,
             end_date=end_date,
-            operation_type=operation_type,
         )
         return summary
     except ValueError as e:

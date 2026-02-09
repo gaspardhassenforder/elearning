@@ -184,3 +184,76 @@ class TokenUsage(ObjectModel):
             "by_operation": by_operation,
             "by_model": by_model,
         }
+
+    @classmethod
+    async def aggregate_by_notebook(
+        cls, notebook_id: str, start_date: datetime, end_date: datetime
+    ) -> dict:
+        """
+        Aggregate token usage by operation type and model for a notebook.
+
+        Returns:
+            {
+                "total_input_tokens": int,
+                "total_output_tokens": int,
+                "total_operations": int,
+                "by_operation": {"chat": {"input": X, "output": Y, "count": Z}, ...},
+                "by_model": {"gpt-4": {"input": X, "output": Y, "count": Z}, ...}
+            }
+        """
+        query = """
+            SELECT
+                operation_type,
+                model_name,
+                math::sum(input_tokens) AS total_input,
+                math::sum(output_tokens) AS total_output,
+                count() AS operation_count
+            FROM token_usage
+            WHERE notebook_id = $notebook_id
+            AND timestamp >= $start_date
+            AND timestamp <= $end_date
+            GROUP BY operation_type, model_name
+        """
+        params = {
+            "notebook_id": notebook_id,
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+        }
+
+        results = await repo_query(query, params)
+
+        # Aggregate results (same logic as aggregate_by_company)
+        total_input = 0
+        total_output = 0
+        by_operation = {}
+        by_model = {}
+
+        for record in results:
+            op_type = record["operation_type"]
+            model = record["model_name"]
+            inp = record["total_input"]
+            out = record["total_output"]
+            count = record["operation_count"]
+
+            total_input += inp
+            total_output += out
+
+            if op_type not in by_operation:
+                by_operation[op_type] = {"input": 0, "output": 0, "count": 0}
+            by_operation[op_type]["input"] += inp
+            by_operation[op_type]["output"] += out
+            by_operation[op_type]["count"] += count
+
+            if model not in by_model:
+                by_model[model] = {"input": 0, "output": 0, "count": 0}
+            by_model[model]["input"] += inp
+            by_model[model]["output"] += out
+            by_model[model]["count"] += count
+
+        return {
+            "total_input_tokens": total_input,
+            "total_output_tokens": total_output,
+            "total_operations": sum(op["count"] for op in by_operation.values()),
+            "by_operation": by_operation,
+            "by_model": by_model,
+        }

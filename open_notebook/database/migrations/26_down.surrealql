@@ -5,6 +5,7 @@
 -- Remove indexes
 REMOVE INDEX IF EXISTS operation_type_idx ON TABLE token_usage;
 REMOVE INDEX IF EXISTS timestamp_idx ON TABLE token_usage;
+REMOVE INDEX IF EXISTS user_idx ON TABLE token_usage;
 REMOVE INDEX IF EXISTS notebook_timestamp_idx ON TABLE token_usage;
 REMOVE INDEX IF EXISTS company_timestamp_idx ON TABLE token_usage;
 

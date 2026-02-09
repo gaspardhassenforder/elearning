@@ -18,7 +18,7 @@
   <h3 align="center">Open Notebook</h3>
 
   <p align="center">
-    An open source, privacy-focused alternative to Google's Notebook LM!
+    Open-source B2B interactive learning platform - Privacy-first alternative to Google's Notebook LM!
     <br /><strong>Join our <a href="https://discord.gg/37XJPXfz2w">Discord server</a> for help, to share workflow ideas, and suggest features!</strong>
     <br />
     <a href="https://www.open-notebook.ai"><strong>Checkout our website »</strong></a>
@@ -40,53 +40,103 @@
 
 <div align="center">
   <!-- Keep these links. Translations will automatically update with the README. -->
-  <a href="https://zdoc.app/de/lfnovo/open-notebook">Deutsch</a> | 
-  <a href="https://zdoc.app/es/lfnovo/open-notebook">Español</a> | 
-  <a href="https://zdoc.app/fr/lfnovo/open-notebook">français</a> | 
-  <a href="https://zdoc.app/ja/lfnovo/open-notebook">日本語</a> | 
-  <a href="https://zdoc.app/ko/lfnovo/open-notebook">한국어</a> | 
-  <a href="https://zdoc.app/pt/lfnovo/open-notebook">Português</a> | 
-  <a href="https://zdoc.app/ru/lfnovo/open-notebook">Русский</a> | 
+  <a href="https://zdoc.app/de/lfnovo/open-notebook">Deutsch</a> |
+  <a href="https://zdoc.app/es/lfnovo/open-notebook">Español</a> |
+  <a href="https://zdoc.app/fr/lfnovo/open-notebook">français</a> |
+  <a href="https://zdoc.app/ja/lfnovo/open-notebook">日本語</a> |
+  <a href="https://zdoc.app/ko/lfnovo/open-notebook">한국어</a> |
+  <a href="https://zdoc.app/pt/lfnovo/open-notebook">Português</a> |
+  <a href="https://zdoc.app/ru/lfnovo/open-notebook">Русский</a> |
   <a href="https://zdoc.app/zh/lfnovo/open-notebook">中文</a>
 </div>
 
-## A private, multi-model, 100% local, full-featured alternative to Notebook LM
+## B2B Interactive Learning Platform - Privacy-First, Multi-Model, Self-Hosted
 
 ![New Notebook](docs/assets/asset_list.png)
 
-In a world dominated by Artificial Intelligence, having the ability to think 🧠 and acquire new knowledge 💡, is a skill that should not be a privilege for a few, nor restricted to a single provider.
+**Open Notebook** transforms educational content delivery by enabling organizations to create AI-guided, interactive learning experiences. From personal research assistant to enterprise learning platform - all while keeping your data private and under your control.
 
-**Open Notebook empowers you to:**
-- 🔒 **Control your data** - Keep your research private and secure
-- 🤖 **Choose your AI models** - Support for 16+ providers including OpenAI, Anthropic, Ollama, LM Studio, and more
-- 📚 **Organize multi-modal content** - PDFs, videos, audio, web pages, and more
-- 🎙️ **Generate professional podcasts** - Advanced multi-speaker podcast generation
-- 🔍 **Search intelligently** - Full-text and vector search across all your content
-- 💬 **Chat with context** - AI conversations powered by your research
-- 🌐 **Multi-language UI** - English, Portuguese, and Chinese (Simplified & Traditional) support
+**Perfect for:**
+- 🏢 **Companies** - Employee training and onboarding programs
+- 🎓 **Educational Institutions** - Course content and study materials
+- 📚 **Training Organizations** - Professional development courses
+- 🔬 **Research Teams** - Collaborative knowledge management
 
-Learn more about our project at [https://www.open-notebook.ai](https://www.open-notebook.ai)
+**What makes Open Notebook unique:**
+- 🔒 **Privacy-First** - Self-hosted, complete data control
+- 🤖 **AI Provider Freedom** - Support for 16+ providers (OpenAI, Anthropic, Ollama, LM Studio, and more)
+- 📚 **Interactive Learning** - AI acts as a guide, not an answer key
+- 🎙️ **Multi-Modal Content** - PDFs, videos, audio, podcasts, quizzes, and more
+- 🔍 **Intelligent Search** - Full-text and vector search across all content
+- 🌐 **Multi-Language** - English, Portuguese, and Chinese (Simplified & Traditional)
+
+Learn more at [https://www.open-notebook.ai](https://www.open-notebook.ai)
 
 ---
+
+## 💼 Platform Architecture
+
+Open Notebook uses a modern three-tier architecture:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│     Frontend (React/Next.js) - 3-Column Learning UI     │
+│              http://localhost:3000 (dev)                 │
+│              http://localhost:8502 (prod)                │
+├─────────────────────────────────────────────────────────┤
+│ • Document Reader (left)                                │
+│ • AI Chat Guide (center)                                │
+│ • Artifacts Panel (right) - quizzes, podcasts, notes    │
+└────────────────────────┬────────────────────────────────┘
+                         │ HTTP REST + JWT Auth
+┌────────────────────────▼────────────────────────────────┐
+│              API (FastAPI)                              │
+│              http://localhost:5055                      │
+├─────────────────────────────────────────────────────────┤
+│ • User authentication & role-based access               │
+│ • Quiz generation (LangGraph workflows)                 │
+│ • Custom podcast generation                             │
+│ • AI chat guide mode (Socratic learning)                │
+│ • Multi-provider AI via Esperanto                       │
+└────────────────────────┬────────────────────────────────┘
+                         │ SurrealQL
+┌────────────────────────▼────────────────────────────────┐
+│         Database (SurrealDB)                            │
+│         http://localhost:8000                           │
+├─────────────────────────────────────────────────────────┤
+│ • Graph database with vector embeddings                 │
+│ • User, Notebook, Quiz, Podcast, Artifact models        │
+│ • Built-in semantic search                              │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Tech Stack:**
+- **Frontend**: Next.js 16, React 19, TypeScript, TanStack Query, Zustand, Shadcn/ui
+- **Backend**: FastAPI, Python 3.11+, LangGraph, Esperanto (multi-provider AI)
+- **Database**: SurrealDB (graph database with vector search)
 
 ## 🆚 Open Notebook vs Google Notebook LM
 
 | Feature | Open Notebook | Google Notebook LM | Advantage |
 |---------|---------------|--------------------|-----------|
 | **Privacy & Control** | Self-hosted, your data | Google cloud only | Complete data sovereignty |
-| **AI Provider Choice** | 16+ providers (OpenAI, Anthropic, Ollama, LM Studio, etc.) | Google models only | Flexibility and cost optimization |
-| **Podcast Speakers** | 1-4 speakers with custom profiles | 2 speakers only | Extreme flexibility |
+| **Use Case** | B2B learning platform + research | Personal research only | Enterprise-ready |
+| **User Management** | Admin/Learner roles, assignments | Single user | Multi-user organizations |
+| **AI Provider Choice** | 16+ providers (OpenAI, Anthropic, Ollama, etc.) | Google models only | Flexibility and cost optimization |
+| **Learning Features** | Quizzes, AI guide mode, custom podcasts | Limited | Interactive learning experience |
+| **Podcast Speakers** | 1-4 speakers, custom topics/length | 2 speakers, fixed format | Extreme flexibility |
 | **Content Transformations** | Custom and built-in | Limited options | Unlimited processing power |
 | **API Access** | Full REST API | No API | Complete automation |
 | **Deployment** | Docker, cloud, or local | Google hosted only | Deploy anywhere |
-| **Citations** | Basic references (will improve) | Comprehensive with sources | Research integrity |
 | **Customization** | Open source, fully customizable | Closed system | Unlimited extensibility |
-| **Cost** | Pay only for AI usage | Free tier + Monthly subscription | Transparent and controllable |
+| **Cost** | Pay only for AI usage | Free tier + limits | Transparent and controllable |
 
 **Why Choose Open Notebook?**
-- 🔒 **Privacy First**: Your sensitive research stays completely private
-- 💰 **Cost Control**: Choose cheaper AI providers or run locally with Ollama
-- 🎙️ **Better Podcasts**: Full script control and multi-speaker flexibility vs limited 2-speaker deep-dive format
+- 🏢 **Built for Organizations**: User management, role-based access, content curation
+- 🎓 **Active Learning**: AI guide mode encourages critical thinking, not passive consumption
+- 🔒 **Privacy First**: Sensitive training materials stay completely private
+- 💰 **Cost Control**: Choose cheaper providers or run locally with Ollama
+- 🎙️ **Better Podcasts**: Full control over topic, length, and speakers
 - 🔧 **Unlimited Customization**: Modify, extend, and integrate as needed
 - 🌐 **No Vendor Lock-in**: Switch providers, deploy anywhere, own your data
 
@@ -98,26 +148,66 @@ Learn more about our project at [https://www.open-notebook.ai](https://www.open-
 
 Choose your installation method:
 
-### 🐳 **Docker (Recommended)**
+### 🐳 **Docker (Recommended for Production)**
 
-**Best for most users** - Fast setup with Docker Compose:
+**Best for deployment** - Fast setup with Docker Compose:
 
 → **[Docker Compose Installation Guide](docs/1-INSTALLATION/docker-compose.md)**
-- Multi-container setup (recommended)
+- Multi-container setup
 - 5-10 minutes setup time
 - Requires Docker Desktop
 
 **Quick Start:**
-- Get an API key (OpenAI, Anthropic, Google, etc.) or setup Ollama
-- Create docker-compose.yml (example in guide)
-- Run: docker compose up -d
-- Access: http://localhost:8502
+
+1. Get an API key (OpenAI, Anthropic, Google, etc.) or setup Ollama
+2. Create `docker-compose.yml`:
+
+```yaml
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:v2
+    volumes:
+      - ./surreal_data:/mydata
+    environment:
+      - SURREAL_EXPERIMENTAL_GRAPHQL=true
+    ports:
+      - "8000:8000"
+    command: start --log info --user root --pass root rocksdb:/mydata/mydatabase.db
+    pull_policy: always
+    restart: always
+
+  open_notebook:
+    image: lfnovo/open_notebook:v1-latest
+    ports:
+      - "8502:8502"
+      - "5055:5055"
+    environment:
+      - OPENAI_API_KEY=your-api-key-here
+      - SURREAL_URL=ws://surrealdb:8000/rpc
+      - SURREAL_USER=root
+      - SURREAL_PASS=root
+      - SURREAL_NS=open_notebook
+      - SURREAL_DB=open_notebook
+    depends_on:
+      - surrealdb
+    volumes:
+      - ./notebook_data:/app/data
+    restart: always
+```
+
+3. Start the services:
+
+```bash
+docker compose up -d
+```
+
+4. Access at **http://localhost:8502**
 
 ---
 
-### 💻 **From Source (Developers)**
+### 💻 **From Source (Recommended for Development)**
 
-**For development and contributors:**
+**For developers and contributors:**
 
 → **[From Source Installation Guide](docs/1-INSTALLATION/from-source.md)**
 - Clone and run locally
@@ -127,12 +217,72 @@ Choose your installation method:
 **Quick Start:**
 
 ```bash
+# 1. Clone the repository
 git clone https://github.com/lfnovo/open-notebook.git
+cd open-notebook
+
+# 2. Install dependencies
 uv sync
+cd frontend && npm install && cd ..
+
+# 3. Configure environment
+cp .env.example .env
+# Edit .env and add your API key (OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.)
+
+# 4. Start all services (Database + API + Worker + Frontend)
 make start-all
 ```
 
-Access: http://localhost:3000 (dev) or http://localhost:8502 (production)
+**Access:**
+- **Frontend**: http://localhost:3000
+- **API**: http://localhost:5055
+- **API Docs**: http://localhost:5055/docs
+
+**Alternative - Start services individually:**
+
+```bash
+# Terminal 1: Database
+make database
+
+# Terminal 2: API
+make api
+
+# Terminal 3: Background Worker
+make worker
+
+# Terminal 4: Frontend
+cd frontend && npm run dev
+```
+
+### 🛠️ Common Commands
+
+Once installed from source, use these commands to manage your installation:
+
+```bash
+# Start all services (recommended)
+make start-all
+
+# Stop all services
+make stop-all
+
+# Check service status
+make status
+
+# Start services individually
+make database    # Start SurrealDB only
+make api         # Start API backend
+make worker      # Start background worker
+make frontend    # Start frontend dev server
+
+# Development
+make ruff        # Format and lint Python code
+make lint        # Type checking with mypy
+make clean-cache # Clean Python cache files
+
+# Docker
+make dev         # Start with docker-compose.dev.yml
+make full        # Start with docker-compose.full.yml
+```
 
 ---
 
@@ -142,6 +292,7 @@ Access: http://localhost:3000 (dev) or http://localhost:8502 (production)
 - **🆘 Troubleshooting**: [5-minute troubleshooting guide](docs/6-TROUBLESHOOTING/quick-fixes.md)
 - **💬 Community Support**: [Discord Server](https://discord.gg/37XJPXfz2w)
 - **🐛 Report Issues**: [GitHub Issues](https://github.com/lfnovo/open-notebook/issues)
+- **📚 Full Documentation**: [docs/](docs/)
 
 ---
 
@@ -176,23 +327,30 @@ Thanks to the [Esperanto](https://github.com/lfnovo/esperanto) library, we suppo
 
 ## ✨ Key Features
 
-### Core Capabilities
-- **🔒 Privacy-First**: Your data stays under your control - no cloud dependencies
-- **🎯 Multi-Notebook Organization**: Manage multiple research projects seamlessly
-- **📚 Universal Content Support**: PDFs, videos, audio, web pages, Office docs, and more
-- **🤖 Multi-Model AI Support**: 16+ providers including OpenAI, Anthropic, Ollama, Google, LM Studio, and more
-- **🎙️ Professional Podcast Generation**: Advanced multi-speaker podcasts with Episode Profiles
-- **🔍 Intelligent Search**: Full-text and vector search across all your content
-- **💬 Context-Aware Chat**: AI conversations powered by your research materials
-- **📝 AI-Assisted Notes**: Generate insights or write notes manually
+### Learning Platform Capabilities
+- **🎓 Interactive Learning**: AI guide mode provides hints and encouragement, not direct answers
+- **👥 User Management**: Admin and Learner roles with notebook assignment system
+- **📖 3-Column Learning Interface**: Document reader, AI chat guide, and artifacts panel
+- **❓ AI-Powered Quizzes**: Generate custom multiple-choice quizzes from your content
+- **🎙️ Custom Podcasts**: Create topic-specific podcasts with configurable length and speakers
+- **📚 Artifact Management**: Track all quizzes, podcasts, notes, and transformations
+- **🔒 Per-Company Data Isolation**: Secure multi-tenant architecture (in development)
+
+### Core Platform Features
+- **🔒 Privacy-First**: Self-hosted, complete data control - no cloud dependencies required
+- **🤖 AI Provider Freedom**: 16+ providers (OpenAI, Anthropic, Ollama, Google, Groq, Mistral, DeepSeek, xAI, LM Studio)
+- **📚 Universal Content Support**: PDFs, videos, audio, web pages, Office documents, and more
+- **🎯 Multi-Notebook Organization**: Manage multiple learning modules or research projects
+- **🔍 Intelligent Search**: Full-text and vector search across all content
+- **💬 Context-Aware Chat**: AI conversations powered by your curated sources
 
 ### Advanced Features
-- **⚡ Reasoning Model Support**: Full support for thinking models like DeepSeek-R1 and Qwen3
-- **🔧 Content Transformations**: Powerful customizable actions to summarize and extract insights
-- **🌐 Comprehensive REST API**: Full programmatic access for custom integrations [![API Docs](https://img.shields.io/badge/API-Documentation-blue?style=flat-square)](http://localhost:5055/docs)
-- **🔐 Optional Password Protection**: Secure public deployments with authentication
+- **⚡ Reasoning Model Support**: Full support for thinking models like DeepSeek-R1 and o1
+- **🔧 Content Transformations**: Customizable actions to summarize and extract insights
+- **🌐 Comprehensive REST API**: Full programmatic access for integrations
 - **📊 Fine-Grained Context Control**: Choose exactly what to share with AI models
-- **📎 Citations**: Get answers with proper source citations
+- **📎 Citations**: Answers with proper source references
+- **🌐 Multi-Language UI**: English, Portuguese, and Chinese (Simplified & Traditional)
 
 
 ## Podcast Feature
@@ -226,22 +384,56 @@ Thanks to the [Esperanto](https://github.com/lfnovo/esperanto) library, we suppo
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+## 🎯 Use Cases
+
+### For Organizations
+
+**Employee Training & Onboarding**
+- Upload training materials, SOPs, and documentation
+- New hires learn interactively with AI guidance
+- Generate quizzes to validate understanding
+- Create orientation podcasts for passive learning
+
+**Educational Institutions**
+- Curate course materials into interactive notebooks
+- AI guide helps students think critically
+- Auto-generate study quizzes and review podcasts
+- Track student engagement with learning artifacts
+
+**Professional Development**
+- Deliver certification training content
+- AI-guided learning paths through complex topics
+- Custom podcasts for on-the-go learning
+- Practical quizzes to reinforce key concepts
+
+### For Individuals
+
+**Research & Knowledge Management**
+- Organize research papers and web content
+- Chat with AI about your sources
+- Generate summaries and insights
+- Create personal study materials
+
 ## 🗺️ Roadmap
 
-### Upcoming Features
-- **Live Front-End Updates**: Real-time UI updates for smoother experience
-- **Async Processing**: Faster UI through asynchronous content processing
-- **Cross-Notebook Sources**: Reuse research materials across projects
-- **Bookmark Integration**: Connect with your favorite bookmarking apps
+### In Development 🚧
+- **Organization Multi-Tenancy**: Complete per-company data isolation
+- **Progress Tracking**: Track learner progress through notebooks
+- **Admin Dashboard**: User and content management interface
+- **Advanced Quiz Types**: Short answer, essay questions, auto-grading
+- **Learning Analytics**: Engagement metrics and completion tracking
 
 ### Recently Completed ✅
+- **B2B Learning Platform**: User management, role-based access, notebook assignments
+- **3-Column Learning Interface**: Document reader, AI chat guide, artifacts panel
+- **AI Guide Mode**: Socratic learning approach (hints, not answers)
+- **Quiz Generation**: AI-powered multiple-choice quiz creation
+- **Custom Podcasts**: Topic-specific podcast generation with speaker options
+- **Artifacts System**: Unified view of all generated content
+- **Token Usage Tracking**: Monitor AI costs per company and user
 - **Next.js Frontend**: Modern React-based frontend with improved performance
-- **Comprehensive REST API**: Full programmatic access to all functionality
 - **Multi-Model Support**: 16+ AI providers including OpenAI, Anthropic, Ollama, LM Studio
-- **Advanced Podcast Generator**: Professional multi-speaker podcasts with Episode Profiles
 - **Content Transformations**: Powerful customizable actions for content processing
-- **Enhanced Citations**: Improved layout and finer control for source citations
-- **Multiple Chat Sessions**: Manage different conversations within notebooks
 
 See the [open issues](https://github.com/lfnovo/open-notebook/issues) for a full list of proposed features and known issues.
 

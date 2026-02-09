@@ -4,7 +4,7 @@ Token Usage Service Layer
 Business logic for token usage aggregation and querying.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from loguru import logger
@@ -24,7 +24,6 @@ async def get_company_token_usage(
     company_id: str,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
-    operation_type: Optional[str] = None,
 ) -> CompanyTokenUsageSummary:
     """
     Get aggregated token usage for a company.
@@ -33,7 +32,6 @@ async def get_company_token_usage(
         company_id: Company record ID
         start_date: Start of time window (defaults to 30 days ago)
         end_date: End of time window (defaults to now)
-        operation_type: Optional filter by operation type
 
     Returns:
         CompanyTokenUsageSummary with aggregated data
@@ -43,7 +41,7 @@ async def get_company_token_usage(
     """
     # Apply default date range if not specified
     if end_date is None:
-        end_date = datetime.utcnow()
+        end_date = datetime.now(timezone.utc)
     if start_date is None:
         start_date = end_date - timedelta(days=30)
 
@@ -97,7 +95,7 @@ async def get_notebook_token_usage(
     """
     # Apply default date range if not specified
     if end_date is None:
-        end_date = datetime.utcnow()
+        end_date = datetime.now(timezone.utc)
     if start_date is None:
         start_date = end_date - timedelta(days=30)
 
@@ -110,68 +108,23 @@ async def get_notebook_token_usage(
         logger.error(f"Error loading notebook {notebook_id}: {e}")
         raise ValueError(f"Notebook {notebook_id} not found")
 
-    # Query aggregated usage
-    query = """
-        SELECT
-            operation_type,
-            model_name,
-            math::sum(input_tokens) AS total_input,
-            math::sum(output_tokens) AS total_output,
-            count() AS operation_count
-        FROM token_usage
-        WHERE notebook_id = $notebook_id
-        AND timestamp >= $start_date
-        AND timestamp <= $end_date
-        GROUP BY operation_type, model_name
-    """
-    params = {
-        "notebook_id": notebook_id,
-        "start_date": start_date.isoformat(),
-        "end_date": end_date.isoformat(),
-    }
-
-    results = await repo_query(query, params)
-
-    # Aggregate results
-    total_input = 0
-    total_output = 0
-    by_operation = {}
-    by_model = {}
-
-    for record in results:
-        op_type = record["operation_type"]
-        model = record["model_name"]
-        inp = record["total_input"]
-        out = record["total_output"]
-        count = record["operation_count"]
-
-        total_input += inp
-        total_output += out
-
-        if op_type not in by_operation:
-            by_operation[op_type] = {"input": 0, "output": 0, "count": 0}
-        by_operation[op_type]["input"] += inp
-        by_operation[op_type]["output"] += out
-        by_operation[op_type]["count"] += count
-
-        if model not in by_model:
-            by_model[model] = {"input": 0, "output": 0, "count": 0}
-        by_model[model]["input"] += inp
-        by_model[model]["output"] += out
-        by_model[model]["count"] += count
-
-    total_operations = sum(op["count"] for op in by_operation.values())
+    # Get aggregated usage from domain model
+    aggregation = await TokenUsage.aggregate_by_notebook(
+        notebook_id=notebook_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
 
     return NotebookTokenUsageSummary(
         notebook_id=notebook_id,
         notebook_title=notebook.title,
         start_date=start_date,
         end_date=end_date,
-        total_input_tokens=total_input,
-        total_output_tokens=total_output,
-        total_operations=total_operations,
-        breakdown_by_operation_type=by_operation,
-        breakdown_by_model=by_model,
+        total_input_tokens=aggregation["total_input_tokens"],
+        total_output_tokens=aggregation["total_output_tokens"],
+        total_operations=aggregation["total_operations"],
+        breakdown_by_operation_type=aggregation["by_operation"],
+        breakdown_by_model=aggregation["by_model"],
     )
 
 
@@ -193,65 +146,121 @@ async def get_platform_token_usage(
     """
     # Apply default date range if not specified
     if end_date is None:
-        end_date = datetime.utcnow()
+        end_date = datetime.now(timezone.utc)
     if start_date is None:
         start_date = end_date - timedelta(days=30)
 
-    # Query all companies with token usage in this period
+    # Single query to aggregate all companies at once (fixes N+1 problem)
     query = """
-        SELECT DISTINCT company_id
+        SELECT
+            company_id,
+            operation_type,
+            model_name,
+            math::sum(input_tokens) AS total_input,
+            math::sum(output_tokens) AS total_output,
+            count() AS operation_count
         FROM token_usage
         WHERE timestamp >= $start_date
         AND timestamp <= $end_date
         AND company_id IS NOT NONE
+        GROUP BY company_id, operation_type, model_name
     """
     params = {
         "start_date": start_date.isoformat(),
         "end_date": end_date.isoformat(),
     }
 
-    company_ids_result = await repo_query(query, params)
-    company_ids = [r["company_id"] for r in company_ids_result]
+    results = await repo_query(query, params)
 
-    # Get summary for each company
-    company_summaries = []
-    total_input = 0
-    total_output = 0
+    # Build per-company aggregations and platform totals in single pass
+    company_data = {}  # company_id -> {total_input, total_output, by_operation, by_model}
     platform_by_operation = {}
     platform_by_model = {}
+    total_input = 0
+    total_output = 0
 
-    for company_id in company_ids:
+    for record in results:
+        company_id = record["company_id"]
+        op_type = record["operation_type"]
+        model = record["model_name"]
+        inp = record["total_input"]
+        out = record["total_output"]
+        count = record["operation_count"]
+
+        # Initialize company data if first record for this company
+        if company_id not in company_data:
+            company_data[company_id] = {
+                "total_input": 0,
+                "total_output": 0,
+                "by_operation": {},
+                "by_model": {},
+            }
+
+        # Update company aggregations
+        company_data[company_id]["total_input"] += inp
+        company_data[company_id]["total_output"] += out
+
+        if op_type not in company_data[company_id]["by_operation"]:
+            company_data[company_id]["by_operation"][op_type] = {
+                "input": 0,
+                "output": 0,
+                "count": 0,
+            }
+        company_data[company_id]["by_operation"][op_type]["input"] += inp
+        company_data[company_id]["by_operation"][op_type]["output"] += out
+        company_data[company_id]["by_operation"][op_type]["count"] += count
+
+        if model not in company_data[company_id]["by_model"]:
+            company_data[company_id]["by_model"][model] = {
+                "input": 0,
+                "output": 0,
+                "count": 0,
+            }
+        company_data[company_id]["by_model"][model]["input"] += inp
+        company_data[company_id]["by_model"][model]["output"] += out
+        company_data[company_id]["by_model"][model]["count"] += count
+
+        # Update platform-wide aggregations
+        total_input += inp
+        total_output += out
+
+        if op_type not in platform_by_operation:
+            platform_by_operation[op_type] = {"input": 0, "output": 0, "count": 0}
+        platform_by_operation[op_type]["input"] += inp
+        platform_by_operation[op_type]["output"] += out
+        platform_by_operation[op_type]["count"] += count
+
+        if model not in platform_by_model:
+            platform_by_model[model] = {"input": 0, "output": 0, "count": 0}
+        platform_by_model[model]["input"] += inp
+        platform_by_model[model]["output"] += out
+        platform_by_model[model]["count"] += count
+
+    # Build company summaries with company names
+    company_summaries = []
+    for company_id, data in company_data.items():
         try:
-            summary = await get_company_token_usage(
+            company = await Company.get(company_id)
+            company_name = company.name if company else None
+        except Exception as e:
+            logger.warning(f"Could not load company {company_id}: {e}")
+            company_name = None
+
+        total_ops = sum(op["count"] for op in data["by_operation"].values())
+
+        company_summaries.append(
+            CompanyTokenUsageSummary(
                 company_id=company_id,
+                company_name=company_name,
                 start_date=start_date,
                 end_date=end_date,
+                total_input_tokens=data["total_input"],
+                total_output_tokens=data["total_output"],
+                total_operations=total_ops,
+                breakdown_by_operation_type=data["by_operation"],
+                breakdown_by_model=data["by_model"],
             )
-            company_summaries.append(summary)
-
-            # Aggregate platform-wide totals
-            total_input += summary.total_input_tokens
-            total_output += summary.total_output_tokens
-
-            # Merge operation breakdowns
-            for op_type, stats in summary.breakdown_by_operation_type.items():
-                if op_type not in platform_by_operation:
-                    platform_by_operation[op_type] = {"input": 0, "output": 0, "count": 0}
-                platform_by_operation[op_type]["input"] += stats["input"]
-                platform_by_operation[op_type]["output"] += stats["output"]
-                platform_by_operation[op_type]["count"] += stats["count"]
-
-            # Merge model breakdowns
-            for model, stats in summary.breakdown_by_model.items():
-                if model not in platform_by_model:
-                    platform_by_model[model] = {"input": 0, "output": 0, "count": 0}
-                platform_by_model[model]["input"] += stats["input"]
-                platform_by_model[model]["output"] += stats["output"]
-                platform_by_model[model]["count"] += stats["count"]
-
-        except ValueError as e:
-            logger.warning(f"Skipping company {company_id}: {e}")
-            continue
+        )
 
     total_operations = sum(op["count"] for op in platform_by_operation.values())
 

@@ -95,7 +95,9 @@ class TokenTrackingCallback(BaseCallbackHandler):
             )
 
             # Fire-and-forget async save (non-blocking)
-            asyncio.create_task(self._save_usage_async(usage_record))
+            task = asyncio.create_task(self._save_usage_async(usage_record))
+            # Add done callback to log unhandled exceptions
+            task.add_done_callback(self._handle_task_exception)
 
         except Exception as e:
             # Log error but don't raise - token tracking failure should not block workflow
@@ -207,3 +209,20 @@ class TokenTrackingCallback(BaseCallbackHandler):
             )
         except Exception as e:
             logger.error(f"Failed to save TokenUsage record: {e}")
+
+    def _handle_task_exception(self, task) -> None:
+        """
+        Callback to handle unhandled exceptions in background save task.
+
+        Logs any exception that wasn't caught by _save_usage_async.
+        """
+        try:
+            # Check if task raised an exception
+            exception = task.exception()
+            if exception:
+                logger.error(
+                    f"Unhandled exception in token usage save task: {exception}"
+                )
+        except Exception as e:
+            # task.exception() itself can raise if task was cancelled
+            logger.error(f"Error checking task exception: {e}")
