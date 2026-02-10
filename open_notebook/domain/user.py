@@ -1,8 +1,8 @@
-from typing import ClassVar, Optional
+from typing import Any, ClassVar, Dict, Optional
 
 from loguru import logger
 
-from open_notebook.database.repository import repo_query
+from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.base import ObjectModel
 from open_notebook.exceptions import DatabaseOperationError
 
@@ -17,6 +17,14 @@ class User(ObjectModel):
     company_id: Optional[str] = None
     profile: Optional[dict] = None
     onboarding_completed: bool = False
+
+    def _prepare_save_data(self) -> Dict[str, Any]:
+        data = super()._prepare_save_data()
+        # SurrealDB schema defines company_id as option<record<company>>.
+        # connection.insert() requires a RecordID object, not a string.
+        if data.get("company_id") and isinstance(data["company_id"], str):
+            data["company_id"] = ensure_record_id(data["company_id"])
+        return data
 
     @classmethod
     async def get_by_username(cls, username: str) -> Optional["User"]:

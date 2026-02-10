@@ -1,8 +1,8 @@
-from typing import ClassVar, Optional
+from typing import Any, ClassVar, Dict, Optional
 
 from loguru import logger
 
-from open_notebook.database.repository import repo_query
+from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.base import ObjectModel
 from open_notebook.exceptions import DatabaseOperationError
 
@@ -25,6 +25,20 @@ class ModuleAssignment(ObjectModel):
     def needs_embedding(self) -> bool:
         """ModuleAssignments are not searchable."""
         return False
+
+    def _prepare_save_data(self) -> Dict[str, Any]:
+        from datetime import datetime
+
+        data = super()._prepare_save_data()
+        # SurrealDB schema defines these as record<company>, record<notebook>,
+        # option<record<user>>. connection.insert() requires RecordID objects.
+        for field in ("company_id", "notebook_id", "assigned_by"):
+            if data.get(field) and isinstance(data[field], str):
+                data[field] = ensure_record_id(data[field])
+        # SurrealDB expects assigned_at as datetime, not string
+        if data.get("assigned_at") and isinstance(data["assigned_at"], str):
+            data["assigned_at"] = datetime.fromisoformat(data["assigned_at"])
+        return data
 
     @classmethod
     async def get_by_company(cls, company_id: str) -> list["ModuleAssignment"]:
