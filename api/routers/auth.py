@@ -3,6 +3,8 @@ Authentication router for Open Notebook API.
 Provides JWT-based registration, login, token refresh, logout, and user info endpoints.
 """
 
+import os
+
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.requests import Request
 from loguru import logger
@@ -18,6 +20,10 @@ from api.auth import (
 )
 from api.models import OnboardingSubmit, OnboardingResponse, UserCreate, UserLogin, UserResponse
 from api.user_service import authenticate_user, register_user
+
+# In local dev (HTTP), cookies with secure=True are silently dropped by browsers.
+# Only set secure=True when explicitly configured for production (HTTPS).
+COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() == "true"
 from open_notebook.domain.user import User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -71,7 +77,7 @@ async def login(user_data: UserLogin, response: Response):
             key="access_token",
             value=access_token,
             httponly=True,
-            secure=True,
+            secure=COOKIE_SECURE,
             samesite="lax",
             max_age=JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
             path="/",
@@ -80,7 +86,7 @@ async def login(user_data: UserLogin, response: Response):
             key="refresh_token",
             value=refresh_token,
             httponly=True,
-            secure=True,
+            secure=COOKIE_SECURE,
             samesite="lax",
             max_age=JWT_REFRESH_TOKEN_EXPIRE_DAYS * 86400,
             path="/api/auth/refresh",
@@ -129,7 +135,7 @@ async def refresh(request: Request, response: Response):
             key="access_token",
             value=access_token,
             httponly=True,
-            secure=True,
+            secure=COOKIE_SECURE,
             samesite="lax",
             max_age=JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
             path="/",
