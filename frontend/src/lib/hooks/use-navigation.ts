@@ -7,7 +7,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { useTranslation } from '../locales/use-translation';
+import { useTranslation } from './use-translation';
 import {
   sendNavigationMessage,
   getNavigationHistory,

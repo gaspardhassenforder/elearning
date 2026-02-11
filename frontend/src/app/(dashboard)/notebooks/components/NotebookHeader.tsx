@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { NotebookResponse } from '@/lib/types/api'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Archive, ArchiveRestore, Trash2 } from 'lucide-react'
+import { Archive, ArchiveRestore, Trash2, Settings } from 'lucide-react'
+import Link from 'next/link'
 import { useUpdateNotebook, useDeleteNotebook } from '@/lib/hooks/use-notebooks'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { formatDistanceToNow } from 'date-fns'
@@ -72,8 +73,17 @@ export function NotebookHeader({ notebook }: NotebookHeaderProps) {
               {notebook.archived && (
                 <Badge variant="secondary">{t.notebooks.archived}</Badge>
               )}
+              <Badge variant={notebook.published ? 'default' : 'secondary'}>
+                {notebook.published ? t.notebooks.published : t.notebooks.draft}
+              </Badge>
             </div>
             <div className="flex gap-2">
+              <Link href={`/notebooks/${encodeURIComponent(notebook.id)}/configure`}>
+                <Button variant="default" size="sm">
+                  <Settings className="h-4 w-4 mr-2" />
+                  {notebook.published ? t.notebooks.moduleSettings : t.notebooks.nextSteps}
+                </Button>
+              </Link>
               <Button
                 variant="outline"
                 size="sm"

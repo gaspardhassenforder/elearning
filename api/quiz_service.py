@@ -14,30 +14,36 @@ async def generate_quiz(
     num_questions: int = 5,
     source_ids: Optional[List[str]] = None,
     instructions: Optional[str] = None,
+    user_id: Optional[str] = None,  # Story 7.7: Token tracking context
+    company_id: Optional[str] = None,  # Story 7.7: Token tracking context
 ) -> dict:
     """
     Generate a quiz for a notebook.
-    
+
     Args:
         notebook_id: ID of the notebook
         topic: Optional topic to focus on
         num_questions: Number of questions to generate
         source_ids: Optional specific source IDs to use
         instructions: Optional specific instructions for quiz generation
-        
+        user_id: Optional user ID for token tracking (Story 7.7)
+        company_id: Optional company ID for token tracking (Story 7.7)
+
     Returns:
         dict with quiz_id if successful, or error if failed
     """
     logger.info(f"Quiz service: generating quiz for notebook {notebook_id}")
-    
+
     result = await generate_quiz_workflow(
         notebook_id=notebook_id,
         topic=topic,
         num_questions=num_questions,
         source_ids=source_ids,
         instructions=instructions,
+        user_id=user_id,  # Story 7.7: Pass token tracking context
+        company_id=company_id,  # Story 7.7: Pass token tracking context
     )
-    
+
     return result
 
 

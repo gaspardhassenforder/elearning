@@ -47,22 +47,35 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return
       }
 
+      // Already have user (e.g. just logged in): don't block on /auth/me again
+      const state = useAuthStore.getState()
+      if (state.isAuthenticated && state.user) {
+        setIsInitializing(false)
+        return
+      }
+
       try {
         const currentUser = await fetchCurrentUser()
 
         if (!currentUser) {
-          // Token invalid or expired - clear state and redirect to login
           clearAuth()
           router.replace('/login')
           return
         }
 
-        // Update store with user data (already done in fetchCurrentUser via checkAuth)
-        setIsInitializing(false)
+        // Store the user so layouts (dashboard/learner) have it after refresh
+        useAuthStore.setState({
+          user: currentUser,
+          isAuthenticated: true,
+          lastAuthCheck: Date.now(),
+        })
       } catch (error) {
         console.error('Auth initialization error:', error)
         clearAuth()
         router.replace('/login')
+      } finally {
+        // Always stop loading so we never block the UI (redirect will happen if auth failed)
+        setIsInitializing(false)
       }
     }
 

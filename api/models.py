@@ -766,18 +766,6 @@ class RegenerateArtifactResponse(BaseModel):
     )
 
 
-# Async artifact generation models (Story 4.7)
-class ArtifactGenerationResult(BaseModel):
-    """Result from generate_artifact tool."""
-
-    job_id: str = Field(..., description="Command job ID (command:xyz format)")
-    artifact_ids: List[str] = Field(..., description="List of artifact tracker IDs created")
-    artifact_type: str = Field(..., description="Type of artifact (podcast, quiz, etc.)")
-    status: str = Field(..., description="Job status (submitted, completed, error)")
-    message: str = Field(..., description="User-friendly acknowledgment message")
-    topic: Optional[str] = Field(None, description="Topic or title of the artifact")
-
-
 # Learning Objectives API models (Story 3.3)
 class LearningObjectiveCreate(BaseModel):
     """Create a new learning objective."""
@@ -800,6 +788,7 @@ class LearningObjectiveResponse(BaseModel):
     text: str
     order: int
     auto_generated: bool
+    source_refs: List[str] = []
     created: Optional[str] = None
     updated: Optional[str] = None
 
@@ -812,8 +801,8 @@ class LearningObjectiveReorder(BaseModel):
     )
 
 
-class BatchGenerationResponse(BaseModel):
-    """Response from batch generation operation."""
+class ObjectiveGenerationResponse(BaseModel):
+    """Response from learning objective batch generation operation."""
 
     status: Literal["pending", "analyzing", "generating", "saving", "completed", "failed"]
     objective_ids: Optional[List[str]] = Field(

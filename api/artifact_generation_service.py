@@ -208,13 +208,25 @@ async def generate_podcast_artifact(notebook_id: str) -> Tuple[str, Optional[str
         if not notebook:
             return ("error", None, [], "Notebook not found")
 
+        # Check that required podcast profiles exist before attempting generation
+        from open_notebook.podcasts.models import EpisodeProfile, SpeakerProfile
+
+        episode_profile = await EpisodeProfile.get_by_name("overview")
+        if not episode_profile:
+            logger.info("Podcast skipped: no 'overview' episode profile configured")
+            return ("skipped", None, [], None)
+
+        speaker_profile = await SpeakerProfile.get_by_name("alex_sarah")
+        if not speaker_profile:
+            logger.info("Podcast skipped: no 'alex_sarah' speaker profile configured")
+            return ("skipped", None, [], None)
+
         # Submit podcast generation job with default profiles
         episode_name = f"{notebook.name} - Overview"
 
-        # Use default profiles
         command_id, artifact_ids = await PodcastService.submit_generation_job(
-            episode_profile_name="overview",  # Default episode profile
-            speaker_profile_name="alex_sarah",  # Default speaker profile
+            episode_profile_name="overview",
+            speaker_profile_name="alex_sarah",
             episode_name=episode_name,
             notebook_id=notebook_id,
         )

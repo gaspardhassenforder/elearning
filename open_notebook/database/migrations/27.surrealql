@@ -1,0 +1,20 @@
+-- Migration 27: Replace deprecated text-embedding-004 with gemini-embedding-001
+-- Google shut down text-embedding-004 on January 14, 2026
+-- See: https://ai.google.dev/gemini-api/docs/changelog
+
+-- Update existing model record
+UPDATE model SET name = "gemini-embedding-001"
+WHERE name = "text-embedding-004" AND provider = "google";
+
+-- If no record existed, create it
+IF array::len(SELECT * FROM model WHERE name = "gemini-embedding-001" AND provider = "google") == 0 THEN
+    CREATE model CONTENT {
+        name: "gemini-embedding-001",
+        provider: "google",
+        type: "embedding"
+    }
+END;
+
+-- Ensure default_embedding_model points to the new model
+LET $new_embedding_id = (SELECT VALUE id FROM model WHERE name = "gemini-embedding-001" AND provider = "google" LIMIT 1)[0];
+UPDATE open_notebook:default_models SET default_embedding_model = $new_embedding_id;

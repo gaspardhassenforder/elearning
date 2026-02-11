@@ -59,11 +59,22 @@ export function NotebookCard({ notebook }: NotebookCardProps) {
                 <CardTitle className="text-base truncate group-hover:text-primary transition-colors">
                   {notebook.name}
                 </CardTitle>
-                {notebook.archived && (
-                  <Badge variant="secondary" className="mt-1">
-                    {t.notebooks.archived}
-                  </Badge>
-                )}
+                <div className="flex items-center gap-1.5 mt-1">
+                  {notebook.published ? (
+                    <Badge variant="default" className="text-xs">
+                      {t.notebooks.published}
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" className="text-xs">
+                      {t.notebooks.draft}
+                    </Badge>
+                  )}
+                  {notebook.archived && (
+                    <Badge variant="secondary" className="text-xs">
+                      {t.notebooks.archived}
+                    </Badge>
+                  )}
+                </div>
               </div>
               
               <DropdownMenu>

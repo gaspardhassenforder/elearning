@@ -15,7 +15,7 @@ from api.token_usage_service import (
     get_notebook_token_usage,
     get_platform_token_usage,
 )
-from api.models.token_usage_models import (
+from api.token_usage_models import (
     CompanyTokenUsageSummary,
     NotebookTokenUsageSummary,
     PlatformTokenUsageSummary,

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { ConnectionError } from '@/lib/types/config'
 import { ConnectionErrorOverlay } from '@/components/errors/ConnectionErrorOverlay'
+import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { getConfig, resetConfig } from '@/lib/config'
 
 interface ConnectionGuardProps {
@@ -98,9 +99,16 @@ export function ConnectionGuard({ children }: ConnectionGuardProps) {
     return <ConnectionErrorOverlay error={error} onRetry={checkConnection} />
   }
 
-  // Show nothing while checking (prevents flash of content)
+  // Show loading while checking (avoids black/blank screen)
   if (isChecking) {
-    return null
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <LoadingSpinner size="lg" />
+          <p className="text-sm text-muted-foreground">Connecting...</p>
+        </div>
+      </div>
+    )
   }
 
   // Render children if connection is good

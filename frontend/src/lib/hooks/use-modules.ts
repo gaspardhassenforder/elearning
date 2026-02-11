@@ -126,8 +126,8 @@ export function useModuleDocuments(moduleId: string, options?: { pollingInterval
     queryFn: () => modulesApi.listDocuments(moduleId),
     enabled: !!moduleId,
     // Poll every 2 seconds if any document is processing
-    refetchInterval: (data) => {
-      const hasProcessing = data?.some((doc: DocumentStatus) => doc.status === 'processing');
+    refetchInterval: (query) => {
+      const hasProcessing = query.state.data?.some((doc: DocumentStatus) => doc.status === 'processing');
       return hasProcessing ? (options?.pollingInterval ?? 2000) : false;
     },
   });

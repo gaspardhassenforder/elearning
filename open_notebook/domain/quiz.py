@@ -5,7 +5,6 @@ from typing import ClassVar, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
 
-from open_notebook.database.repository import ensure_record_id
 from open_notebook.domain.base import ObjectModel
 
 
@@ -23,6 +22,7 @@ class Quiz(ObjectModel):
     """Quiz artifact generated from notebook sources."""
 
     table_name: ClassVar[str] = "quiz"
+    record_id_fields: ClassVar[set[str]] = {"notebook_id"}
 
     notebook_id: str
     title: str
@@ -79,13 +79,9 @@ class Quiz(ObjectModel):
     def _prepare_save_data(self) -> dict:
         """Override to serialize questions as JSON string for reliable storage."""
         from loguru import logger
-        
+
         data = super()._prepare_save_data()
-        
-        # Convert notebook_id string to RecordID format for database
-        if "notebook_id" in data and data["notebook_id"] is not None:
-            data["notebook_id"] = ensure_record_id(data["notebook_id"])
-        
+
         # Serialize questions to JSON string for reliable storage in SurrealDB
         if "questions" in data and data["questions"]:
             questions_data = data["questions"]

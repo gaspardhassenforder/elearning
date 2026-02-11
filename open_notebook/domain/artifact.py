@@ -3,7 +3,6 @@
 from typing import ClassVar, Literal, Optional
 
 from loguru import logger
-from open_notebook.database.repository import ensure_record_id
 from open_notebook.domain.base import ObjectModel
 
 
@@ -11,21 +10,12 @@ class Artifact(ObjectModel):
     """Unified tracking of all generated artifacts in a notebook."""
 
     table_name: ClassVar[str] = "artifact"
+    record_id_fields: ClassVar[set[str]] = {"notebook_id"}
 
     notebook_id: str
-    artifact_type: Literal["quiz", "podcast", "note", "transformation"]
+    artifact_type: Literal["quiz", "podcast", "note", "summary", "transformation"]
     artifact_id: str  # ID of the actual artifact (quiz:xxx, podcast:xxx, etc.)
     title: str
-    
-    def _prepare_save_data(self) -> dict:
-        """Override to ensure notebook_id is converted to RecordID for database."""
-        data = super()._prepare_save_data()
-        
-        # Convert notebook_id string to RecordID format for database
-        if "notebook_id" in data and data["notebook_id"] is not None:
-            data["notebook_id"] = ensure_record_id(data["notebook_id"])
-        
-        return data
 
     def _is_job_id(self) -> bool:
         """Check if artifact_id is a job ID (command:xxx) rather than a real artifact ID."""
@@ -47,7 +37,7 @@ class Artifact(ObjectModel):
                 from open_notebook.podcasts.models import PodcastEpisode
 
                 return await PodcastEpisode.get(self.artifact_id)
-            elif self.artifact_type == "note":
+            elif self.artifact_type in ("note", "summary"):
                 from open_notebook.domain.notebook import Note
 
                 return await Note.get(self.artifact_id)
@@ -90,7 +80,7 @@ class Artifact(ObjectModel):
     async def create_for_artifact(
         cls,
         notebook_id: str,
-        artifact_type: Literal["quiz", "podcast", "note", "transformation"],
+        artifact_type: Literal["quiz", "podcast", "note", "summary", "transformation"],
         artifact_id: str,
         title: str,
     ) -> "Artifact":

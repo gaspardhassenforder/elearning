@@ -232,11 +232,11 @@ export function DocumentUploader({ moduleId }: DocumentUploaderProps) {
         <p className="text-xs text-muted-foreground">{t.modules.maxFileSize}</p>
       </div>
 
-      {/* Uploading Files List */}
-      {uploadingFiles.length > 0 && (
+      {/* Uploading Files List - hide entries already visible in documents list */}
+      {uploadingFiles.filter((f) => !f.id || !documents?.some((d) => d.id === f.id)).length > 0 && (
         <div className="space-y-2">
           <h3 className="text-sm font-medium">{t.modules.uploadingFiles}</h3>
-          {uploadingFiles.map((uploadingFile, index) => (
+          {uploadingFiles.filter((f) => !f.id || !documents?.some((d) => d.id === f.id)).map((uploadingFile, index) => (
             <div
               key={index}
               className="flex items-center gap-3 p-3 border rounded-lg"

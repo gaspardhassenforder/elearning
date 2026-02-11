@@ -6,6 +6,8 @@ import json
 import re
 from typing import List, Literal, Optional, TypedDict
 
+from langchain_core.runnables import RunnableConfig
+
 from ai_prompter import Prompter
 from langchain_core.output_parsers.pydantic import PydanticOutputParser
 from loguru import logger
@@ -15,6 +17,7 @@ from open_notebook.ai.provision import provision_langchain_model
 from open_notebook.domain.artifact import Artifact
 from open_notebook.domain.notebook import Notebook, vector_search_for_notebook
 from open_notebook.domain.quiz import Quiz, QuizQuestion
+from open_notebook.observability.token_tracking_callback import TokenTrackingCallback
 from open_notebook.utils import clean_thinking_content
 
 
@@ -33,6 +36,9 @@ class QuizGenerationState(TypedDict):
     quiz_id: Optional[str]
     error: Optional[str]
     status: Literal["pending", "gathering", "generating", "saving", "completed", "failed"]
+    # Story 7.7: Token tracking context
+    user_id: Optional[str]
+    company_id: Optional[str]
 
 
 class QuizSearch(BaseModel):
@@ -77,14 +83,26 @@ async def generate_rag_queries(state: QuizGenerationState) -> dict:
             structured=dict(type="json"),
         )
 
-        ai_message = await model.ainvoke(system_prompt)
+        # Story 7.7: Token tracking for quiz generation
+        callbacks = []
+        if state.get("user_id") or state.get("company_id"):
+            callbacks.append(
+                TokenTrackingCallback(
+                    user_id=state.get("user_id"),
+                    company_id=state.get("company_id"),
+                    notebook_id=state.get("notebook_id"),
+                    operation_type="quiz_generation",
+                )
+            )
 
-        # Clean the thinking content from the response
-        message_content = (
-            ai_message.content
-            if isinstance(ai_message.content, str)
-            else str(ai_message.content)
-        )
+        config = RunnableConfig(callbacks=callbacks) if callbacks else None
+        ai_message = await model.ainvoke(system_prompt, config=config)
+
+        # Extract text from response (handles string, list of content blocks, etc.)
+        from open_notebook.utils import extract_text_from_response
+
+        raw_content = ai_message.content
+        message_content = extract_text_from_response(raw_content)
         cleaned_content = clean_thinking_content(message_content)
 
         # Parse the cleaned JSON content
@@ -319,8 +337,21 @@ async def generate_questions(state: QuizGenerationState) -> dict:
             max_tokens=4096,
         )
 
+        # Story 7.7: Token tracking for quiz generation
+        callbacks = []
+        if state.get("user_id") or state.get("company_id"):
+            callbacks.append(
+                TokenTrackingCallback(
+                    user_id=state.get("user_id"),
+                    company_id=state.get("company_id"),
+                    notebook_id=state.get("notebook_id"),
+                    operation_type="quiz_generation",
+                )
+            )
+
+        config = RunnableConfig(callbacks=callbacks) if callbacks else None
         # Generate questions
-        response = await model.ainvoke(prompt)
+        response = await model.ainvoke(prompt, config=config)
         
         # Extract text from response (handles string, list of content blocks, etc.)
         from open_notebook.utils import extract_text_from_response
@@ -464,17 +495,21 @@ async def generate_quiz(
     num_questions: int = 5,
     source_ids: Optional[List[str]] = None,
     instructions: Optional[str] = None,
+    user_id: Optional[str] = None,  # Story 7.7: Token tracking context
+    company_id: Optional[str] = None,  # Story 7.7: Token tracking context
 ) -> dict:
     """
     Main entry point for quiz generation.
-    
+
     Args:
         notebook_id: ID of the notebook to generate quiz for
         topic: Optional topic to focus questions on
         num_questions: Number of questions to generate (default: 5)
         source_ids: Optional list of specific source IDs to use
         instructions: Optional specific instructions for quiz generation
-        
+        user_id: Optional user ID for token tracking (Story 7.7)
+        company_id: Optional company ID for token tracking (Story 7.7)
+
     Returns:
         dict with quiz_id if successful, or error message if failed
     """
@@ -494,6 +529,8 @@ async def generate_quiz(
         "quiz_id": None,
         "error": None,
         "status": "pending",
+        "user_id": user_id,  # Story 7.7: Token tracking context
+        "company_id": company_id,  # Story 7.7: Token tracking context
     }
 
     # Run workflow steps sequentially

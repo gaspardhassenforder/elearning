@@ -131,7 +131,10 @@ class TestNoteCreationFlow:
         save_data = artifact._prepare_save_data()
         
         # Verify all required fields are present
-        assert save_data["notebook_id"] == "notebook:nb123"
+        # notebook_id is converted to RecordID by record_id_fields mechanism
+        from surrealdb import RecordID
+        assert isinstance(save_data["notebook_id"], RecordID)
+        assert str(save_data["notebook_id"]) == "notebook:nb123"
         assert save_data["artifact_type"] == "note"
         assert save_data["artifact_id"] == "note:test123"
         assert save_data["title"] == "Test Note"

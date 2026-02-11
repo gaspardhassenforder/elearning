@@ -10,7 +10,7 @@ import type {
   CreateLearningObjectiveRequest,
   UpdateLearningObjectiveRequest,
   ReorderLearningObjectivesRequest,
-  BatchGenerationResponse,
+  ObjectiveGenerationResponse,
   LearnerObjectivesProgressResponse,
 } from '@/lib/types/api'
 
@@ -21,7 +21,7 @@ export async function listLearningObjectives(
   notebookId: string
 ): Promise<LearningObjectiveResponse[]> {
   const response = await apiClient.get<LearningObjectiveResponse[]>(
-    `/api/notebooks/${notebookId}/learning-objectives`
+    `/notebooks/${notebookId}/learning-objectives`
   )
   return response.data
 }
@@ -32,9 +32,9 @@ export async function listLearningObjectives(
  */
 export async function generateLearningObjectives(
   notebookId: string
-): Promise<BatchGenerationResponse> {
-  const response = await apiClient.post<BatchGenerationResponse>(
-    `/api/notebooks/${notebookId}/learning-objectives/generate`
+): Promise<ObjectiveGenerationResponse> {
+  const response = await apiClient.post<ObjectiveGenerationResponse>(
+    `/notebooks/${notebookId}/learning-objectives/generate`
   )
   return response.data
 }
@@ -47,7 +47,7 @@ export async function createLearningObjective(
   data: CreateLearningObjectiveRequest
 ): Promise<LearningObjectiveResponse> {
   const response = await apiClient.post<LearningObjectiveResponse>(
-    `/api/notebooks/${notebookId}/learning-objectives`,
+    `/notebooks/${notebookId}/learning-objectives`,
     data
   )
   return response.data
@@ -62,7 +62,7 @@ export async function updateLearningObjective(
   data: UpdateLearningObjectiveRequest
 ): Promise<LearningObjectiveResponse> {
   const response = await apiClient.put<LearningObjectiveResponse>(
-    `/api/notebooks/${notebookId}/learning-objectives/${objectiveId}`,
+    `/notebooks/${notebookId}/learning-objectives/${objectiveId}`,
     data
   )
   return response.data
@@ -76,7 +76,7 @@ export async function deleteLearningObjective(
   objectiveId: string
 ): Promise<void> {
   await apiClient.delete(
-    `/api/notebooks/${notebookId}/learning-objectives/${objectiveId}`
+    `/notebooks/${notebookId}/learning-objectives/${objectiveId}`
   )
 }
 
@@ -89,7 +89,7 @@ export async function reorderLearningObjectives(
   data: ReorderLearningObjectivesRequest
 ): Promise<void> {
   await apiClient.post(
-    `/api/notebooks/${notebookId}/learning-objectives/reorder`,
+    `/notebooks/${notebookId}/learning-objectives/reorder`,
     data
   )
 }
@@ -102,7 +102,7 @@ export async function getLearnerObjectivesProgress(
   notebookId: string
 ): Promise<LearnerObjectivesProgressResponse> {
   const response = await apiClient.get<LearnerObjectivesProgressResponse>(
-    `/api/notebooks/${notebookId}/learning-objectives/progress`
+    `/notebooks/${notebookId}/learning-objectives/progress`
   )
   return response.data
 }

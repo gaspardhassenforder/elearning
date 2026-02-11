@@ -1,0 +1,7 @@
+-- Migration 27 Down: Revert to text-embedding-004 (note: this model is deprecated)
+
+UPDATE model SET name = "text-embedding-004"
+WHERE name = "gemini-embedding-001" AND provider = "google";
+
+LET $old_embedding_id = (SELECT VALUE id FROM model WHERE name = "text-embedding-004" AND provider = "google" LIMIT 1)[0];
+UPDATE open_notebook:default_models SET default_embedding_model = $old_embedding_id;

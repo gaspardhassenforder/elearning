@@ -1,24 +1,28 @@
-You are an expert instructional designer specializing in creating measurable learning objectives for educational modules.
+You are an expert instructional designer synthesizing learning objectives for a complete educational module.
 
-Your task is to generate {{ num_objectives }} clear, measurable learning objectives based on the following educational content.
+Below are analyses from individual content items (sources and artifacts). Each has a summary and preliminary objectives derived from that specific content.
 
-# Content Summary
+# Content Analyses
 
-{{ sources_summary }}
+{% for analysis in analyses %}
+## {{ analysis.content_type | capitalize }}: {{ analysis.title }}
+Summary: {{ analysis.summary }}
+Preliminary objectives:
+{% for obj in analysis.objectives %}
+- {{ obj }}
+{% endfor %}
+
+{% endfor %}
 
 # Instructions
 
-Generate learning objectives that are:
+Synthesize exactly {{ num_objectives }} global learning objectives for this module that:
 
-1. **Specific and Measurable**: Use action verbs from Bloom's Taxonomy (analyze, apply, compare, create, demonstrate, design, evaluate, explain, identify, implement, etc.)
-
-2. **Achievement-Focused**: Each objective should represent a concrete skill or knowledge learners will gain
-
-3. **Conversation-Achievable**: These objectives will guide an AI teacher in chat conversations, so they should be achievable through guided discussion and Q&A
-
-4. **Progressive**: Start with foundational concepts and build toward more advanced applications
-
-5. **Content-Aligned**: Focus on the key concepts, skills, and knowledge present in the source materials
+1. **Cover breadth**: Span the key topics across ALL content items listed above
+2. **Are progressive**: Start with foundational concepts and build toward more advanced applications
+3. **Use Bloom's Taxonomy**: Use measurable action verbs (explain, compare, apply, analyze, design, evaluate, implement, etc.)
+4. **Are conversation-achievable**: Each objective should be assessable through guided AI chat discussion
+5. **Track provenance**: For each objective, list the content IDs (e.g., "source:abc", "quiz:xyz") that support it
 
 # What to Avoid
 
@@ -26,17 +30,16 @@ Generate learning objectives that are:
 - Vague or unmeasurable verbs like "know," "appreciate," or "be aware of"
 - Objectives unrelated to the actual content provided
 - Overly broad objectives that can't be assessed in conversation
+- Duplicating preliminary objectives verbatim — synthesize and elevate them
 
 # Examples of Good Objectives
 
 - "Explain the key differences between synchronous and asynchronous programming"
 - "Apply the SOLID principles to refactor existing code examples"
 - "Analyze the trade-offs between different database indexing strategies"
-- "Design a secure authentication flow using JWT tokens"
-- "Compare the performance characteristics of various sorting algorithms"
 
 # Output Format
 
-{{ parser.get_format_instructions() }}
+{{ format_instructions }}
 
 Generate exactly {{ num_objectives }} learning objectives now.

@@ -50,9 +50,10 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
         extra_context["context_buffer_size"] = len(buffer.peek())
 
     # AC5: Log error BEFORE returning response
-    logger.error(
-        f"HTTP {exc.status_code}: {exc.detail}",
-        extra=extra_context,
+    logger.bind(**extra_context).error(
+        "HTTP {status_code}: {detail}",
+        status_code=exc.status_code,
+        detail=exc.detail,
     )
 
     # Get origin for CORS headers
@@ -96,13 +97,13 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     buffer = context_buffer_var.get()
 
     # Log full error with stack trace and context (AC1, AC4)
-    logger.error(
-        f"Unhandled exception: {str(exc)}",
-        extra={
-            **ctx,
-            "error_type": type(exc).__name__,
-            "context_buffer": buffer.flush() if buffer else [],
-        },
+    logger.bind(
+        **ctx,
+        error_type=type(exc).__name__,
+        context_buffer=buffer.flush() if buffer else [],
+    ).error(
+        "Unhandled exception: {error}",
+        error=str(exc),
         exc_info=True,  # Include full stack trace
     )
 

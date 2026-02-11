@@ -11,9 +11,14 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     setMounted(true)
   }, [])
 
-  // Avoid hydration mismatch by waiting for mount
+  // Avoid hydration mismatch by waiting for mount.
+  // Use a minimal loading state instead of hidden content to avoid a black/blank screen.
   if (!mounted) {
-    return <div style={{ visibility: 'hidden' }}>{children}</div>
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    )
   }
 
   return (

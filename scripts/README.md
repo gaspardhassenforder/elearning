@@ -1,5 +1,26 @@
 # Scripts Documentation
 
+## seed_test_accounts.py
+
+Creates test **admin** and **learner** accounts with a test company so you can try the platform locally. The learner is assigned to the company and (by default) one published module is created and assigned to that company.
+
+**Requirements:** `.env` with `JWT_SECRET_KEY` and `SURREAL_*` (or `SURREAL_URL`), and SurrealDB reachable. Run after the API has been started at least once (migrations applied).
+
+```bash
+# Create test company, admin (admin / changeme), learner (learner / learner123), and one sample module
+uv run python scripts/seed_test_accounts.py
+
+# Skip creating a sample notebook (company and users only)
+uv run python scripts/seed_test_accounts.py --no-notebook
+
+# If you already have a learner without company, assign them to the test company
+uv run python scripts/seed_test_accounts.py --force
+```
+
+Optional env vars: `DEFAULT_ADMIN_USERNAME`, `DEFAULT_ADMIN_PASSWORD`, `TEST_LEARNER_USERNAME`, `TEST_LEARNER_PASSWORD`, `TEST_COMPANY_NAME`, `TEST_COMPANY_SLUG`, `TEST_NOTEBOOK_NAME`.
+
+---
+
 ## clear_command_queue.py
 
 Clears the **surreal-commands** job queue (e.g. podcast generation backlog). Optionally removes artifact rows that reference pending jobs so the UI no longer shows stuck “generating” items.

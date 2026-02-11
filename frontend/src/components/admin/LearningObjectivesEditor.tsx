@@ -45,15 +45,14 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import { useModuleCreationStore } from '@/lib/stores/module-creation-store'
 
 interface LearningObjectivesEditorProps {
   moduleId: string
+  isEditMode?: boolean
 }
 
-export function LearningObjectivesEditor({ moduleId }: LearningObjectivesEditorProps) {
+export function LearningObjectivesEditor({ moduleId, isEditMode = false }: LearningObjectivesEditorProps) {
   const { t } = useTranslation()
-  const { isEditMode } = useModuleCreationStore()
 
   // Query and mutations
   const { data: objectives = [], isLoading, error } = useLearningObjectives(moduleId)

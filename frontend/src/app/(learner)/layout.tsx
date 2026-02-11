@@ -42,18 +42,21 @@ export default function LearnerLayout({
 
     // Role guard: If user is not learner, redirect to admin home
     if (user.role !== 'learner') {
+      setHasCheckedRole(true)
       router.replace('/notebooks')
       return
     }
 
     // Onboarding guard: Force incomplete onboarding to /onboarding
     if (!user.onboarding_completed && pathname !== '/onboarding') {
+      setHasCheckedRole(true)
       router.replace('/onboarding')
       return
     }
 
     // Skip onboarding if already completed
     if (user.onboarding_completed && pathname === '/onboarding') {
+      setHasCheckedRole(true)
       router.replace('/modules')
       return
     }
@@ -70,14 +73,23 @@ export default function LearnerLayout({
     )
   }
 
-  // Don't render if not authenticated (AuthProvider handles redirect)
+  // Don't render main content if not authenticated (AuthProvider handles redirect)
+  // Show loading instead of null to avoid a black/blank screen
   if (!isAuthenticated || !user) {
-    return null
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    )
   }
 
-  // Don't render if not learner (redirect in progress)
+  // Don't render main content if not learner (redirect in progress)
   if (user.role !== 'learner') {
-    return null
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    )
   }
 
   // Extract current notebook ID from pathname for context-aware navigation

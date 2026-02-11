@@ -35,6 +35,7 @@ class Notebook(ObjectModel):
                 """
                 select * omit source.full_text from (
                 select in as source from reference where out=$id
+                group by source
                 fetch source
             ) order by source.updated desc
             """,

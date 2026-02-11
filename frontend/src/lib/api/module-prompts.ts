@@ -12,7 +12,7 @@ import type { ModulePrompt, ModulePromptUpdate } from '@/lib/types/api'
  * Returns null if no prompt configured.
  */
 export async function getModulePrompt(notebookId: string): Promise<ModulePrompt | null> {
-  const response = await apiClient.get<ModulePrompt | null>(`/api/notebooks/${notebookId}/prompt`)
+  const response = await apiClient.get<ModulePrompt | null>(`/notebooks/${notebookId}/prompt`)
   return response.data
 }
 
@@ -23,6 +23,6 @@ export async function updateModulePrompt(
   notebookId: string,
   data: ModulePromptUpdate
 ): Promise<ModulePrompt> {
-  const response = await apiClient.put<ModulePrompt>(`/api/notebooks/${notebookId}/prompt`, data)
+  const response = await apiClient.put<ModulePrompt>(`/notebooks/${notebookId}/prompt`, data)
   return response.data
 }

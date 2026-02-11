@@ -46,6 +46,7 @@ export default function DashboardLayout({
 
     // Role guard: If user is not admin, redirect to learner home
     if (user.role !== 'admin') {
+      setHasCheckedRole(true)
       router.replace('/modules')
       return
     }
@@ -62,14 +63,23 @@ export default function DashboardLayout({
     )
   }
 
-  // Don't render if not authenticated (AuthProvider handles redirect)
+  // Don't render main content if not authenticated (AuthProvider handles redirect)
+  // Show loading instead of null to avoid a black/blank screen
   if (!isAuthenticated || !user) {
-    return null
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    )
   }
 
-  // Don't render if not admin (redirect in progress)
+  // Don't render main content if not admin (redirect in progress)
   if (user.role !== 'admin') {
-    return null
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    )
   }
 
   return (

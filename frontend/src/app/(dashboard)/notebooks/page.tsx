@@ -11,10 +11,13 @@ import { CreateNotebookDialog } from '@/components/notebooks/CreateNotebookDialo
 import { Input } from '@/components/ui/input'
 import { useTranslation } from '@/lib/hooks/use-translation'
 
+type StatusFilter = 'all' | 'published' | 'draft'
+
 export default function NotebooksPage() {
   const { t } = useTranslation()
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const { data: notebooks, isLoading, refetch } = useNotebooks(false)
   const { data: archivedNotebooks } = useNotebooks(true)
 
@@ -24,13 +27,19 @@ export default function NotebooksPage() {
     if (!notebooks) {
       return undefined
     }
-    if (!normalizedQuery) {
-      return notebooks
+    let result = notebooks
+    if (normalizedQuery) {
+      result = result.filter((notebook) =>
+        notebook.name.toLowerCase().includes(normalizedQuery)
+      )
     }
-    return notebooks.filter((notebook) =>
-      notebook.name.toLowerCase().includes(normalizedQuery)
-    )
-  }, [notebooks, normalizedQuery])
+    if (statusFilter === 'published') {
+      result = result.filter((notebook) => notebook.published)
+    } else if (statusFilter === 'draft') {
+      result = result.filter((notebook) => !notebook.published)
+    }
+    return result
+  }, [notebooks, normalizedQuery, statusFilter])
 
   const filteredArchived = useMemo(() => {
     if (!archivedNotebooks) {
@@ -59,6 +68,21 @@ export default function NotebooksPage() {
             </Button>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+            <div className="flex items-center gap-1 rounded-md border p-0.5">
+              {(['all', 'published', 'draft'] as const).map((filter) => (
+                <Button
+                  key={filter}
+                  variant={statusFilter === filter ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7 px-3 text-xs"
+                  onClick={() => setStatusFilter(filter)}
+                >
+                  {filter === 'all' && t.notebooks.filterAll}
+                  {filter === 'published' && t.notebooks.filterPublished}
+                  {filter === 'draft' && t.notebooks.filterDraft}
+                </Button>
+              ))}
+            </div>
             <Input
               id="notebook-search"
               name="notebook-search"

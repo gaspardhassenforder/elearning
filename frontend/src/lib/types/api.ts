@@ -371,6 +371,7 @@ export interface LearningObjectiveResponse {
   text: string
   order: number
   auto_generated: boolean
+  source_refs?: string[]
   created: string
   updated: string
 }
@@ -391,7 +392,7 @@ export interface ReorderLearningObjectivesRequest {
   }>
 }
 
-export interface BatchGenerationResponse {
+export interface ObjectiveGenerationResponse {
   status: 'completed' | 'error'
   objective_ids?: string[]
   error?: string

@@ -228,29 +228,51 @@ export function ModulePromptEditor({ moduleId, onNext, onBack }: ModulePromptEdi
         </CardContent>
       </Card>
 
-      {/* Navigation Buttons */}
-      <div className="flex items-center justify-between">
-        <Button
-          variant="outline"
-          onClick={handleBack}
-          disabled={updateMutation.isPending}
-        >
-          {t.common.back}
-        </Button>
-        <Button
-          onClick={handleNext}
-          disabled={updateMutation.isPending}
-        >
-          {updateMutation.isPending ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              {t.common.saving}
-            </>
-          ) : (
-            t.common.next
+      {/* Navigation Buttons — hidden when no callbacks provided (standalone mode) */}
+      {(onBack || onNext) ? (
+        <div className="flex items-center justify-between">
+          {onBack ? (
+            <Button
+              variant="outline"
+              onClick={handleBack}
+              disabled={updateMutation.isPending}
+            >
+              {t.common.back}
+            </Button>
+          ) : <div />}
+          {onNext && (
+            <Button
+              onClick={handleNext}
+              disabled={updateMutation.isPending}
+            >
+              {updateMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {t.common.saving}
+                </>
+              ) : (
+                t.common.next
+              )}
+            </Button>
           )}
-        </Button>
-      </div>
+        </div>
+      ) : hasChanges && (
+        <div className="flex justify-end">
+          <Button
+            onClick={handleSave}
+            disabled={updateMutation.isPending}
+          >
+            {updateMutation.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {t.common.saving}
+              </>
+            ) : (
+              t.common.save
+            )}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

@@ -31,8 +31,9 @@ class QuizAnswersRequest(BaseModel):
 async def generate_quiz(notebook_id: str, request: QuizGenerateRequest, admin: User = Depends(require_admin)):
     """
     Generate a new quiz for the notebook.
-    
+
     The quiz will be generated from the notebook's sources using AI.
+    Story 7.7: Passes admin user/company context for token tracking.
     """
     try:
         result = await quiz_service.generate_quiz(
@@ -41,6 +42,8 @@ async def generate_quiz(notebook_id: str, request: QuizGenerateRequest, admin: U
             num_questions=request.num_questions,
             source_ids=request.source_ids,
             instructions=request.instructions,
+            user_id=admin.id,  # Story 7.7: Token tracking context
+            company_id=admin.company_id,  # Story 7.7: Token tracking context
         )
 
         if result.get("error"):

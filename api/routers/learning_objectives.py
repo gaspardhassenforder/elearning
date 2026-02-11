@@ -16,11 +16,11 @@ from api import learning_objectives_service
 from api.auth import LearnerContext, get_current_learner, require_admin
 from api.learner_chat_service import get_learner_objectives_with_status, validate_learner_access_to_notebook
 from api.models import (
-    BatchGenerationResponse,
     LearningObjectiveCreate,
     LearningObjectiveReorder,
     LearningObjectiveResponse,
     LearningObjectiveUpdate,
+    ObjectiveGenerationResponse,
     ObjectiveWithProgress,
 )
 from open_notebook.domain.user import User
@@ -50,14 +50,15 @@ async def list_objectives(notebook_id: str):
             text=obj.text,
             order=obj.order,
             auto_generated=obj.auto_generated,
-            created=getattr(obj, "created", None),
-            updated=getattr(obj, "updated", None),
+            source_refs=obj.source_refs,
+            created=str(obj.created) if obj.created else None,
+            updated=str(obj.updated) if obj.updated else None,
         )
         for obj in objectives
     ]
 
 
-@router.post("/notebooks/{notebook_id}/learning-objectives/generate", response_model=BatchGenerationResponse)
+@router.post("/notebooks/{notebook_id}/learning-objectives/generate", response_model=ObjectiveGenerationResponse)
 async def generate_objectives(notebook_id: str, admin: User = Depends(require_admin)):
     """Auto-generate learning objectives from notebook sources using LangGraph workflow.
 
@@ -66,7 +67,7 @@ async def generate_objectives(notebook_id: str, admin: User = Depends(require_ad
         admin: Authenticated admin user (injected)
 
     Returns:
-        BatchGenerationResponse with generation status and objective IDs
+        ObjectiveGenerationResponse with generation status and objective IDs
 
     Raises:
         HTTPException 400: Objectives already exist or notebook has no sources
@@ -83,7 +84,7 @@ async def generate_objectives(notebook_id: str, admin: User = Depends(require_ad
         else:
             raise HTTPException(status_code=500, detail=result["error"])
 
-    return BatchGenerationResponse(
+    return ObjectiveGenerationResponse(
         status=result["status"],
         objective_ids=result.get("objective_ids"),
         error=result.get("error"),
@@ -125,8 +126,9 @@ async def create_objective(
         text=objective.text,
         order=objective.order,
         auto_generated=objective.auto_generated,
-        created=getattr(objective, "created", None),
-        updated=getattr(objective, "updated", None),
+        source_refs=objective.source_refs,
+        created=str(objective.created) if objective.created else None,
+        updated=str(objective.updated) if objective.updated else None,
     )
 
 
@@ -169,8 +171,9 @@ async def update_objective(
         text=objective.text,
         order=objective.order,
         auto_generated=objective.auto_generated,
-        created=getattr(objective, "created", None),
-        updated=getattr(objective, "updated", None),
+        source_refs=objective.source_refs,
+        created=str(objective.created) if objective.created else None,
+        updated=str(objective.updated) if objective.updated else None,
     )
 
 

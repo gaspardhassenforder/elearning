@@ -87,7 +87,7 @@ export function ModuleForm({ open, onOpenChange, module }: ModuleFormProps) {
 
         // Close dialog and navigate to module page for document upload
         onOpenChange(false);
-        router.push(`/modules/${newModule.id}`);
+        router.push(`/admin/modules/${newModule.id}`);
       }
     } catch (error) {
       // Error already handled by mutation hook with toast

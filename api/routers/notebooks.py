@@ -368,9 +368,7 @@ async def upload_document_to_notebook(
         from commands.source_commands import SourceProcessingInput
 
         # Prepare content state for processing
-        from open_notebook.graphs.source import StateDict
-
-        content_state: StateDict = {
+        content_state: dict = {
             "source_id": source.id or "",
             "notebook_ids": [notebook_id],
             "file_path": file_path,

@@ -32,6 +32,7 @@ class ObjectModel(BaseModel):
     id: Optional[str] = None
     table_name: ClassVar[str] = ""
     nullable_fields: ClassVar[set[str]] = set()  # Fields that can be saved as None
+    record_id_fields: ClassVar[set[str]] = set()  # Fields that are record<> references in SurrealDB
     created: Optional[datetime] = None
     updated: Optional[datetime] = None
 
@@ -196,6 +197,9 @@ class ObjectModel(BaseModel):
 
     def _prepare_save_data(self) -> Dict[str, Any]:
         data = self.model_dump()
+        for field_name in self.__class__.record_id_fields:
+            if field_name in data and data[field_name] is not None:
+                data[field_name] = ensure_record_id(data[field_name])
         return {
             key: value
             for key, value in data.items()

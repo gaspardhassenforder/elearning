@@ -8,7 +8,7 @@ from typing import ClassVar, Optional
 from loguru import logger
 from pydantic import field_validator
 
-from open_notebook.database.repository import repo_query
+from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.base import ObjectModel
 from open_notebook.exceptions import DatabaseOperationError, InvalidInputError
 
@@ -27,11 +27,13 @@ class LearningObjective(ObjectModel):
     """
 
     table_name: ClassVar[str] = "learning_objective"
+    record_id_fields: ClassVar[set[str]] = {"notebook_id"}
 
     notebook_id: str
     text: str
     order: int = 0
     auto_generated: bool = False
+    source_refs: list[str] = []  # Content IDs that contributed to this objective
 
     @field_validator("notebook_id")
     @classmethod
@@ -73,7 +75,7 @@ class LearningObjective(ObjectModel):
             if ordered:
                 query += " ORDER BY order ASC"
 
-            result = await repo_query(query, {"notebook_id": notebook_id})
+            result = await repo_query(query, {"notebook_id": ensure_record_id(notebook_id)})
             return [cls(**item) for item in result]
         except Exception as e:
             logger.error(f"Error fetching objectives for notebook {notebook_id}: {str(e)}")
@@ -147,7 +149,7 @@ class LearningObjective(ObjectModel):
         try:
             result = await repo_query(
                 "SELECT count() AS count FROM learning_objective WHERE notebook_id = $notebook_id GROUP ALL",
-                {"notebook_id": notebook_id},
+                {"notebook_id": ensure_record_id(notebook_id)},
             )
             return result[0]["count"] if result else 0
         except Exception as e:

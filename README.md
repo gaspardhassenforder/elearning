@@ -74,6 +74,36 @@ Learn more at [https://www.open-notebook.ai](https://www.open-notebook.ai)
 
 ---
 
+## 🆕 What's New - Enterprise B2B Learning Platform
+
+Open Notebook has evolved from a personal research tool into a **full-featured enterprise B2B learning platform**:
+
+**Latest in v1.5+ (20,000+ lines of new code):**
+- ✅ **Multi-Tenancy (Companies)** - Complete per-company data isolation and management
+- ✅ **Module Assignments** - Assign learning modules to specific companies
+- ✅ **Learning Objectives & Progress** - Track learner goals and completion
+- ✅ **Token Usage Tracking** - Monitor AI costs per company, user, and module
+- ✅ **GDPR Compliance** - User and company data deletion endpoints
+- ✅ **LangSmith Integration** - Advanced LLM tracing and debugging
+- ✅ **Admin Error Notifications** - Real-time error monitoring for administrators
+- ✅ **AI Navigation Assistant** - Platform-wide AI help and guidance
+- ✅ **Module Prompts** - Custom AI prompts per learning module
+- ✅ **Enhanced Podcasts** - Speaker and episode profiles for customized audio
+- ✅ **Source Chat** - Chat with individual documents separately
+- ✅ **Separate Chat Interfaces** - Dedicated admin and learner chat experiences
+- ✅ **User Management** - Admin and Learner roles with authentication
+- ✅ **AI Guide Mode** - Socratic learning approach (hints, not answers)
+- ✅ **Quiz Generation** - AI-powered multiple-choice quiz creation from content
+- ✅ **Artifacts System** - Unified view of quizzes, podcasts, and notes
+- ✅ **3-Column Interface** - Document reader, chat guide, and artifacts panel
+
+**In Development:**
+- 🚧 Advanced Learning Analytics - Detailed engagement metrics and reporting
+- 🚧 Progress Dashboards - Visual learner progress tracking
+- 🚧 Certificate Generation - Course completion certificates
+
+---
+
 ## 💼 Platform Architecture
 
 Open Notebook uses a modern three-tier architecture:
@@ -85,19 +115,28 @@ Open Notebook uses a modern three-tier architecture:
 │              http://localhost:8502 (prod)                │
 ├─────────────────────────────────────────────────────────┤
 │ • Document Reader (left)                                │
-│ • AI Chat Guide (center)                                │
+│ • AI Chat Guide (center) - Admin, Learner, Source modes│
 │ • Artifacts Panel (right) - quizzes, podcasts, notes    │
+│ • AI Navigation Assistant (platform-wide help)          │
+│ • Learning Objectives & Progress Display                │
 └────────────────────────┬────────────────────────────────┘
                          │ HTTP REST + JWT Auth
 ┌────────────────────────▼────────────────────────────────┐
-│              API (FastAPI)                              │
+│              API (FastAPI) - 33+ Routers                │
 │              http://localhost:5055                      │
 ├─────────────────────────────────────────────────────────┤
-│ • User authentication & role-based access               │
+│ • Multi-tenant company management                       │
+│ • User authentication & role-based access (Admin/Learner)│
+│ • Module assignments to companies                       │
+│ • Learning objectives & progress tracking               │
+│ • Token usage tracking (per company/user/module)        │
 │ • Quiz generation (LangGraph workflows)                 │
-│ • Custom podcast generation                             │
+│ • Custom podcast generation (speaker/episode profiles)  │
 │ • AI chat guide mode (Socratic learning)                │
-│ • Multi-provider AI via Esperanto                       │
+│ • GDPR-compliant data deletion                          │
+│ • LangSmith LLM tracing integration                     │
+│ • Admin error notifications                             │
+│ • Multi-provider AI via Esperanto (16+ providers)       │
 └────────────────────────┬────────────────────────────────┘
                          │ SurrealQL
 ┌────────────────────────▼────────────────────────────────┐
@@ -105,28 +144,75 @@ Open Notebook uses a modern three-tier architecture:
 │         http://localhost:8000                           │
 ├─────────────────────────────────────────────────────────┤
 │ • Graph database with vector embeddings                 │
-│ • User, Notebook, Quiz, Podcast, Artifact models        │
-│ • Built-in semantic search                              │
+│ • Enterprise models: Company, ModuleAssignment          │
+│ • User models: User, TokenUsage                         │
+│ • Learning models: Notebook, LearningObjective, Progress│
+│ • Content models: Source, Note, Quiz, Podcast, Artifact │
+│ • Built-in semantic search & relationships              │
 └─────────────────────────────────────────────────────────┘
 ```
 
 **Tech Stack:**
 - **Frontend**: Next.js 16, React 19, TypeScript, TanStack Query, Zustand, Shadcn/ui
-- **Backend**: FastAPI, Python 3.11+, LangGraph, Esperanto (multi-provider AI)
+- **Backend**: FastAPI, Python 3.11+, LangGraph, Esperanto (multi-provider AI), 33+ API routers
 - **Database**: SurrealDB (graph database with vector search)
+- **Integrations**: LangSmith (LLM tracing), Surreal-Commands (async jobs)
+
+## 🏢 Enterprise Features
+
+Open Notebook v1.5+ includes comprehensive enterprise capabilities for B2B deployments:
+
+### Multi-Tenancy & Data Isolation
+- **Company Management**: Create and manage multiple client organizations
+- **Per-Company Data Isolation**: Complete data segregation between companies (CRITICAL security feature)
+- **Module Assignments**: Assign specific learning modules to specific companies
+- **Locked Modules**: Prevent companies from modifying assigned modules
+
+### Cost Management & Monitoring
+- **Token Usage Tracking**: Monitor AI costs at multiple levels:
+  - Per company: Total AI usage across all users
+  - Per user: Individual learner AI consumption
+  - Per module: Cost per learning module
+  - Per interaction: Detailed token counts for every AI call
+- **Budget Alerts**: Set limits and receive notifications (in development)
+- **Cost Transparency**: Learners can view their own token usage
+
+### Learning Analytics & Progress
+- **Learning Objectives**: Define measurable goals for each module
+- **Progress Tracking**: Monitor learner completion of objectives
+- **Engagement Metrics**: Track quiz attempts, chat interactions, podcast listens
+- **Completion Reports**: Generate reports per company or learner (in development)
+
+### Compliance & Security
+- **GDPR-Compliant Data Deletion**: Complete user and company data removal endpoints
+- **Role-Based Access Control**: Admin and Learner roles with fine-grained permissions
+- **Security Patterns**: Per-company endpoints with automatic isolation enforcement
+- **Audit Logging**: Comprehensive logging of all system operations
+- **Error Notifications**: Admin alerts for system errors and security events
+
+### Administration & Management
+- **Admin Dashboard**: Manage companies, users, and module assignments
+- **Error Monitoring**: Real-time error notifications with detailed context
+- **LangSmith Integration**: Advanced LLM debugging and performance monitoring
+- **System Configuration**: Per-module AI prompts and behavior settings
+- **Speaker/Episode Profiles**: Custom podcast voice and format configurations
 
 ## 🆚 Open Notebook vs Google Notebook LM
 
 | Feature | Open Notebook | Google Notebook LM | Advantage |
 |---------|---------------|--------------------|-----------|
 | **Privacy & Control** | Self-hosted, your data | Google cloud only | Complete data sovereignty |
-| **Use Case** | B2B learning platform + research | Personal research only | Enterprise-ready |
-| **User Management** | Admin/Learner roles, assignments | Single user | Multi-user organizations |
+| **Use Case** | Enterprise B2B learning platform | Personal research only | Multi-tenant enterprise-ready |
+| **Multi-Tenancy** | Full company management + isolation | Single user | Serve multiple organizations |
+| **User Management** | Admin/Learner roles + permissions | Single user | Team collaboration |
+| **Cost Tracking** | Per-company/user/module token tracking | None | Budget management & transparency |
+| **Learning Features** | Objectives, progress, quizzes, AI guide | Basic chat only | Structured learning paths |
+| **GDPR Compliance** | Full data deletion capabilities | Google's policy | EU/enterprise compliance |
 | **AI Provider Choice** | 16+ providers (OpenAI, Anthropic, Ollama, etc.) | Google models only | Flexibility and cost optimization |
-| **Learning Features** | Quizzes, AI guide mode, custom podcasts | Limited | Interactive learning experience |
-| **Podcast Speakers** | 1-4 speakers, custom topics/length | 2 speakers, fixed format | Extreme flexibility |
+| **Podcast Speakers** | 1-4 speakers, custom topics/length/voices | 2 speakers, fixed format | Extreme flexibility |
 | **Content Transformations** | Custom and built-in | Limited options | Unlimited processing power |
-| **API Access** | Full REST API | No API | Complete automation |
+| **API Access** | Full REST API (33+ routers) | No API | Complete automation |
+| **LLM Tracing** | LangSmith integration | None | Performance monitoring |
 | **Deployment** | Docker, cloud, or local | Google hosted only | Deploy anywhere |
 | **Customization** | Open source, fully customizable | Closed system | Unlimited extensibility |
 | **Cost** | Pay only for AI usage | Free tier + limits | Transparent and controllable |
@@ -217,26 +303,95 @@ docker compose up -d
 **Quick Start:**
 
 ```bash
-# 1. Clone the repository
+# Step 1: Clone the repository
 git clone https://github.com/lfnovo/open-notebook.git
 cd open-notebook
 
-# 2. Install dependencies
+# Step 2: Install dependencies
 uv sync
 cd frontend && npm install && cd ..
 
-# 3. Configure environment
+# Step 3: Configure environment
 cp .env.example .env
 # Edit .env and add your API key (OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.)
+```
 
-# 4. Start all services (Database + API + Worker + Frontend)
+**Step 4: Start Docker Desktop (CRITICAL)**
+
+⚠️ **You MUST start Docker Desktop BEFORE proceeding!**
+
+- **macOS**: Open Docker Desktop, wait for whale icon in menu bar to be steady (not animated)
+- **Windows**: Open Docker Desktop, wait for icon in system tray to stabilize
+- **Linux**: Ensure daemon is running: `sudo systemctl start docker`
+
+Verify Docker is ready:
+```bash
+docker ps
+# Should show: CONTAINER ID   IMAGE   COMMAND   CREATED   STATUS   PORTS   NAMES
+# (empty list is OK, just shouldn't error)
+```
+
+**Step 5: Start all services**
+
+```bash
 make start-all
 ```
+
+This command will:
+1. Start SurrealDB in Docker (wait 3 seconds)
+2. Start FastAPI backend (wait 3 seconds)
+3. Start background worker (wait 2 seconds)
+4. Start Next.js frontend (interactive mode)
+
+**⚠️ Common Error**: If you get "Cannot connect to the Docker daemon", you skipped Step 4. Start Docker Desktop and retry.
+
 
 **Access:**
 - **Frontend**: http://localhost:3000
 - **API**: http://localhost:5055
 - **API Docs**: http://localhost:5055/docs
+
+**Step 6: Verify installation**
+
+Wait 10-15 seconds for all services to start, then verify:
+
+```bash
+# Check all services are running
+make status
+
+# Expected output:
+# 📊 Open Notebook Service Status:
+# Database (SurrealDB):
+#   ✅ Running
+# API Backend:
+#   ✅ Running
+# Background Worker:
+#   ✅ Running
+# Next.js Frontend:
+#   ✅ Running
+```
+
+Test each service:
+
+```bash
+# Test API health endpoint
+curl http://localhost:5055/health
+# Expected: {"status":"ok"}
+
+# Test API docs (in browser)
+open http://localhost:5055/docs
+
+# Test frontend (in browser)
+open http://localhost:3000
+```
+
+**Success Indicators:**
+- ✅ SurrealDB container running in Docker Desktop
+- ✅ API responds at http://localhost:5055/docs
+- ✅ Frontend loads at http://localhost:3000
+- ✅ No error messages in terminal where `make start-all` is running
+
+**If anything fails**, see the [Troubleshooting](#-troubleshooting) section below.
 
 **Alternative - Start services individually:**
 
@@ -253,6 +408,64 @@ make worker
 # Terminal 4: Frontend
 cd frontend && npm run dev
 ```
+
+### ⚙️ Environment Configuration
+
+**Required Environment Variables** (in `.env` file):
+
+```bash
+# AI Provider (choose one or more)
+OPENAI_API_KEY=sk-...                    # For OpenAI models
+ANTHROPIC_API_KEY=sk-ant-...             # For Claude models
+GROQ_API_KEY=gsk_...                     # For Groq (fast inference)
+GOOGLE_API_KEY=...                       # For Google/Gemini
+# Or use Ollama (free, local) - no API key needed
+
+# Database (automatically configured with docker-compose)
+SURREAL_URL=ws://localhost:8000/rpc
+SURREAL_USER=root
+SURREAL_PASS=root
+SURREAL_NS=open_notebook
+SURREAL_DB=open_notebook
+
+# API (optional)
+API_URL=http://localhost:5055           # Frontend API connection
+API_HOST=127.0.0.1
+API_PORT=5055
+```
+
+**See `.env.example` for complete configuration options including:**
+- Multiple AI provider configurations
+- Custom model selection
+- TTS/STT provider settings
+- Advanced database configuration
+- User authentication settings
+
+**First Run - What Happens:**
+On first startup, the API will automatically:
+1. ✅ Run database migrations (check API terminal for "Migration successful")
+2. ✅ Create all database tables (Company, User, Notebook, ModuleAssignment, etc.)
+3. ✅ Initialize indexes and relationships
+4. ✅ Set up vector embeddings infrastructure
+5. ✅ Create default system configuration
+
+**No manual database setup needed!** Just watch the API terminal for confirmation messages.
+
+**Optional - Create First Admin User:**
+After startup, create your first admin user via API:
+
+```bash
+curl -X POST http://localhost:5055/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "admin",
+    "email": "admin@example.com",
+    "password": "admin",
+    "role": "admin"
+  }'
+```
+
+Then log in at http://localhost:3000
 
 ### 🛠️ Common Commands
 
@@ -327,14 +540,25 @@ Thanks to the [Esperanto](https://github.com/lfnovo/esperanto) library, we suppo
 
 ## ✨ Key Features
 
-### Learning Platform Capabilities
+### Enterprise Learning Platform
+- **🏢 Multi-Tenancy**: Full company management with per-company data isolation
+- **📊 Module Assignments**: Assign learning modules to specific companies
+- **🎯 Learning Objectives**: Define and track measurable learning goals
+- **📈 Progress Tracking**: Monitor learner progress through objectives
+- **💰 Token Usage Tracking**: Monitor AI costs per company, user, and module
+- **🔐 GDPR Compliance**: Complete user and company data deletion capabilities
+- **🔔 Admin Notifications**: Real-time error and system event notifications
+- **🗺️ AI Navigation**: Platform-wide AI assistant for help and guidance
+
+### Learning Experience
 - **🎓 Interactive Learning**: AI guide mode provides hints and encouragement, not direct answers
-- **👥 User Management**: Admin and Learner roles with notebook assignment system
+- **👥 User Management**: Admin and Learner roles with fine-grained permissions
 - **📖 3-Column Learning Interface**: Document reader, AI chat guide, and artifacts panel
 - **❓ AI-Powered Quizzes**: Generate custom multiple-choice quizzes from your content
-- **🎙️ Custom Podcasts**: Create topic-specific podcasts with configurable length and speakers
+- **🎙️ Custom Podcasts**: Create topic-specific podcasts with speaker and episode profiles
+- **💬 Multiple Chat Modes**: Source chat, learner chat, admin chat
 - **📚 Artifact Management**: Track all quizzes, podcasts, notes, and transformations
-- **🔒 Per-Company Data Isolation**: Secure multi-tenant architecture (in development)
+- **📝 Module Prompts**: Custom AI behavior per learning module
 
 ### Core Platform Features
 - **🔒 Privacy-First**: Self-hosted, complete data control - no cloud dependencies required
@@ -353,7 +577,41 @@ Thanks to the [Esperanto](https://github.com/lfnovo/esperanto) library, we suppo
 - **🌐 Multi-Language UI**: English, Portuguese, and Chinese (Simplified & Traditional)
 
 
-## Podcast Feature
+## 🎓 How It Works
+
+### For Learners
+
+1. **📚 Access Your Modules** - Log in and see learning modules assigned to your company
+2. **🎯 Review Objectives** - See learning goals and track your progress
+3. **📖 Read & Explore** - View documents, PDFs, videos in the reader panel
+4. **💬 Ask Questions** - Chat with AI guide for hints (not direct answers)
+5. **❓ Test Yourself** - Generate custom quizzes to validate understanding
+6. **🎙️ Listen & Learn** - Create topic-specific podcasts for passive learning
+7. **📊 Track Progress** - View your artifacts, objectives completion, and token usage
+8. **🗺️ Get Help** - Use AI Navigation Assistant for platform guidance
+
+### For Admins
+
+1. **🏢 Create Companies** - Set up client organizations
+2. **📚 Create Modules** - Organize learning content by topic
+3. **📄 Upload Sources** - Add PDFs, videos, documents, web pages
+4. **🎯 Define Objectives** - Set measurable learning goals per module
+5. **📝 Configure Prompts** - Customize AI behavior per module
+6. **🎙️ Pre-Generate Content** - Create overview podcasts and base quizzes
+7. **🔗 Assign Modules** - Link modules to specific companies
+8. **👥 Manage Users** - Add learners to companies
+9. **💰 Monitor Costs** - Track token usage per company/user/module
+10. **🔔 Receive Alerts** - Get notified of errors and system events
+
+### AI Guide Mode - Socratic Learning
+
+The AI guide is prompt-engineered to encourage critical thinking:
+- Provides **hints** instead of direct answers
+- Asks **follow-up questions** to deepen understanding
+- References **specific document sections** to review
+- Encourages **active exploration** over passive consumption
+
+## 🎙️ Podcast Feature Demo
 
 [![Check out our podcast sample](https://img.youtube.com/vi/D-760MlGwaI/0.jpg)](https://www.youtube.com/watch?v=D-760MlGwaI)
 
@@ -417,22 +675,42 @@ Thanks to the [Esperanto](https://github.com/lfnovo/esperanto) library, we suppo
 ## 🗺️ Roadmap
 
 ### In Development 🚧
-- **Organization Multi-Tenancy**: Complete per-company data isolation
-- **Progress Tracking**: Track learner progress through notebooks
-- **Admin Dashboard**: User and content management interface
+- **Advanced Learning Analytics Dashboard**: Visual engagement metrics and reporting
+- **Certificate Generation**: Course completion certificates
+- **Budget Alerts**: Token usage limits and notifications
 - **Advanced Quiz Types**: Short answer, essay questions, auto-grading
-- **Learning Analytics**: Engagement metrics and completion tracking
+- **Mobile App**: Native iOS/Android applications
+- **SSO Integration**: SAML/OAuth for enterprise authentication
 
-### Recently Completed ✅
-- **B2B Learning Platform**: User management, role-based access, notebook assignments
-- **3-Column Learning Interface**: Document reader, AI chat guide, artifacts panel
+### Recently Completed ✅ (v1.5+ - 20,000+ lines)
+
+**Enterprise Features**:
+- **Multi-Tenancy (Companies)**: Complete per-company data isolation (Story 7.5)
+- **Module Assignments**: Assign learning modules to specific companies (Story 2.2)
+- **Learning Objectives & Progress**: Track learner goals and completion (Story 3.3)
+- **Token Usage Tracking**: Monitor AI costs per company/user/module (Story 7.7)
+- **Learner Transparency**: Detailed token usage view for learners (Story 7.8)
+- **GDPR Compliance**: User and company data deletion endpoints (Story 7.6)
+- **Admin Error Notifications**: Real-time error monitoring (Story 7.3)
+- **Structured Error Logging**: Comprehensive system logging (Story 7.2)
+
+**AI & Learning Features**:
+- **LangSmith Integration**: Advanced LLM tracing and debugging (Story 7.4)
+- **AI Navigation Assistant**: Platform-wide AI help system (Story 6.1)
+- **Module Prompts**: Custom AI behavior per module (Story 3.4)
+- **Source Chat**: Chat with individual documents
+- **Admin/Learner Chat Modes**: Separate chat interfaces
+- **Speaker/Episode Profiles**: Enhanced podcast customization
 - **AI Guide Mode**: Socratic learning approach (hints, not answers)
 - **Quiz Generation**: AI-powered multiple-choice quiz creation
-- **Custom Podcasts**: Topic-specific podcast generation with speaker options
-- **Artifacts System**: Unified view of all generated content
-- **Token Usage Tracking**: Monitor AI costs per company and user
-- **Next.js Frontend**: Modern React-based frontend with improved performance
+- **Custom Podcasts**: Topic-specific podcast generation
+
+**Platform & Architecture**:
+- **3-Column Learning Interface**: Document reader, AI chat guide, artifacts panel
+- **Next.js 16 Frontend**: Modern React 19-based UI with improved performance
+- **33+ API Routers**: Comprehensive REST API coverage
 - **Multi-Model Support**: 16+ AI providers including OpenAI, Anthropic, Ollama, LM Studio
+- **Artifacts System**: Unified view of all generated content
 - **Content Transformations**: Powerful customizable actions for content processing
 
 See the [open issues](https://github.com/lfnovo/open-notebook/issues) for a full list of proposed features and known issues.
@@ -440,11 +718,139 @@ See the [open issues](https://github.com/lfnovo/open-notebook/issues) for a full
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
+## 🔧 Troubleshooting
+
+### Docker daemon not running
+
+**Issue**: `Cannot connect to the Docker daemon at unix:///Users/.../.docker/run/docker.sock`
+
+**Solution**:
+```bash
+# 1. Open Docker Desktop application
+# 2. Wait for Docker to fully start (whale icon in menu bar should be steady)
+# 3. Verify Docker is running:
+docker ps
+
+# 4. Then retry:
+make start-all
+```
+
+**On macOS**: Look for the Docker whale icon in the menu bar (top right). It should be steady, not animated.
+**On Windows**: Check system tray for Docker icon.
+**On Linux**: Ensure Docker daemon is running: `sudo systemctl status docker`
+
+### Services won't start
+
+**Issue**: `make start-all` fails or services crash
+
+**Solutions**:
+```bash
+# Check if ports are already in use
+lsof -i :3000  # Frontend
+lsof -i :5055  # API
+lsof -i :8000  # Database
+
+# Stop any running services
+make stop-all
+
+# Verify Docker is running
+docker ps
+
+# Start database separately first
+make database
+# Wait 5 seconds, then start API
+make api
+```
+
+### Frontend can't connect to API
+
+**Issue**: "Network Error" or "Cannot connect to API"
+
+**Solutions**:
+1. Verify API is running: `curl http://localhost:5055/health`
+2. Check `.env` file has correct `API_URL=http://localhost:5055`
+3. Check CORS settings in `api/main.py`
+4. Restart both API and frontend
+
+### Python version errors
+
+**Issue**: "Python 3.13 not supported" or similar
+
+**Solutions**:
+```bash
+# Check Python version
+python --version
+
+# Use specific Python version with uv
+uv sync --python 3.11
+```
+
+### npm install fails
+
+**Issue**: Package installation errors in frontend
+
+**Solutions**:
+```bash
+cd frontend
+rm -rf node_modules package-lock.json
+npm install
+```
+
+### Database connection errors
+
+**Issue**: "Cannot connect to SurrealDB"
+
+**Solutions**:
+```bash
+# Check SurrealDB is running
+docker ps | grep surrealdb
+
+# Check logs
+docker logs surrealdb
+
+# Restart database
+docker compose down
+make database
+```
+
+### Background worker not processing jobs
+
+**Issue**: Podcasts or async tasks stuck in "processing"
+
+**Solutions**:
+```bash
+# Check worker is running
+pgrep -f "surreal-commands-worker"
+
+# Restart worker
+make worker-restart
+
+# Check worker logs
+# Look for error messages in terminal where worker is running
+```
+
 ## 📖 Need Help?
-- **🤖 AI Installation Assistant**: We have a [CustomGPT built to help you install Open Notebook](https://chatgpt.com/g/g-68776e2765b48191bd1bae3f30212631-open-notebook-installation-assistant) - it will guide you through each step!
+- **🤖 AI Installation Assistant**: [CustomGPT to help you install](https://chatgpt.com/g/g-68776e2765b48191bd1bae3f30212631-open-notebook-installation-assistant) - it will guide you through each step!
+- **🆘 Troubleshooting Guide**: [5-minute troubleshooting guide](docs/6-TROUBLESHOOTING/quick-fixes.md)
 - **New to Open Notebook?** Start with our [Getting Started Guide](docs/0-START-HERE/index.md)
 - **Need installation help?** Check our [Installation Guide](docs/1-INSTALLATION/index.md)
 - **Want to see it in action?** Try our [Quick Start Tutorial](docs/0-START-HERE/quick-start.md)
+
+## 💻 System Requirements
+
+### For Docker Deployment
+- **Docker Desktop** or Docker Engine
+- **4GB RAM minimum** (8GB recommended)
+- **10GB disk space** for images and data
+- Any OS that supports Docker (Windows, macOS, Linux)
+
+### For Development (From Source)
+- **Python 3.11 or 3.12** (3.13 not yet supported)
+- **Node.js 18+** and npm
+- **Docker** (for SurrealDB)
+- **uv** package manager: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+- **8GB RAM recommended**
+- **Git** for cloning the repository
 
 ## 🤝 Community & Contributing
 
@@ -454,14 +860,39 @@ See the [open issues](https://github.com/lfnovo/open-notebook/issues) for a full
 - ⭐ **Star this repo** - Show your support and help others discover Open Notebook
 
 ### Contributing
-We welcome contributions! We're especially looking for help with:
-- **Frontend Development**: Help improve our modern Next.js/React UI
-- **Testing & Bug Fixes**: Make Open Notebook more robust
-- **Feature Development**: Build the coolest research tool together
-- **Documentation**: Improve guides and tutorials
+We welcome contributions! We're building the future of enterprise learning platforms together. With 20,000+ lines of new code in v1.5, there's plenty to explore. We're especially looking for help with:
 
-**Current Tech Stack**: Python, FastAPI, Next.js, React, SurrealDB
-**Future Roadmap**: Real-time updates, enhanced async processing
+**High-Priority Areas**:
+- **Learning Analytics Dashboard**: Visual progress tracking and reporting
+- **Certificate Generation**: Course completion certificates
+- **Budget Alerts**: Token usage limits and notifications
+- **Advanced Quiz Types**: Short answer, essay questions, auto-grading
+- **Mobile Responsiveness**: Optimize 3-column layout for tablets/mobile
+- **Testing**: Unit tests for 33+ API routers
+- **Documentation**: User guides for enterprise features
+
+**Good First Issues**:
+- UI/UX improvements for learner interface
+- Additional AI prompt templates
+- Bug fixes and edge case handling
+- Documentation updates
+- Translation support
+
+**Current Tech Stack**:
+- Backend: Python 3.11+, FastAPI, LangGraph, SurrealDB, 33+ API routers
+- Frontend: Next.js 16, React 19, TypeScript, TanStack Query, Zustand
+- AI: Esperanto (multi-provider), LangChain, LangSmith
+- Infrastructure: Docker, Surreal-Commands (async jobs)
+
+**Architecture**: See [CLAUDE.md](CLAUDE.md) for comprehensive architectural guidance
+
+**Recent Additions** (good places to contribute):
+- `api/routers/companies.py` - Company management
+- `api/routers/module_assignments.py` - Module assignments
+- `api/routers/learning_objectives.py` - Learning objectives
+- `api/routers/token_usage.py` - Token usage tracking
+- `frontend/src/components/admin/` - Admin UI components
+- `frontend/src/components/learner/` - Learner UI components
 
 See our [Contributing Guide](CONTRIBUTING.md) for detailed information on how to get started.
 

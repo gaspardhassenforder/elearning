@@ -13,7 +13,7 @@ from open_notebook.domain.token_usage import TokenUsage
 from open_notebook.domain.company import Company
 from open_notebook.domain.notebook import Notebook
 from open_notebook.database.repository import repo_query
-from api.models.token_usage_models import (
+from api.token_usage_models import (
     CompanyTokenUsageSummary,
     NotebookTokenUsageSummary,
     PlatformTokenUsageSummary,

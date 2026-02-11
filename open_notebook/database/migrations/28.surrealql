@@ -1,0 +1,14 @@
+-- Migration 28: Content analysis cache + learning objective provenance
+
+-- Per-content AI analysis (sources + artifacts)
+DEFINE TABLE content_analysis SCHEMAFULL;
+DEFINE FIELD content_id ON content_analysis TYPE string;
+DEFINE FIELD content_type ON content_analysis TYPE string;
+DEFINE FIELD summary ON content_analysis TYPE string;
+DEFINE FIELD objectives ON content_analysis TYPE array DEFAULT [];
+DEFINE FIELD created ON content_analysis TYPE datetime DEFAULT time::now();
+DEFINE FIELD updated ON content_analysis TYPE datetime DEFAULT time::now();
+DEFINE INDEX idx_content_analysis_id ON content_analysis FIELDS content_id UNIQUE;
+
+-- Add provenance tracking to learning objectives
+DEFINE FIELD source_refs ON learning_objective TYPE array DEFAULT [];

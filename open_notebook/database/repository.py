@@ -2,6 +2,7 @@ import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, TypeVar, Union
+from urllib.parse import unquote
 
 from loguru import logger
 from surrealdb import AsyncSurreal, RecordID  # type: ignore
@@ -38,10 +39,17 @@ def parse_record_ids(obj: Any) -> Any:
 
 
 def ensure_record_id(value: Union[str, RecordID]) -> RecordID:
-    """Ensure a value is a RecordID."""
+    """Ensure a value is a RecordID.
+
+    Defensively URL-decodes the string first to handle cases where
+    a URL-encoded ID (e.g. ``notebook%3Axyz``) arrives from the API layer
+    due to double-encoding by the HTTP client.
+    """
     if isinstance(value, RecordID):
         return value
-    return RecordID.parse(value)
+    # Decode URL-encoded characters (e.g. %3A → :) before parsing
+    decoded = unquote(value)
+    return RecordID.parse(decoded)
 
 
 @asynccontextmanager
