@@ -83,7 +83,7 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
 
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [userHasEdited, setUserHasEdited] = useState(false)
-  const lastAppliedTranscriptRef = useRef('')
+  const textBeforeRecordingRef = useRef('')
 
   // Merge history with current messages
   const allMessages = historyLoaded && historyData?.messages
@@ -131,28 +131,20 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
     }
   }, [messages, isStreaming, isUserScrolledUp])
 
-  // Append new voice transcript to input (don't replace existing text)
+  // Set input to pre-recording text + current transcript
   useEffect(() => {
     if (transcript && inputRef.current && !userHasEdited) {
-      const lastApplied = lastAppliedTranscriptRef.current
-      // Only append the portion of transcript that's new
-      if (transcript.length > lastApplied.length && transcript.startsWith(lastApplied)) {
-        const newText = transcript.slice(lastApplied.length)
-        const currentValue = inputRef.current.value
-        inputRef.current.value = currentValue + (currentValue && newText && !newText.startsWith(' ') ? ' ' : '') + newText
-      } else if (transcript !== lastApplied) {
-        // Transcript changed in a non-append way (e.g., interim correction) - replace trailing portion
-        inputRef.current.value = inputRef.current.value.slice(0, inputRef.current.value.length - lastApplied.length) + transcript
-      }
-      lastAppliedTranscriptRef.current = transcript
+      const prefix = textBeforeRecordingRef.current
+      const separator = prefix && !prefix.endsWith(' ') ? ' ' : ''
+      inputRef.current.value = prefix + separator + transcript
     }
   }, [transcript, userHasEdited])
 
-  // Reset edit flag and transcript tracking when recording starts
+  // Capture existing text when recording starts
   useEffect(() => {
     if (isListening) {
       setUserHasEdited(false)
-      lastAppliedTranscriptRef.current = ''
+      textBeforeRecordingRef.current = inputRef.current?.value || ''
     }
   }, [isListening])
 

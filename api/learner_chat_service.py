@@ -97,7 +97,7 @@ async def get_learner_objectives_with_status(
         return objectives_with_status
 
     except Exception as e:
-        logger.error(f"Error loading objectives with progress: {e}")
+        logger.error("Error loading objectives with progress: {}", str(e))
         # Fallback to objectives without progress on error
         try:
             objectives = await LearningObjective.get_for_notebook(notebook_id)
@@ -181,7 +181,7 @@ async def validate_learner_access_to_notebook(
     try:
         notebook = await Notebook.get(notebook_id)
     except Exception as e:
-        logger.error(f"Error fetching notebook {notebook_id}: {e}")
+        logger.error("Error fetching notebook {}: {}", notebook_id, str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
 
     if not notebook:
@@ -253,7 +253,7 @@ async def prepare_chat_context(
         )
         logger.debug(f"Loaded {len(objectives_with_status)} learning objectives with progress")
     except Exception as e:
-        logger.warning(f"Failed to load learning objectives for notebook {notebook_id}: {e}")
+        logger.warning("Failed to load learning objectives for notebook {}: {}", notebook_id, str(e))
         objectives_with_status = []
 
     # 3. Assemble system prompt (global + per-module from Story 3.4)
@@ -269,7 +269,7 @@ async def prepare_chat_context(
             f"System prompt assembled: {len(system_prompt)} chars for notebook {notebook_id}"
         )
     except Exception as e:
-        logger.error(f"Failed to assemble system prompt for notebook {notebook_id}: {e}")
+        logger.error("Failed to assemble system prompt for notebook {}: {}", notebook_id, str(e))
         # Generic error message - don't leak internal details
         raise HTTPException(
             status_code=500,
@@ -309,7 +309,7 @@ async def generate_proactive_greeting(
         objectives = await LearningObjective.get_for_notebook(notebook_id)
         logger.debug(f"Found {len(objectives)} learning objectives for notebook {notebook_id}")
     except Exception as e:
-        logger.warning(f"Failed to load learning objectives for notebook {notebook_id}: {e}")
+        logger.warning("Failed to load learning objectives for notebook {}: {}", notebook_id, str(e))
         objectives = []
 
     # 2. Determine first objective to introduce
@@ -358,7 +358,7 @@ Return ONLY the question, nothing else."""
         opening_question = str(opening_question).strip()
         logger.debug(f"Generated opening question: {opening_question}")
     except Exception as e:
-        logger.warning(f"Failed to generate opening question, using fallback: {e}")
+        logger.warning("Failed to generate opening question, using fallback: {}", str(e))
         opening_question = f"What comes to mind when you think about {first_objective_text.lower()}?"
 
     # 4. Render greeting template
@@ -376,6 +376,8 @@ Return ONLY the question, nothing else."""
         logger.info(f"Proactive greeting generated: {len(greeting_text)} chars")
         return greeting_text
     except Exception as e:
-        logger.error(f"Failed to render greeting template: {e}")
+        logger.error("Failed to render greeting template: {}", str(e))
         # Fallback to simple greeting
+        if language == "fr-FR":
+            return f"Bonjour {learner_profile.get('role', 'apprenant')} ! Bienvenue dans {notebook.name}. Commençons !"
         return f"Hello {learner_profile.get('role', 'learner')}! Welcome to {notebook.name}. Let's get started!"

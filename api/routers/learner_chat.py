@@ -421,6 +421,7 @@ async def stream_learner_chat(
                             learner_profile=learner_profile_dict,
                             objectives_with_status=objectives_with_status,
                             notebook_id=notebook_id,
+                            language=request.language,
                         )
                     else:
                         # Story 4.2: Proactive greeting for first-time visitors

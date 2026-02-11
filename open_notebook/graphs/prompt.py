@@ -147,7 +147,7 @@ async def _load_available_artifacts(notebook_id: str) -> str:
             return ""
 
     except Exception as e:
-        logger.error(f"Error loading artifacts for notebook {notebook_id}: {e}")
+        logger.error("Error loading artifacts for notebook {}: {}", notebook_id, str(e))
         # Return empty string on error - don't break prompt assembly
         return ""
 
@@ -237,14 +237,14 @@ async def assemble_system_prompt(
         global_rendered = Template(global_template).render(global_context)
         logger.debug(f"Global template rendered ({len(global_rendered)} chars)")
     except Exception as e:
-        logger.error(f"Failed to render global template: {e}")
+        logger.error("Failed to render global template: {}", str(e))
         raise
 
     # 2. Load and render per-module prompt (if exists)
     try:
         module_prompt = await ModulePrompt.get_by_notebook(notebook_id)
     except Exception as e:
-        logger.error(f"Error loading module prompt for {notebook_id}: {e}")
+        logger.error("Error loading module prompt for {}: {}", notebook_id, str(e))
         # Continue with global-only if module prompt fetch fails
         module_prompt = None
 
@@ -259,7 +259,7 @@ async def assemble_system_prompt(
             final_prompt = f"{global_rendered}\n\n---\n\n# MODULE-SPECIFIC CUSTOMIZATION\n\n{module_rendered}"
             logger.info(f"Assembled final prompt: {len(final_prompt)} chars (global + module)")
         except Exception as e:
-            logger.error(f"Failed to render module template: {e}")
+            logger.error("Failed to render module template: {}", str(e))
             # Fall back to global-only if module rendering fails
             final_prompt = global_rendered
             logger.warning("Falling back to global-only prompt due to module template error")
@@ -351,6 +351,7 @@ async def generate_re_engagement_greeting(
     learner_profile: dict,
     objectives_with_status: list[dict],
     notebook_id: str,
+    language: str = "en-US",
 ) -> str:
     """Generate contextual welcome-back message for returning learners.
 
@@ -430,6 +431,17 @@ async def generate_re_engagement_greeting(
         learner_name = learner_profile.get("name", "there")
         learner_role = learner_profile.get("role", "")
 
+        # Language instruction for non-English greetings
+        language_names = {
+            "fr-FR": "French (Français)",
+            "en-US": "English",
+            "pt-BR": "Brazilian Portuguese (Português)",
+            "zh-CN": "Simplified Chinese (简体中文)",
+            "zh-TW": "Traditional Chinese (繁體中文)",
+        }
+        language_display = language_names.get(language, "English")
+        language_instruction = f"\n6. IMPORTANT: You MUST respond in {language_display}." if language != "en-US" else ""
+
         prompt_template = """Generate a warm, personalized welcome-back message for a returning learner.
 
 **Learner Context:**
@@ -445,7 +457,7 @@ async def generate_re_engagement_greeting(
 2. Acknowledge their progress made (if progress > 0)
 3. Invite them to continue OR shift focus (give them agency)
 4. Keep under 3 sentences, conversational and warm tone
-5. Use their name once at the beginning
+5. Use their name once at the beginning{{ language_instruction }}
 
 **Examples of good re-engagement messages:**
 - "Welcome back, Alice! Last time we were discussing AI applications in logistics, specifically around predictive shipping. You had some great insights on automation. Ready to continue where we left off?"
@@ -461,6 +473,7 @@ Now generate the welcome-back message:
             "completed_count": completed_count,
             "total_count": total_count,
             "conversation_summary": conversation_summary,
+            "language_instruction": language_instruction,
         }
 
         rendered_prompt = Template(prompt_template).render(prompt_context)
@@ -482,7 +495,7 @@ Now generate the welcome-back message:
         return greeting.strip()
 
     except Exception as e:
-        logger.error(f"Error generating re-engagement greeting: {e}", exc_info=True)
+        logger.error("Error generating re-engagement greeting: {}", str(e), exc_info=True)
         # Fallback to standard greeting on error
         logger.warning("Falling back to standard greeting due to error")
         return await generate_proactive_greeting(
@@ -552,7 +565,7 @@ Topic summary (1-2 sentences):"""
         return topic_summary
 
     except Exception as e:
-        logger.error(f"Error extracting conversation topics: {e}")
+        logger.error("Error extracting conversation topics: {}", str(e))
         # Fallback to generic summary
         return "discussing the module content and learning objectives"
 
