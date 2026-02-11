@@ -65,19 +65,39 @@ interface UseVoiceInputReturn {
   stopListening: () => void
   clearTranscript: () => void
   error: string | null
+  analyserNode: AnalyserNode | null
 }
 
-export function useVoiceInput(): UseVoiceInputReturn {
+export function useVoiceInput(language?: string): UseVoiceInputReturn {
   const [isListening, setIsListening] = useState(false)
   const [isSupported, setIsSupported] = useState(false)
   const [isRequestingPermission, setIsRequestingPermission] = useState(false)
   const [finalTranscript, setFinalTranscript] = useState('')
   const [interimTranscript, setInterimTranscript] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [analyserNode, setAnalyserNode] = useState<AnalyserNode | null>(null)
 
   const recognitionRef = useRef<SpeechRecognition | null>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const mediaStreamRef = useRef<MediaStream | null>(null)
 
-  // Initialize Speech Recognition on mount
+  // Determine effective language for STT
+  const effectiveLang = language || navigator.language || 'en-US'
+
+  // Cleanup Web Audio resources
+  const cleanupAudio = useCallback(() => {
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => {})
+      audioContextRef.current = null
+    }
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => track.stop())
+      mediaStreamRef.current = null
+    }
+    setAnalyserNode(null)
+  }, [])
+
+  // Initialize Speech Recognition on mount or language change
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -92,10 +112,10 @@ export function useVoiceInput(): UseVoiceInputReturn {
     const recognition = new SpeechRecognitionAPI()
 
     // Configuration
-    recognition.continuous = false  // Single utterance mode
+    recognition.continuous = true  // Keep recording until user stops
     recognition.interimResults = true  // Real-time feedback
     recognition.maxAlternatives = 1
-    recognition.lang = navigator.language || 'en-US'  // User's browser language
+    recognition.lang = effectiveLang  // Use app language for STT
 
     // Event handlers
     recognition.onstart = () => {
@@ -107,11 +127,13 @@ export function useVoiceInput(): UseVoiceInputReturn {
     recognition.onend = () => {
       setIsListening(false)
       setIsRequestingPermission(false)
+      cleanupAudio()
     }
 
     recognition.onerror = (event) => {
       setIsListening(false)
       setIsRequestingPermission(false)
+      cleanupAudio()
 
       // Map error codes to user-friendly messages
       switch (event.error) {
@@ -159,11 +181,33 @@ export function useVoiceInput(): UseVoiceInputReturn {
 
     recognitionRef.current = recognition
 
-    // Cleanup on unmount
+    // Cleanup on unmount or language change
     return () => {
       if (recognitionRef.current) {
         recognitionRef.current.abort()
       }
+      cleanupAudio()
+    }
+  }, [effectiveLang, cleanupAudio])
+
+  // Start Web Audio API for waveform visualization
+  const startAudioAnalyser = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      mediaStreamRef.current = stream
+
+      const audioContext = new AudioContext()
+      audioContextRef.current = audioContext
+
+      const source = audioContext.createMediaStreamSource(stream)
+      const analyser = audioContext.createAnalyser()
+      analyser.fftSize = 2048
+      analyser.smoothingTimeConstant = 0.8
+      source.connect(analyser)
+
+      setAnalyserNode(analyser)
+    } catch {
+      // Audio analyser is optional - voice input still works without it
     }
   }, [])
 
@@ -175,6 +219,10 @@ export function useVoiceInput(): UseVoiceInputReturn {
       setFinalTranscript('')  // Clear previous transcript
       setInterimTranscript('')
       setIsRequestingPermission(true)
+
+      // Start audio analyser for waveform (fire-and-forget)
+      startAudioAnalyser()
+
       recognitionRef.current.start()
     } catch (err) {
       if (process.env.NODE_ENV === 'development') {
@@ -182,8 +230,9 @@ export function useVoiceInput(): UseVoiceInputReturn {
       }
       setError('failed-to-start')
       setIsRequestingPermission(false)
+      cleanupAudio()
     }
-  }, [isSupported, isListening, isRequestingPermission])
+  }, [isSupported, isListening, isRequestingPermission, startAudioAnalyser, cleanupAudio])
 
   const stopListening = useCallback(() => {
     if (!recognitionRef.current) return
@@ -195,7 +244,8 @@ export function useVoiceInput(): UseVoiceInputReturn {
         console.error('Failed to stop speech recognition:', err)
       }
     }
-  }, [])
+    cleanupAudio()
+  }, [cleanupAudio])
 
   const clearTranscript = useCallback(() => {
     setFinalTranscript('')
@@ -215,5 +265,6 @@ export function useVoiceInput(): UseVoiceInputReturn {
     stopListening,
     clearTranscript,
     error,
+    analyserNode,
   }
 }

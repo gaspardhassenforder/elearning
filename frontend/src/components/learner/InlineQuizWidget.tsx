@@ -3,20 +3,20 @@
 /**
  * Story 4.6: Inline Quiz Widget Component
  *
- * Displays interactive quiz preview inline in chat with answer submission.
+ * Displays interactive multi-question quiz inline in chat.
  * Registered as assistant-ui custom message part for surface_quiz tool results.
  *
  * Features:
- * - First question preview with radio button options
- * - Submit answer with instant feedback
- * - Green feedback for correct, amber for incorrect
- * - Explanation text after submission
+ * - Multi-question step-through with Next/Previous navigation
+ * - Progress indicator: "Question 2 of 5"
+ * - Submit all answers on final question
+ * - Results screen with score and per-question correct/incorrect feedback
  * - "View Full Quiz" link for complete quiz experience
  */
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, XCircle, FileQuestion } from 'lucide-react'
+import { CheckCircle2, XCircle, FileQuestion, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
@@ -30,11 +30,19 @@ interface QuizQuestion {
   // Note: correct_answer is NOT included (kept server-side for security)
 }
 
-interface QuizFeedback {
-  isCorrect: boolean
-  correctAnswer: number
-  userAnswer: number
+interface QuestionResult {
+  question_index: number
+  user_answer: number
+  correct_answer: number
+  is_correct: boolean
   explanation?: string
+}
+
+interface QuizResults {
+  score: number
+  total: number
+  percentage: number
+  results: QuestionResult[]
 }
 
 interface InlineQuizWidgetProps {
@@ -43,7 +51,7 @@ interface InlineQuizWidgetProps {
   description?: string
   questions: QuizQuestion[]
   totalQuestions: number
-  quizUrl: string
+  quizUrl?: string
 }
 
 export function InlineQuizWidget({
@@ -56,14 +64,13 @@ export function InlineQuizWidget({
 }: InlineQuizWidgetProps) {
   const { t } = useTranslation()
   const router = useRouter()
-  const [selectedOption, setSelectedOption] = useState<number | null>(null)
-  const [feedback, setFeedback] = useState<QuizFeedback | null>(null)
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({})
+  const [quizResults, setQuizResults] = useState<QuizResults | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
-  // Get first question (only one shown in inline preview)
-  const question = questions[0]
-
-  if (!question) {
+  if (!questions.length) {
     return (
       <Card className="my-2 p-3 bg-warm-neutral-50 dark:bg-warm-neutral-900 border-warm-neutral-200 dark:border-warm-neutral-700">
         <p className="text-sm text-muted-foreground">{t.learner.quiz.noQuestions}</p>
@@ -71,39 +78,46 @@ export function InlineQuizWidget({
     )
   }
 
+  const question = questions[currentIndex]
+  const isFirst = currentIndex === 0
+  const isLast = currentIndex === questions.length - 1
+  const allAnswered = questions.every((_, i) => selectedAnswers[i] !== undefined)
+
+  const handleSelectOption = useCallback((value: string) => {
+    setSelectedAnswers(prev => ({ ...prev, [currentIndex]: parseInt(value) }))
+  }, [currentIndex])
+
+  const handleNext = useCallback(() => {
+    if (!isLast) setCurrentIndex(prev => prev + 1)
+  }, [isLast])
+
+  const handlePrev = useCallback(() => {
+    if (!isFirst) setCurrentIndex(prev => prev - 1)
+  }, [isFirst])
+
   const handleSubmit = async () => {
-    if (selectedOption === null) return
+    if (!allAnswered) return
 
     setIsSubmitting(true)
+    setSubmitError(null)
 
     try {
-      // Call quiz scoring API
+      // Build ordered answers array
+      const answers = questions.map((_, i) => selectedAnswers[i])
+
       const response = await fetch(`/api/quizzes/${quizId}/check`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answers: [selectedOption] }),
+        body: JSON.stringify({ answers }),
       })
 
       if (!response.ok) throw new Error('Failed to score quiz')
 
-      const result = await response.json()
-      const questionResult = result.results[0]
-
-      setFeedback({
-        isCorrect: questionResult.is_correct,
-        correctAnswer: questionResult.correct_answer,
-        userAnswer: questionResult.user_answer,
-        explanation: questionResult.explanation,
-      })
+      const result: QuizResults = await response.json()
+      setQuizResults(result)
     } catch (error) {
       console.error('Quiz submission error:', error)
-      // Show error feedback
-      setFeedback({
-        isCorrect: false,
-        correctAnswer: 0,
-        userAnswer: selectedOption,
-        explanation: t.learner.quiz.submissionError,
-      })
+      setSubmitError(t.learner.quiz.submissionError)
     } finally {
       setIsSubmitting(false)
     }
@@ -111,10 +125,84 @@ export function InlineQuizWidget({
 
   const handleViewFullQuiz = (e: React.MouseEvent) => {
     e.preventDefault()
-    // Use Next.js router for client-side navigation
-    router.push(quizUrl)
+    if (quizUrl) router.push(quizUrl)
   }
 
+  // Results view
+  if (quizResults) {
+    return (
+      <Card className="my-2 p-4 bg-warm-neutral-50 dark:bg-warm-neutral-900 border-warm-neutral-200 dark:border-warm-neutral-700">
+        <div className="flex items-start gap-3">
+          <div className="flex-shrink-0 w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center">
+            <FileQuestion className="h-4 w-4 text-primary" />
+          </div>
+
+          <div className="flex-1 min-w-0 space-y-3">
+            <div>
+              <h4 className="text-sm font-semibold text-foreground mb-1">{title}</h4>
+              <p className="text-sm font-medium text-foreground">
+                {t.learner.quiz.score
+                  .replace('{score}', String(quizResults.score))
+                  .replace('{total}', String(quizResults.total))}
+              </p>
+            </div>
+
+            {/* Per-question results */}
+            <div className="space-y-2">
+              {quizResults.results.map((result, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    'p-2 rounded-md text-sm',
+                    result.is_correct
+                      ? 'bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800'
+                      : 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800'
+                  )}
+                >
+                  <div className="flex items-start gap-2">
+                    {result.is_correct ? (
+                      <CheckCircle2 className="h-4 w-4 flex-shrink-0 mt-0.5 text-green-600 dark:text-green-400" />
+                    ) : (
+                      <XCircle className="h-4 w-4 flex-shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                    )}
+                    <div className="flex-1">
+                      <p className={cn(
+                        'font-medium',
+                        result.is_correct ? 'text-green-700 dark:text-green-300' : 'text-amber-700 dark:text-amber-300'
+                      )}>
+                        Q{i + 1}: {questions[i]?.text}
+                      </p>
+                      {result.explanation && (
+                        <p className={cn(
+                          'mt-1',
+                          result.is_correct ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'
+                        )}>
+                          {result.explanation}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {quizUrl && (
+              <div className="pt-2">
+                <button
+                  onClick={handleViewFullQuiz}
+                  className="text-xs text-primary hover:underline font-medium"
+                >
+                  {t.learner.quiz.viewFullQuiz} →
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </Card>
+    )
+  }
+
+  // Question view (step-through)
   return (
     <Card className="my-2 p-4 bg-warm-neutral-50 dark:bg-warm-neutral-900 border-warm-neutral-200 dark:border-warm-neutral-700">
       <div className="flex items-start gap-3">
@@ -125,16 +213,38 @@ export function InlineQuizWidget({
 
         {/* Content */}
         <div className="flex-1 min-w-0 space-y-3">
-          {/* Quiz title */}
+          {/* Quiz title + progress */}
           <div>
             <h4 className="text-sm font-semibold text-foreground mb-1">
               {title}
             </h4>
-            {description && (
-              <p className="text-xs text-muted-foreground">
+            {description && currentIndex === 0 && (
+              <p className="text-xs text-muted-foreground mb-1">
                 {description}
               </p>
             )}
+            <p className="text-xs text-muted-foreground">
+              {t.learner.quiz.questionOf
+                .replace('{current}', String(currentIndex + 1))
+                .replace('{total}', String(questions.length))}
+            </p>
+          </div>
+
+          {/* Progress dots */}
+          <div className="flex gap-1">
+            {questions.map((_, i) => (
+              <div
+                key={i}
+                className={cn(
+                  'h-1.5 flex-1 rounded-full transition-colors',
+                  i === currentIndex
+                    ? 'bg-primary'
+                    : selectedAnswers[i] !== undefined
+                    ? 'bg-primary/40'
+                    : 'bg-warm-neutral-200 dark:bg-warm-neutral-700'
+                )}
+              />
+            ))}
           </div>
 
           {/* Question */}
@@ -145,99 +255,71 @@ export function InlineQuizWidget({
 
             {/* Options */}
             <RadioGroup
-              value={selectedOption?.toString()}
-              onValueChange={(value) => setSelectedOption(parseInt(value))}
-              disabled={feedback !== null}
+              value={selectedAnswers[currentIndex]?.toString() ?? ''}
+              onValueChange={handleSelectOption}
             >
               <div className="space-y-2">
-                {question.options.map((option, index) => {
-                  const isUserAnswer = feedback && feedback.userAnswer === index
-                  const isCorrectAnswer = feedback && feedback.correctAnswer === index
-                  const showCorrect = isCorrectAnswer
-                  const showIncorrect = isUserAnswer && !feedback.isCorrect
-
-                  return (
-                    <div
-                      key={index}
-                      className={cn(
-                        'flex items-center space-x-2 p-2 rounded-md transition-colors',
-                        showCorrect && 'bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800',
-                        showIncorrect && 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800',
-                        !feedback && 'hover:bg-warm-neutral-100 dark:hover:bg-warm-neutral-800'
-                      )}
+                {question.options.map((option, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center space-x-2 p-2 rounded-md transition-colors hover:bg-warm-neutral-100 dark:hover:bg-warm-neutral-800"
+                  >
+                    <RadioGroupItem
+                      value={index.toString()}
+                      id={`q${currentIndex}-option-${index}`}
+                    />
+                    <Label
+                      htmlFor={`q${currentIndex}-option-${index}`}
+                      className="flex-1 text-sm cursor-pointer"
                     >
-                      {feedback ? (
-                        // Show result icons after submission
-                        <div className="flex-shrink-0 w-4 h-4">
-                          {showCorrect && (
-                            <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-                          )}
-                          {showIncorrect && (
-                            <XCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                          )}
-                        </div>
-                      ) : (
-                        // Show radio buttons before submission
-                        <RadioGroupItem value={index.toString()} id={`option-${index}`} />
-                      )}
-                      <Label
-                        htmlFor={`option-${index}`}
-                        className={cn(
-                          'flex-1 text-sm cursor-pointer',
-                          showCorrect && 'font-medium text-green-700 dark:text-green-300',
-                          showIncorrect && 'text-amber-700 dark:text-amber-300',
-                          feedback && !showCorrect && !showIncorrect && 'text-muted-foreground'
-                        )}
-                      >
-                        {option}
-                      </Label>
-                    </div>
-                  )
-                })}
+                      {option}
+                    </Label>
+                  </div>
+                ))}
               </div>
             </RadioGroup>
           </div>
 
-          {/* Feedback explanation */}
-          {feedback && feedback.explanation && (
-            <div
-              className={cn(
-                'p-3 rounded-md text-sm',
-                feedback.isCorrect
-                  ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
-                  : 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-              )}
-            >
-              <div className="flex items-start gap-2">
-                {feedback.isCorrect ? (
-                  <CheckCircle2 className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                ) : (
-                  <XCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                )}
-                <p className="flex-1">{feedback.explanation}</p>
-              </div>
-            </div>
+          {/* Submit error */}
+          {submitError && (
+            <p className="text-sm text-amber-600 dark:text-amber-400">{submitError}</p>
           )}
 
-          {/* Actions */}
-          <div className="flex items-center gap-3 pt-2">
-            {!feedback ? (
-              <Button
-                onClick={handleSubmit}
-                disabled={selectedOption === null || isSubmitting}
-                size="sm"
-                className="bg-primary hover:bg-primary/90"
-              >
-                {isSubmitting ? t.learner.quiz.submitting : t.learner.quiz.submitAnswer}
-              </Button>
-            ) : null}
-
-            <button
-              onClick={handleViewFullQuiz}
-              className="text-xs text-primary hover:underline font-medium"
+          {/* Navigation + Submit */}
+          <div className="flex items-center justify-between pt-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handlePrev}
+              disabled={isFirst}
+              className="gap-1"
             >
-              {t.learner.quiz.viewFullQuiz} ({totalQuestions} {totalQuestions === 1 ? t.learner.quiz.question : t.learner.quiz.questions}) →
-            </button>
+              <ChevronLeft className="h-4 w-4" />
+              {t.learner.quiz.previous}
+            </Button>
+
+            <div className="flex items-center gap-2">
+              {isLast ? (
+                <Button
+                  onClick={handleSubmit}
+                  disabled={!allAnswered || isSubmitting}
+                  size="sm"
+                  className="bg-primary hover:bg-primary/90"
+                >
+                  {isSubmitting ? t.learner.quiz.submitting : t.learner.quiz.submitQuiz}
+                </Button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleNext}
+                  className="gap-1"
+                >
+                  {t.learner.quiz.next}
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>

@@ -157,7 +157,8 @@ async def assemble_system_prompt(
     learner_profile: Optional[dict] = None,
     objectives_with_status: Optional[list[dict]] = None,
     context: Optional[str] = None,
-    current_focus_objective: Optional[str] = None  # Story 4.2: Explicit focus objective
+    current_focus_objective: Optional[str] = None,  # Story 4.2: Explicit focus objective
+    language: Optional[str] = None,  # UI language code for response language
 ) -> str:
     """Assemble final system prompt from global + per-module templates.
 
@@ -269,6 +270,24 @@ async def assemble_system_prompt(
         else:
             logger.info(f"No module prompt configured for notebook {notebook_id} - using global only")
         final_prompt = global_rendered
+
+    # Append language instruction if specified
+    if language and language != "en-US":
+        language_map = {
+            "fr-FR": "French (Français)",
+            "pt-BR": "Brazilian Portuguese (Português)",
+            "zh-CN": "Simplified Chinese (简体中文)",
+            "zh-TW": "Traditional Chinese (繁體中文)",
+        }
+        language_name = language_map.get(language, language)
+        language_instruction = (
+            f"\n\n# RESPONSE LANGUAGE\n\n"
+            f"IMPORTANT: You MUST respond in {language_name}. "
+            f"All your messages, questions, feedback, and guidance should be in {language_name}. "
+            f"Only use English for technical terms that have no common translation."
+        )
+        final_prompt += language_instruction
+        logger.info(f"Added language instruction for {language_name}")
 
     return final_prompt
 

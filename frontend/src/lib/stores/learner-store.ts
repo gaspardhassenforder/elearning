@@ -25,6 +25,7 @@ interface ActiveJob {
 interface ViewerSheet {
   type: 'source' | 'artifact'
   id: string
+  searchText?: string  // Excerpt text for PDF search / text highlight
 }
 
 interface LearnerState {

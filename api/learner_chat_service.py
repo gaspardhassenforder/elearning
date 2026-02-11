@@ -208,7 +208,7 @@ async def validate_learner_access_to_notebook(
 
 
 async def prepare_chat_context(
-    notebook_id: str, learner: LearnerContext
+    notebook_id: str, learner: LearnerContext, language: Optional[str] = None
 ) -> Tuple[str, dict]:
     """Prepare context for learner chat.
 
@@ -263,6 +263,7 @@ async def prepare_chat_context(
             learner_profile=learner_profile,
             objectives_with_status=objectives_with_status,
             context=None,  # Context built by LangGraph chat workflow
+            language=language,
         )
         logger.info(
             f"System prompt assembled: {len(system_prompt)} chars for notebook {notebook_id}"
@@ -279,7 +280,7 @@ async def prepare_chat_context(
 
 
 async def generate_proactive_greeting(
-    notebook_id: str, learner_profile: dict, notebook: Notebook
+    notebook_id: str, learner_profile: dict, notebook: Notebook, language: str = "en-US"
 ) -> str:
     """Generate personalized proactive greeting for first visit.
 
@@ -293,6 +294,7 @@ async def generate_proactive_greeting(
         notebook_id: Notebook/module record ID
         learner_profile: Learner profile dict with role, ai_familiarity, job_description
         notebook: Notebook instance
+        language: UI language code (e.g., 'en-US', 'fr-FR') for greeting language
 
     Returns:
         Personalized greeting string
@@ -316,6 +318,17 @@ async def generate_proactive_greeting(
 
     # 3. Generate opening question based on first objective
     # Use LLM to create contextual opening question
+    # Map language codes to display names for LLM instruction
+    language_names = {
+        "fr-FR": "French (Français)",
+        "en-US": "English",
+        "pt-BR": "Brazilian Portuguese (Português)",
+        "zh-CN": "Simplified Chinese (简体中文)",
+        "zh-TW": "Traditional Chinese (繁體中文)",
+    }
+    language_display = language_names.get(language, "English")
+    language_instruction = f"\nIMPORTANT: You MUST respond in {language_display}." if language != "en-US" else ""
+
     opening_question_prompt = f"""Generate a thought-provoking opening question to engage a learner starting to explore this learning objective:
 
 "{first_objective_text}"
@@ -328,7 +341,7 @@ Create a question that:
 - Encourages them to think about what they already know
 - Sets up exploration of the objective
 - Is open-ended (not yes/no)
-
+{language_instruction}
 Return ONLY the question, nothing else."""
 
     try:
@@ -356,6 +369,8 @@ Return ONLY the question, nothing else."""
                 "module_title": notebook.name,
                 "first_objective_text": first_objective_text,
                 "opening_question": opening_question,
+                "language": language,
+                "language_display": language_display,
             }
         )
         logger.info(f"Proactive greeting generated: {len(greeting_text)} chars")

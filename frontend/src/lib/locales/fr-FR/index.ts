@@ -1480,6 +1480,15 @@ export const frFR = {
       question: "question",
       questions: "questions",
       submissionError: "Impossible de soumettre la réponse. Veuillez réessayer.",
+      next: "Suivant",
+      previous: "Précédent",
+      submitQuiz: "Soumettre le quiz",
+      questionOf: "Question {current} sur {total}",
+      correct: "Correct",
+      incorrect: "Incorrect",
+      score: "Score : {score}/{total}",
+      results: "Résultats",
+      tryAgain: "Réessayer",
     },
     // Story 4.6: Lecteur de podcast
     podcast: {

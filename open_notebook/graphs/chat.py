@@ -74,9 +74,13 @@ def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict
     # Story 4.3: surface_document for document references
     # Story 4.4: check_off_objective for progress tracking (learner chat only)
     # Story 4.6: surface_quiz and surface_podcast for artifact surfacing
+    # Surface tools put structured data INTO tool call args for frontend extraction.
+    # They don't need server-side ToolNode execution.
+    # TODO: Re-add search_documents, generate_artifact, search_available_modules
+    # when a proper ToolNode + tool execution loop is added to the graph.
     tools = [surface_document, surface_quiz, surface_podcast]
     if user_id:
-        # Only bind check_off_objective for learner chat (has user_id)
+        # Learner chat gets objective tracking
         tools.append(check_off_objective)
 
     try:

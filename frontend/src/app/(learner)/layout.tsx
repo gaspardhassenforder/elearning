@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { LearnerErrorBoundaryWithRouter } from '@/components/learner/LearnerErrorBoundary'
+import { LearnerHeader } from '@/components/learner/LearnerHeader'
 
 /**
  * Learner Layout
@@ -78,8 +79,11 @@ export default function LearnerLayout({
 
   return (
     <LearnerErrorBoundaryWithRouter>
-      <div className="min-h-screen bg-background">
-        {children}
+      <div className="min-h-screen bg-background flex flex-col">
+        <LearnerHeader />
+        <div className="flex-1 min-h-0">
+          {children}
+        </div>
       </div>
     </LearnerErrorBoundaryWithRouter>
   )

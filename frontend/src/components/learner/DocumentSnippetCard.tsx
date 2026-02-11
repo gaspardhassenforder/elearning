@@ -38,7 +38,7 @@ export function DocumentSnippetCard({
 
   const handleOpenInSources = (e: React.MouseEvent) => {
     e.preventDefault()
-    openViewerSheet({ type: 'source', id: sourceId })
+    openViewerSheet({ type: 'source', id: sourceId, searchText: excerpt })
   }
 
   // Truncate excerpt to 200 chars if needed (should already be done by backend, but double-check)

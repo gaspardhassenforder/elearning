@@ -61,6 +61,10 @@ class LearnerChatRequest(BaseModel):
         default=False,
         description="Story 4.2: If true, only return greeting without processing message"
     )
+    language: str = Field(
+        default="en-US",
+        description="UI language code (e.g., 'en-US', 'fr-FR') for AI response language"
+    )
 
 
 class SSETextEvent(BaseModel):
@@ -152,7 +156,7 @@ async def get_chat_history(
         raise
     except Exception as e:
         logger.error(
-            f"Error validating learner access to notebook {notebook_id}: {e}"
+            "Error validating learner access to notebook {}: {}", notebook_id, str(e)
         )
         raise HTTPException(
             status_code=500, detail="Failed to validate notebook access"
@@ -257,7 +261,7 @@ async def get_chat_history(
                 # Skip corrupt message but continue processing rest of history
                 msg_id = getattr(msg, "id", "unknown")
                 logger.warning(
-                    f"Skipping corrupt message {msg_id} in thread {thread_id}: {e}"
+                    "Skipping corrupt message {} in thread {}: {}", msg_id, thread_id, str(e)
                 )
                 continue
 
@@ -273,7 +277,7 @@ async def get_chat_history(
         )
 
     except Exception as e:
-        logger.error(f"Error loading chat history for thread {thread_id}: {e}", exc_info=True)
+        logger.error("Error loading chat history for thread {}: {}", thread_id, str(e), exc_info=True)
         raise HTTPException(
             status_code=500, detail="Failed to load chat history"
         )
@@ -328,7 +332,7 @@ async def stream_learner_chat(
         raise
     except Exception as e:
         logger.error(
-            f"Error validating learner access to notebook {notebook_id}: {e}"
+            "Error validating learner access to notebook {}: {}", notebook_id, str(e)
         )
         raise HTTPException(
             status_code=500, detail="Failed to validate notebook access"
@@ -337,13 +341,13 @@ async def stream_learner_chat(
     # 2. Prepare chat context (system prompt, learner profile, objectives)
     try:
         system_prompt, learner_profile_dict = await prepare_chat_context(
-            notebook_id=notebook_id, learner=learner
+            notebook_id=notebook_id, learner=learner, language=request.language
         )
         logger.debug(
             f"System prompt prepared ({len(system_prompt)} chars) for notebook {notebook_id}"
         )
     except Exception as e:
-        logger.error(f"Error preparing chat context for notebook {notebook_id}: {e}")
+        logger.error("Error preparing chat context for notebook {}: {}", notebook_id, str(e))
         raise HTTPException(status_code=500, detail="Failed to prepare chat context")
 
     # 3. Define SSE event generator
@@ -389,7 +393,7 @@ async def stream_learner_chat(
                     is_returning_user = True
                     logger.info(f"Returning user detected for thread {thread_id} ({len(messages)} messages in history)")
             except Exception as e:
-                logger.warning(f"Could not check thread state, assuming first visit: {e}")
+                logger.warning("Could not check thread state, assuming first visit: {}", str(e))
                 is_first_visit = True
 
             # Story 4.2 + 4.8: Generate and stream greeting (proactive or re-engagement)
@@ -424,6 +428,7 @@ async def stream_learner_chat(
                             notebook_id=notebook_id,
                             learner_profile=learner_profile_dict,
                             notebook=notebook,
+                            language=request.language,
                         )
 
                     # Stream greeting token-by-token for smooth UX
@@ -448,7 +453,7 @@ async def stream_learner_chat(
                     logger.info(f"{greeting_type.capitalize()} greeting sent successfully")
 
                 except Exception as e:
-                    logger.error(f"Failed to generate {greeting_type} greeting: {e}")
+                    logger.error("Failed to generate {} greeting: {}", greeting_type, str(e))
                     # Continue with normal chat flow if greeting fails
 
             # Story 4.2 + 4.8: If greeting-only request, return after sending greeting
@@ -505,6 +510,8 @@ async def stream_learner_chat(
                     "configurable": {
                         "thread_id": thread_id,
                         "user_id": learner.user.id,  # Story 4.4: Pass to tools
+                        "notebook_id": notebook_id,  # For search_documents + generate_artifact tools
+                        "company_id": learner.company_id,  # For search_available_modules tool
                     },
                     "callbacks": callbacks,  # Story 7.4: LangSmith tracing
                 },
@@ -570,7 +577,7 @@ async def stream_learner_chat(
         except Exception as e:
             # Story 7.1: Stream error event to frontend
             # Log full error details but don't leak technical info to client
-            logger.error(f"Error during SSE streaming for notebook {notebook_id}: {e}", exc_info=True)
+            logger.error("Error during SSE streaming for notebook {}: {}", notebook_id, str(e), exc_info=True)
             error_event = {
                 "error": "I had trouble processing that",
                 "error_type": "service_error",

@@ -16,6 +16,7 @@ import { useToast } from './use-toast'
 import { learnerToast } from '../utils/learner-toast'
 import { useLearnerStore } from '../stores/learner-store'
 import { learningObjectivesKeys } from './use-learning-objectives'
+import { useTranslation } from './use-translation'
 
 interface UseLearnerChatResult {
   messages: LearnerChatMessage[]
@@ -36,6 +37,7 @@ interface UseLearnerChatResult {
  */
 export function useLearnerChat(notebookId: string): UseLearnerChatResult {
   const { toast } = useToast()
+  const { language } = useTranslation()
   const queryClient = useQueryClient()
   const [messages, setMessages] = useState<LearnerChatMessage[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
@@ -81,7 +83,7 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
 
         // Start streaming assistant response
         setIsStreaming(true)
-        const response = await sendLearnerChatMessage(notebookId, { message: content })
+        const response = await sendLearnerChatMessage(notebookId, { message: content, language })
 
         // Parse SSE stream and accumulate response
         // Story 4.3: Also track tool calls for reactive scroll
@@ -266,6 +268,7 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
           const response = await sendLearnerChatMessage(notebookId, {
             message: '',
             request_greeting_only: true,
+            language,
           })
 
           // Parse SSE stream and accumulate greeting
@@ -316,7 +319,7 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
 
   return {
     messages,
-    isLoading: isLoading || isStreaming,
+    isLoading,
     isStreaming,
     error: error as Error | null,
     sendMessage,

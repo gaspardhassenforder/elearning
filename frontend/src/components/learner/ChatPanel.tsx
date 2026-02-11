@@ -28,13 +28,14 @@ import { useLearnerStore } from '@/lib/stores/learner-store'
 import { useToast } from '@/lib/hooks/use-toast'
 import { learnerToast } from '@/lib/utils/learner-toast'
 import { useVoiceInput } from '@/lib/hooks/use-voice-input'
+import { VoiceRecordingOverlay } from './VoiceRecordingOverlay'
 
 interface ChatPanelProps {
   notebookId: string
 }
 
 export function ChatPanel({ notebookId }: ChatPanelProps) {
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
   const { toast } = useToast()
   const [mounted, setMounted] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -76,11 +77,13 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
     startListening,
     stopListening,
     clearTranscript,
-    error: voiceError
-  } = useVoiceInput()
+    error: voiceError,
+    analyserNode,
+  } = useVoiceInput(language)
 
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [userHasEdited, setUserHasEdited] = useState(false)
+  const lastAppliedTranscriptRef = useRef('')
 
   // Merge history with current messages
   const allMessages = historyLoaded && historyData?.messages
@@ -128,17 +131,28 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
     }
   }, [messages, isStreaming, isUserScrolledUp])
 
-  // Update input when voice transcript changes
+  // Append new voice transcript to input (don't replace existing text)
   useEffect(() => {
     if (transcript && inputRef.current && !userHasEdited) {
-      inputRef.current.value = transcript
+      const lastApplied = lastAppliedTranscriptRef.current
+      // Only append the portion of transcript that's new
+      if (transcript.length > lastApplied.length && transcript.startsWith(lastApplied)) {
+        const newText = transcript.slice(lastApplied.length)
+        const currentValue = inputRef.current.value
+        inputRef.current.value = currentValue + (currentValue && newText && !newText.startsWith(' ') ? ' ' : '') + newText
+      } else if (transcript !== lastApplied) {
+        // Transcript changed in a non-append way (e.g., interim correction) - replace trailing portion
+        inputRef.current.value = inputRef.current.value.slice(0, inputRef.current.value.length - lastApplied.length) + transcript
+      }
+      lastAppliedTranscriptRef.current = transcript
     }
   }, [transcript, userHasEdited])
 
-  // Reset edit flag when recording starts
+  // Reset edit flag and transcript tracking when recording starts
   useEffect(() => {
     if (isListening) {
       setUserHasEdited(false)
+      lastAppliedTranscriptRef.current = ''
     }
   }, [isListening])
 
@@ -316,7 +330,14 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
 
             {/* Input Area - ChatGPT style */}
             <div className="flex-shrink-0 border-t bg-background">
-              <div className="max-w-3xl mx-auto px-4 py-3">
+              <div className="max-w-3xl mx-auto px-4 py-3 relative">
+                {/* Voice recording overlay */}
+                {isListening && (
+                  <VoiceRecordingOverlay
+                    analyserNode={analyserNode}
+                    onStop={stopListening}
+                  />
+                )}
                 <form
                   onSubmit={handleSubmit}
                   className="relative flex items-end gap-2 rounded-2xl border bg-background px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 transition-all"

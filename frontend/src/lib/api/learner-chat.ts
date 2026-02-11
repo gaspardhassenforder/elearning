@@ -25,6 +25,7 @@ export interface ToolCall {
 export interface SendLearnerChatMessageRequest {
   message: string
   request_greeting_only?: boolean  // Story 4.2: Request proactive greeting without processing message
+  language?: string  // UI language code for AI response language
 }
 
 /**

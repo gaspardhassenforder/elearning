@@ -458,16 +458,13 @@ async def surface_quiz(quiz_id: str, config: Optional[dict] = None) -> dict:
                 # Intentionally exclude correct_answer
             })
 
-        # Show only first question for inline preview
-        first_question_only = questions_preview[:1] if questions_preview else []
-
         # Return structured data for frontend rendering
         result = {
             "artifact_type": "quiz",
             "quiz_id": quiz_id,
             "title": quiz.title,
             "description": quiz.description,
-            "questions": first_question_only,  # Only first question
+            "questions": questions_preview,  # All questions for inline quiz
             "total_questions": len(quiz.questions),
             "quiz_url": f"/quizzes/{quiz_id}",  # Frontend route
         }
@@ -595,6 +592,67 @@ async def surface_podcast(podcast_id: str, config: Optional[dict] = None) -> dic
 
 
 @tool
+async def search_documents(
+    query: str,
+    config: Optional[dict] = None,
+) -> list:
+    """Search across all documents in the current module using semantic search.
+
+    Use this to find relevant document passages when the learner asks about a topic.
+    Returns relevant chunks with source_id, title, and excerpt that you can then
+    surface using the surface_document tool.
+
+    Args:
+        query: The search query (e.g., "machine learning basics", "neural networks")
+        config: RunnableConfig containing notebook_id (injected by chat graph)
+
+    Returns:
+        List of dicts with source_id, title, excerpt, relevance_score
+    """
+    from open_notebook.domain.notebook import vector_search_for_notebook
+
+    logger.info(f"search_documents tool called with query: '{query}'")
+
+    # Extract notebook_id from config
+    notebook_id = None
+    if config:
+        configurable = config.get("configurable", {})
+        notebook_id = configurable.get("notebook_id")
+
+    if not notebook_id:
+        logger.warning("search_documents called without notebook_id in config")
+        return []
+
+    try:
+        results = await vector_search_for_notebook(
+            notebook_id=notebook_id,
+            keyword=query,
+            results=5,
+        )
+
+        # Format results for the AI to use
+        formatted = []
+        for r in results:
+            # Extract content snippet (first 200 chars)
+            content = r.get("content", "")
+            excerpt = content[:200] + "..." if len(content) > 200 else content
+
+            formatted.append({
+                "source_id": str(r.get("parent_id") or r.get("id", "")),
+                "title": r.get("title", "Untitled"),
+                "excerpt": excerpt,
+                "relevance_score": r.get("similarity", 0),
+            })
+
+        logger.info(f"search_documents found {len(formatted)} results for '{query}'")
+        return formatted
+
+    except Exception as e:
+        logger.error(f"Error in search_documents: {e}", exc_info=True)
+        return []
+
+
+@tool
 async def generate_artifact(
     artifact_type: str,
     topic: str,
@@ -610,7 +668,7 @@ async def generate_artifact(
     without blocking. The learner will be notified when the artifact is ready.
 
     Args:
-        artifact_type: Type of artifact to generate ("podcast" or "quiz")
+        artifact_type: Type of artifact to generate ("podcast", "quiz", or "transformation")
         topic: Topic or title for the artifact
         notebook_id: Notebook ID for the artifact (optional - from config if not provided)
         num_questions: Number of questions for quiz (default: 5, only used for quizzes)
@@ -707,10 +765,72 @@ async def generate_artifact(
                     "recoverable": False,
                 }
 
+        elif artifact_type == "transformation":
+            # Import here to avoid circular dependencies
+            from open_notebook.graphs.transformation import graph as transformation_graph
+            from open_notebook.domain.notebook import Source
+            from open_notebook.domain.transformation import Transformation
+            from open_notebook.database.repository import repo_query, ensure_record_id
+
+            logger.info(f"Running transformation: topic={topic}, notebook={notebook_id}")
+
+            # Find a suitable source from the notebook
+            source_results = await repo_query(
+                """
+                SELECT VALUE ->has->source FROM notebook
+                WHERE id = $notebook_id
+                LIMIT 1
+                """,
+                {"notebook_id": ensure_record_id(notebook_id)},
+            )
+
+            source = None
+            if source_results and source_results[0]:
+                source_ids = source_results[0]
+                if source_ids:
+                    source = await Source.get(str(source_ids[0]))
+
+            if not source:
+                return {
+                    "error": "No source documents found to transform",
+                    "error_type": "not_found",
+                    "recoverable": True,
+                }
+
+            # Create an ad-hoc transformation with the topic as prompt
+            transformation = Transformation(
+                name=f"chat_{topic[:30]}",
+                title=f"Summary: {topic}",
+                prompt=f"Based on the following content, create a comprehensive summary focused on: {topic}",
+            )
+
+            # Run the transformation graph
+            result = await transformation_graph.ainvoke({
+                "input_text": source.full_text or "",
+                "source": source,
+                "transformation": transformation,
+                "output": "",
+            })
+
+            output_text = result.get("output", "")
+
+            # Create artifact tracker
+            artifact = await Artifact.create_for_artifact(
+                notebook_id=notebook_id,
+                artifact_type="transformation",
+                artifact_id=str(source.id),
+                title=f"Summary: {topic}",
+                content=output_text,
+            )
+
+            job_id = str(artifact.id)
+            artifact_ids = [str(artifact.id)]
+            message = f"Summary on '{topic}' has been generated."
+
         else:
             logger.warning(f"Unsupported artifact type: {artifact_type}")
             return {
-                "error": "I can only generate quizzes and podcasts",
+                "error": "I can only generate quizzes, podcasts, and transformations",
                 "error_type": "validation",
                 "recoverable": True,
             }

@@ -1480,6 +1480,15 @@ export const enUS = {
       question: "question",
       questions: "questions",
       submissionError: "Unable to submit answer. Please try again.",
+      next: "Next",
+      previous: "Previous",
+      submitQuiz: "Submit Quiz",
+      questionOf: "Question {current} of {total}",
+      correct: "Correct",
+      incorrect: "Incorrect",
+      score: "Score: {score}/{total}",
+      results: "Results",
+      tryAgain: "Try Again",
     },
     // Story 4.6: Podcast Player
     podcast: {

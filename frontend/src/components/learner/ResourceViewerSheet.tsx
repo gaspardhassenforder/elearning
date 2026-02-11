@@ -11,7 +11,7 @@
  * ~50% viewport width on desktop, 100% on mobile.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { ErrorBoundary } from '@/components/common/ErrorBoundary'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import {
@@ -62,6 +62,7 @@ export function ResourceViewerSheet({ notebookId }: ResourceViewerSheetProps) {
           <SourceViewer
             notebookId={notebookId}
             sourceId={viewerSheet.id}
+            searchText={viewerSheet.searchText}
             t={t}
           />
         )}
@@ -80,10 +81,12 @@ export function ResourceViewerSheet({ notebookId }: ResourceViewerSheetProps) {
 function SourceViewer({
   notebookId,
   sourceId,
+  searchText,
   t,
 }: {
   notebookId: string
   sourceId: string
+  searchText?: string
   t: Record<string, unknown>
 }) {
   const { sources } = useNotebookSources(notebookId)
@@ -148,7 +151,7 @@ function SourceViewer({
             </div>
           ) : blobUrl ? (
             <iframe
-              src={blobUrl}
+              src={searchText ? `${blobUrl}#search=${encodeURIComponent(searchText.slice(0, 80))}` : blobUrl}
               title={source?.title || 'PDF'}
               className="w-full h-full border-0"
             />
@@ -171,11 +174,7 @@ function SourceViewer({
               </Button>
             </div>
           ) : content?.content ? (
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
-                {content.content}
-              </pre>
-            </div>
+            <TextContentWithHighlight content={content.content} searchText={searchText} />
           ) : (
             <p className="text-sm text-muted-foreground text-center py-12">
               {tSources?.noContent || 'No content available'}
@@ -184,6 +183,66 @@ function SourceViewer({
         </ScrollArea>
       )}
     </>
+  )
+}
+
+// Text content with search highlight
+function TextContentWithHighlight({
+  content,
+  searchText,
+}: {
+  content: string
+  searchText?: string
+}) {
+  const highlightRef = useRef<HTMLElement>(null)
+
+  // Scroll to first highlighted match after render
+  useEffect(() => {
+    if (highlightRef.current) {
+      highlightRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [searchText, content])
+
+  if (!searchText) {
+    return (
+      <div className="prose prose-sm dark:prose-invert max-w-none">
+        <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
+          {content}
+        </pre>
+      </div>
+    )
+  }
+
+  // Find and highlight the first occurrence of searchText (case-insensitive)
+  const lowerContent = content.toLowerCase()
+  const lowerSearch = searchText.toLowerCase().slice(0, 100) // Use first 100 chars for matching
+  const matchIndex = lowerContent.indexOf(lowerSearch)
+
+  if (matchIndex === -1) {
+    // No match found - render plain
+    return (
+      <div className="prose prose-sm dark:prose-invert max-w-none">
+        <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
+          {content}
+        </pre>
+      </div>
+    )
+  }
+
+  const before = content.slice(0, matchIndex)
+  const match = content.slice(matchIndex, matchIndex + lowerSearch.length)
+  const after = content.slice(matchIndex + lowerSearch.length)
+
+  return (
+    <div className="prose prose-sm dark:prose-invert max-w-none">
+      <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
+        {before}
+        <mark ref={highlightRef} className="bg-yellow-200 dark:bg-yellow-800 rounded px-0.5">
+          {match}
+        </mark>
+        {after}
+      </pre>
+    </div>
   )
 }
 
