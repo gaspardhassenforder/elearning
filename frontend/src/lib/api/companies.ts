@@ -23,6 +23,6 @@ export const companiesApi = {
   },
 
   delete: async (id: string) => {
-    await apiClient.delete(`/companies/${id}`)
+    await apiClient.delete(`/companies/${id}?confirm=true`)
   }
 }

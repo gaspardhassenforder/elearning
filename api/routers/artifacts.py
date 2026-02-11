@@ -141,24 +141,32 @@ async def validate_learner_access_to_notebook(
     Raises:
         HTTPException 403: Access denied (not assigned, locked, or unpublished)
     """
+    # Check assignment exists, is unlocked, and notebook is published
     result = await repo_query(
         """
-        SELECT notebook.id, assignment.is_locked
-        FROM notebook
-        JOIN module_assignment AS assignment ON assignment.notebook_id = notebook.id
-        WHERE notebook.id = $notebook_id
-        AND assignment.company_id = $company_id
-        AND notebook.published = true
-        AND assignment.is_locked = false
+        SELECT VALUE true FROM module_assignment
+        WHERE notebook_id = $notebook_id
+          AND company_id = $company_id
+          AND is_locked = false
         LIMIT 1
         """,
-        {"notebook_id": ensure_record_id(notebook_id), "company_id": learner_context.company_id},
+        {"notebook_id": ensure_record_id(notebook_id), "company_id": ensure_record_id(learner_context.company_id)},
     )
 
     if not result:
         logger.warning(
             f"Learner {learner_context.user.id} attempted to access artifacts for unauthorized notebook {notebook_id}"
         )
+        raise HTTPException(
+            status_code=403, detail="You do not have access to this module"
+        )
+
+    # Verify notebook is published
+    notebook_result = await repo_query(
+        "SELECT VALUE published FROM notebook WHERE id = $notebook_id LIMIT 1",
+        {"notebook_id": ensure_record_id(notebook_id)},
+    )
+    if not notebook_result or notebook_result[0] != True:
         raise HTTPException(
             status_code=403, detail="You do not have access to this module"
         )
@@ -241,25 +249,45 @@ async def validate_learner_access_to_artifact(
     Raises:
         HTTPException 403: Access denied (not assigned, locked, or unpublished)
     """
-    result = await repo_query(
-        """
-        SELECT artifact.id, artifact.notebook_id, notebook.published, assignment.is_locked
-        FROM artifact
-        JOIN notebook ON notebook.id = artifact.notebook_id
-        JOIN module_assignment AS assignment ON assignment.notebook_id = notebook.id
-        WHERE artifact.id = $artifact_id
-        AND assignment.company_id = $company_id
-        AND notebook.published = true
-        AND assignment.is_locked = false
-        LIMIT 1
-        """,
-        {"artifact_id": ensure_record_id(artifact_id), "company_id": learner_context.company_id},
+    # Step 1: Get the artifact and its notebook_id
+    artifact_result = await repo_query(
+        "SELECT id, notebook_id FROM artifact WHERE id = $artifact_id LIMIT 1",
+        {"artifact_id": ensure_record_id(artifact_id)},
     )
 
-    if not result:
+    if not artifact_result:
+        raise HTTPException(
+            status_code=403, detail="You do not have access to this artifact"
+        )
+
+    artifact_notebook_id = artifact_result[0].get("notebook_id")
+
+    # Step 2: Check assignment + published + unlocked
+    access_result = await repo_query(
+        """
+        SELECT VALUE true FROM module_assignment
+        WHERE notebook_id = $notebook_id
+          AND company_id = $company_id
+          AND is_locked = false
+        LIMIT 1
+        """,
+        {"notebook_id": ensure_record_id(artifact_notebook_id), "company_id": ensure_record_id(learner_context.company_id)},
+    )
+
+    if not access_result:
         logger.warning(
             f"Learner {learner_context.user.id} attempted to access unauthorized artifact {artifact_id}"
         )
+        raise HTTPException(
+            status_code=403, detail="You do not have access to this artifact"
+        )
+
+    # Verify notebook is published
+    pub_result = await repo_query(
+        "SELECT VALUE published FROM notebook WHERE id = $notebook_id LIMIT 1",
+        {"notebook_id": ensure_record_id(artifact_notebook_id)},
+    )
+    if not pub_result or pub_result[0] != True:
         raise HTTPException(
             status_code=403, detail="You do not have access to this artifact"
         )

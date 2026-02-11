@@ -26,7 +26,7 @@ export function ModuleSuggestionCard({ suggestion }: ModuleSuggestionCardProps) 
 
   const handleOpenModule = () => {
     // Navigate to module
-    router.push(`/learner/modules/${suggestion.id}`)
+    router.push(`/modules/${suggestion.id}`)
     // Close navigation overlay
     closeNavigator()
   }

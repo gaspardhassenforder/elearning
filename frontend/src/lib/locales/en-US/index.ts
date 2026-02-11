@@ -1356,7 +1356,7 @@ export const enUS = {
     referencedDocument: "Referenced Document",
     chat: {
       title: "AI Teacher",
-      placeholder: "Ask a question or share your thoughts...",
+      placeholder: "Message your teacher...",
       send: "Send",
       error: "Unable to connect to AI teacher",
       errorDesc: "Please check your connection and try again.",
@@ -1489,6 +1489,13 @@ export const enUS = {
       minutes: "minutes",
       viewTranscript: "View Transcript",
       generating: "Podcast is currently being generated. Please check back later.",
+    },
+    // Sidebar & Sheet viewer
+    sidebar: {
+      openSidebar: "Open sidebar",
+      closeSidebar: "Close sidebar",
+      viewSource: "View source",
+      viewArtifact: "View artifact",
     },
     // Story 6.1: Navigation Assistant
     navigation: {

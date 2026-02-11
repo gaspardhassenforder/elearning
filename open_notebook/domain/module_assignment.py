@@ -1,10 +1,21 @@
+from datetime import datetime
 from typing import Any, ClassVar, Dict, Optional
 
 from loguru import logger
+from pydantic import field_validator
 
 from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.base import ObjectModel
 from open_notebook.exceptions import DatabaseOperationError
+
+
+def _record_params(**kwargs: str) -> Dict[str, Any]:
+    """Convert string record IDs to RecordID objects for SurrealDB query params.
+
+    SurrealDB stores record<> fields as RecordIDs. Passing plain strings
+    in WHERE clauses won't match. This helper ensures proper type casting.
+    """
+    return {k: ensure_record_id(v) for k, v in kwargs.items()}
 
 
 class ModuleAssignment(ObjectModel):
@@ -22,13 +33,18 @@ class ModuleAssignment(ObjectModel):
     assigned_at: Optional[str] = None
     assigned_by: Optional[str] = None
 
+    @field_validator("assigned_at", mode="before")
+    @classmethod
+    def coerce_assigned_at(cls, v: Any) -> Optional[str]:
+        if isinstance(v, datetime):
+            return v.isoformat()
+        return v
+
     def needs_embedding(self) -> bool:
         """ModuleAssignments are not searchable."""
         return False
 
     def _prepare_save_data(self) -> Dict[str, Any]:
-        from datetime import datetime
-
         data = super()._prepare_save_data()
         # SurrealDB schema defines these as record<company>, record<notebook>,
         # option<record<user>>. connection.insert() requires RecordID objects.
@@ -46,7 +62,7 @@ class ModuleAssignment(ObjectModel):
         try:
             result = await repo_query(
                 "SELECT * FROM module_assignment WHERE company_id = $company_id",
-                {"company_id": company_id},
+                _record_params(company_id=company_id),
             )
             return [cls(**item) for item in result]
         except Exception as e:
@@ -59,7 +75,7 @@ class ModuleAssignment(ObjectModel):
         try:
             result = await repo_query(
                 "SELECT * FROM module_assignment WHERE notebook_id = $notebook_id",
-                {"notebook_id": notebook_id},
+                _record_params(notebook_id=notebook_id),
             )
             return [cls(**item) for item in result]
         except Exception as e:
@@ -74,7 +90,7 @@ class ModuleAssignment(ObjectModel):
         try:
             result = await repo_query(
                 "SELECT * FROM module_assignment WHERE company_id = $company_id AND notebook_id = $notebook_id LIMIT 1",
-                {"company_id": company_id, "notebook_id": notebook_id},
+                _record_params(company_id=company_id, notebook_id=notebook_id),
             )
             return cls(**result[0]) if result else None
         except Exception as e:
@@ -89,7 +105,7 @@ class ModuleAssignment(ObjectModel):
         try:
             await repo_query(
                 "DELETE FROM module_assignment WHERE company_id = $company_id AND notebook_id = $notebook_id",
-                {"company_id": company_id, "notebook_id": notebook_id},
+                _record_params(company_id=company_id, notebook_id=notebook_id),
             )
             logger.info(
                 f"Deleted assignment for company {company_id} and notebook {notebook_id}"
@@ -145,8 +161,8 @@ class ModuleAssignment(ObjectModel):
         return assignment
 
     @classmethod
-    async def get_unlocked_for_company(cls, company_id: str) -> list["ModuleAssignment"]:
-        """Get all unlocked module assignments for a company.
+    async def get_unlocked_for_company(cls, company_id: str) -> list[dict]:
+        """Get all unlocked module assignments for a company with notebook data.
 
         Used for learner module visibility — only shows unlocked modules.
 
@@ -154,51 +170,52 @@ class ModuleAssignment(ObjectModel):
             company_id: Company record ID
 
         Returns:
-            List of ModuleAssignments where is_locked = False
+            List of dicts with assignment fields + nested notebook_data dict
         """
         logger.info(f"Fetching unlocked modules for company {company_id}")
 
         try:
+            # Step 1: Fetch unlocked assignments
             result = await repo_query(
                 """
-                SELECT
-                    assignment.*,
-                    notebook.*,
-                    array::len(notebook.sources) AS source_count
-                FROM module_assignment AS assignment
-                JOIN notebook ON assignment.notebook_id = notebook.id
-                WHERE assignment.company_id = $company_id
-                  AND assignment.is_locked = false
-                ORDER BY assignment.assigned_at DESC
+                SELECT *
+                FROM module_assignment
+                WHERE company_id = $company_id
+                  AND is_locked = false
+                ORDER BY assigned_at DESC
                 """,
-                {"company_id": company_id},
+                _record_params(company_id=company_id),
             )
 
-            # Parse results - each row has both assignment and notebook fields
-            assignments = []
-            for row in result:
-                # Extract assignment fields
-                assignment = cls(
-                    id=row.get("assignment.id") or row.get("id"),
-                    company_id=row.get("assignment.company_id") or row.get("company_id"),
-                    notebook_id=row.get("assignment.notebook_id")
-                    or row.get("notebook_id"),
-                    is_locked=row.get("assignment.is_locked", False),
-                    assigned_at=row.get("assignment.assigned_at"),
-                    assigned_by=row.get("assignment.assigned_by"),
+            # Step 2: Batch-fetch notebook data for all assignments
+            nb_map: Dict[str, dict] = {}
+            if result:
+                nb_ids = list({str(r.get("notebook_id")) for r in result})
+                nb_id_list = ", ".join(nb_ids)
+                notebooks = await repo_query(
+                    f"SELECT id, name, description, published, array::len(sources ?? []) AS source_count FROM notebook WHERE id IN [{nb_id_list}]"
                 )
-                # Attach notebook data for service layer (includes source_count and published from JOIN)
-                assignment.notebook_data = {
-                    "id": row.get("notebook.id"),
-                    "name": row.get("notebook.name"),
-                    "description": row.get("notebook.description"),
-                    "published": row.get("notebook.published", False),
-                    "source_count": row.get("source_count", 0),
-                }
-                assignments.append(assignment)
+                for nb in notebooks:
+                    nb_map[str(nb.get("id"))] = nb
 
-            logger.info(f"Found {len(assignments)} unlocked modules for company {company_id}")
-            return assignments
+            # Step 3: Build enriched dicts
+            enriched = []
+            for row in result:
+                nb = nb_map.get(str(row.get("notebook_id")), {})
+                enriched.append({
+                    "notebook_id": row.get("notebook_id"),
+                    "is_locked": row.get("is_locked", False),
+                    "assigned_at": row.get("assigned_at"),
+                    "notebook_data": {
+                        "name": nb.get("name"),
+                        "description": nb.get("description"),
+                        "published": nb.get("published", False),
+                        "source_count": nb.get("source_count", 0),
+                    },
+                })
+
+            logger.info(f"Found {len(enriched)} unlocked modules for company {company_id}")
+            return enriched
         except Exception as e:
             logger.error(f"Error fetching unlocked assignments for company {company_id}: {str(e)}")
             raise DatabaseOperationError(e)

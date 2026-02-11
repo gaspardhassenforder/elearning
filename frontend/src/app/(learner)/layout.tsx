@@ -5,18 +5,13 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { LearnerErrorBoundaryWithRouter } from '@/components/learner/LearnerErrorBoundary'
-import { NavigationAssistant } from '@/components/learner/NavigationAssistant'
 
 /**
  * Learner Layout
  *
- * This layout is for learner-only routes:
- * - /modules, /onboarding, and future learner pages
- *
- * Guards:
- * - If user is not authenticated, redirect to /login (handled by AuthProvider)
- * - If user is authenticated but NOT learner, redirect to /notebooks (admin home)
- * - If learner hasn't completed onboarding, redirect to /onboarding
+ * Minimal layout for the ChatGPT-like learner interface.
+ * Guards: auth, role check, onboarding.
+ * No NavigationAssistant - navigation is handled by the module page header.
  */
 export default function LearnerLayout({
   children,
@@ -29,32 +24,25 @@ export default function LearnerLayout({
   const [hasCheckedRole, setHasCheckedRole] = useState(false)
 
   useEffect(() => {
-    // Wait for store to hydrate
-    if (!hasHydrated) {
-      return
-    }
+    if (!hasHydrated) return
 
-    // If not authenticated, AuthProvider will handle redirect to login
     if (!isAuthenticated || !user) {
       setHasCheckedRole(true)
       return
     }
 
-    // Role guard: If user is not learner, redirect to admin home
     if (user.role !== 'learner') {
       setHasCheckedRole(true)
       router.replace('/notebooks')
       return
     }
 
-    // Onboarding guard: Force incomplete onboarding to /onboarding
     if (!user.onboarding_completed && pathname !== '/onboarding') {
       setHasCheckedRole(true)
       router.replace('/onboarding')
       return
     }
 
-    // Skip onboarding if already completed
     if (user.onboarding_completed && pathname === '/onboarding') {
       setHasCheckedRole(true)
       router.replace('/modules')
@@ -64,7 +52,6 @@ export default function LearnerLayout({
     setHasCheckedRole(true)
   }, [hasHydrated, isAuthenticated, user, router, pathname])
 
-  // Show loading spinner during initial role check
   if (!hasHydrated || !hasCheckedRole) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -73,8 +60,6 @@ export default function LearnerLayout({
     )
   }
 
-  // Don't render main content if not authenticated (AuthProvider handles redirect)
-  // Show loading instead of null to avoid a black/blank screen
   if (!isAuthenticated || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -83,7 +68,6 @@ export default function LearnerLayout({
     )
   }
 
-  // Don't render main content if not learner (redirect in progress)
   if (user.role !== 'learner') {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -92,16 +76,10 @@ export default function LearnerLayout({
     )
   }
 
-  // Extract current notebook ID from pathname for context-aware navigation
-  // Pattern: /modules/{notebookId}
-  const currentNotebookId = pathname.match(/\/modules\/([^/]+)/)?.[1]
-
   return (
     <LearnerErrorBoundaryWithRouter>
       <div className="min-h-screen bg-background">
         {children}
-        {/* Story 6.1: Platform-wide navigation assistant */}
-        <NavigationAssistant currentNotebookId={currentNotebookId} />
       </div>
     </LearnerErrorBoundaryWithRouter>
   )

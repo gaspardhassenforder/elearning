@@ -1356,7 +1356,7 @@ export const frFR = {
     referencedDocument: "Document référencé",
     chat: {
       title: "Enseignant IA",
-      placeholder: "Posez une question ou partagez vos réflexions...",
+      placeholder: "Envoyez un message à votre enseignant...",
       send: "Envoyer",
       error: "Impossible de se connecter à l'enseignant IA",
       errorDesc: "Veuillez vérifier votre connexion et réessayer.",
@@ -1489,6 +1489,13 @@ export const frFR = {
       minutes: "minutes",
       viewTranscript: "Voir la transcription",
       generating: "Le podcast est en cours de génération. Veuillez revenir plus tard.",
+    },
+    // Barre latérale et visionneuse
+    sidebar: {
+      openSidebar: "Ouvrir la barre latérale",
+      closeSidebar: "Fermer la barre latérale",
+      viewSource: "Voir la source",
+      viewArtifact: "Voir l'artefact",
     },
     // Story 6.1: Assistant de navigation
     navigation: {

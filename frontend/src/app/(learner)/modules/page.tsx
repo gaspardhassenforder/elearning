@@ -33,7 +33,7 @@ export default function ModulesPage() {
   const handleOpenModule = (notebookId: string, isLocked: boolean) => {
     // Prevent navigation if module is locked
     if (isLocked) return
-    router.push(`/learner/learn/${notebookId}`)
+    router.push(`/modules/${notebookId}`)
   }
 
   return (

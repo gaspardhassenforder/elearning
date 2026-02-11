@@ -1030,24 +1030,31 @@ async def validate_learner_access_to_source(
     Raises:
         HTTPException 403: Access denied (not assigned, locked, or unpublished)
     """
-    # Single query to validate source access through notebook assignment
-    # Checks: source exists, linked to notebook, notebook assigned to company,
-    #         notebook is published, assignment is not locked
-    result = await repo_query(
-        """
-        SELECT source.*, notebook.id AS notebook_id, notebook.published, assignment.is_locked
-        FROM source
-        JOIN reference ON reference.in = source.id
-        JOIN notebook ON notebook.id = reference.out
-        JOIN module_assignment AS assignment ON assignment.notebook_id = notebook.id
-        WHERE source.id = $source_id
-        AND assignment.company_id = $company_id
-        AND notebook.published = true
-        AND assignment.is_locked = false
-        LIMIT 1
-        """,
-        {"source_id": ensure_record_id(source_id), "company_id": learner_context.company_id},
+    # Step 1: Get notebooks linked to this source via reference edges
+    notebook_result = await repo_query(
+        "SELECT VALUE out FROM reference WHERE in = $source_id",
+        {"source_id": ensure_record_id(source_id)},
     )
+
+    if not notebook_result:
+        result = []
+    else:
+        # Step 2: Check if any of those notebooks are assigned to the learner's company,
+        # published, and unlocked
+        result = await repo_query(
+            """
+            SELECT VALUE true FROM module_assignment
+            WHERE notebook_id IN $notebook_ids
+              AND company_id = $company_id
+              AND is_locked = false
+              AND notebook_id IN (SELECT VALUE id FROM notebook WHERE id IN $notebook_ids AND published = true)
+            LIMIT 1
+            """,
+            {
+                "notebook_ids": [ensure_record_id(nid) for nid in notebook_result],
+                "company_id": ensure_record_id(learner_context.company_id),
+            },
+        )
 
     if not result:
         # Either source doesn't exist OR not accessible to this company
@@ -1134,3 +1141,18 @@ async def get_source_content(
         raise HTTPException(
             status_code=500, detail="Error fetching document content"
         )
+
+
+@router.get("/sources/{source_id}/file")
+async def get_source_file(
+    source_id: str,
+    learner: LearnerContext = Depends(get_current_learner),
+):
+    """Download original file for a source (learner-scoped).
+
+    Validates company assignment before serving file.
+    Used by the learner PDF viewer to render original documents.
+    """
+    await validate_learner_access_to_source(source_id, learner)
+    resolved_path, filename = await _resolve_source_file(source_id)
+    return FileResponse(path=resolved_path, filename=filename)

@@ -2,10 +2,12 @@ import asyncio
 import sqlite3
 from typing import Annotated, Optional
 
+import aiosqlite
 from ai_prompter import Prompter
 from langchain_core.messages import AIMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from typing_extensions import TypedDict
@@ -129,10 +131,8 @@ def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict
     return {"messages": cleaned_message}
 
 
-conn = sqlite3.connect(
-    LANGGRAPH_CHECKPOINT_FILE,
-    check_same_thread=False,
-)
+# Sync checkpointer for admin chat (graph.invoke)
+conn = sqlite3.connect(LANGGRAPH_CHECKPOINT_FILE, check_same_thread=False)
 memory = SqliteSaver(conn)
 
 agent_state = StateGraph(ThreadState)
@@ -140,3 +140,30 @@ agent_state.add_node("agent", call_model_with_messages)
 agent_state.add_edge(START, "agent")
 agent_state.add_edge("agent", END)
 graph = agent_state.compile(checkpointer=memory)
+
+# Async checkpointer for learner chat (graph.astream_events)
+# Must be initialized lazily because AsyncSqliteSaver requires a running event loop
+_async_memory: Optional[AsyncSqliteSaver] = None
+_async_graph = None
+
+
+async def get_async_memory() -> AsyncSqliteSaver:
+    """Get or create the async checkpoint saver (lazy singleton)."""
+    global _async_memory
+    if _async_memory is None:
+        aconn = await aiosqlite.connect(LANGGRAPH_CHECKPOINT_FILE)
+        # Patch for aiosqlite 0.22+ which removed is_alive() needed by AsyncSqliteSaver.setup()
+        if not hasattr(aconn, "is_alive"):
+            aconn.is_alive = lambda: True
+        _async_memory = AsyncSqliteSaver(conn=aconn)
+        await _async_memory.setup()
+    return _async_memory
+
+
+async def get_async_graph():
+    """Get or create the async-compatible chat graph (lazy singleton)."""
+    global _async_graph
+    if _async_graph is None:
+        amemory = await get_async_memory()
+        _async_graph = agent_state.compile(checkpointer=amemory)
+    return _async_graph

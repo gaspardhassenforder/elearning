@@ -34,11 +34,11 @@ export function DocumentSnippetCard({
   relevance,
 }: DocumentSnippetCardProps) {
   const { t } = useTranslation()
-  const expandAndScrollToSource = useLearnerStore((state) => state.expandAndScrollToSource)
+  const openViewerSheet = useLearnerStore((state) => state.openViewerSheet)
 
   const handleOpenInSources = (e: React.MouseEvent) => {
     e.preventDefault()
-    expandAndScrollToSource(sourceId)
+    openViewerSheet({ type: 'source', id: sourceId })
   }
 
   // Truncate excerpt to 200 chars if needed (should already be done by backend, but double-check)

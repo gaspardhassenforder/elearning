@@ -55,9 +55,8 @@ export function SourcesPanel({ notebookId }: SourcesPanelProps) {
   const scrollToSourceId = useLearnerStore((state) => state.scrollToSourceId)
   const setScrollToSourceId = useLearnerStore((state) => state.setScrollToSourceId)
 
-  // Story 5.1: Track expanded document (accordion behavior)
-  const expandedSourceId = useLearnerStore((state) => state.expandedSourceId)
-  const setExpandedSourceId = useLearnerStore((state) => state.setExpandedSourceId)
+  // Story 5.1: Track expanded document (accordion behavior) - local state (store properties removed)
+  const [expandedSourceId, setExpandedSourceId] = useState<string | null>(null)
 
   const {
     sources,

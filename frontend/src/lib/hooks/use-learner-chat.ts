@@ -44,20 +44,10 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
 
   // Story 4.3: Access scroll actions from store
   // Story 4.7: Access job tracking actions from store
-  // Story 5.1: Access panel collapsed state and badge actions
-  const {
-    setScrollToSourceId,
-    panelManuallyCollapsed,
-    setActiveJob,
-    sourcesPanelExpanded,
-    incrementBadgeCount,
-  } = useLearnerStore((state) => ({
-    setScrollToSourceId: state.setScrollToSourceId,
-    panelManuallyCollapsed: state.panelManuallyCollapsed,
-    setActiveJob: state.setActiveJob,
-    sourcesPanelExpanded: state.sourcesPanelExpanded,
-    incrementBadgeCount: state.incrementBadgeCount,
-  }))
+  // Individual selectors to avoid infinite re-renders from object creation
+  const setScrollToSourceId = useLearnerStore((state) => state.setScrollToSourceId)
+  const setActiveJob = useLearnerStore((state) => state.setActiveJob)
+  const openViewerSheet = useLearnerStore((state) => state.openViewerSheet)
 
   // Story 4.8: Chat history is now loaded via useChatHistory hook (see ChatPanel.tsx)
   // This hook manages message state and streaming, not history loading
@@ -202,16 +192,10 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
               .filter((tc) => tc.toolName === 'surface_document' && tc.result?.source_id)
               .map((tc) => tc.result!.source_id as string)
 
-            // Story 5.1: Handle document references based on panel state
+            // Open viewer sheet for first referenced document
             if (documentRefs.length > 0) {
-              if (!sourcesPanelExpanded) {
-                // Panel is collapsed - increment badge count for each referenced document
-                documentRefs.forEach(() => incrementBadgeCount())
-              } else if (!panelManuallyCollapsed) {
-                // Panel is expanded - trigger scroll to first referenced document
-                const firstDocId = documentRefs[0]
-                setScrollToSourceId(firstDocId)
-              }
+              const firstDocId = documentRefs[0]
+              setScrollToSourceId(firstDocId)
             }
           }
         }

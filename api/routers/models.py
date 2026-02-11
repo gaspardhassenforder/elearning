@@ -5,7 +5,7 @@ from esperanto import AIFactory
 from fastapi import APIRouter, Depends, HTTPException, Query
 from loguru import logger
 
-from api.auth import require_admin
+from api.auth import get_current_user, require_admin
 
 from api.models import (
     DefaultModelsResponse,
@@ -14,9 +14,10 @@ from api.models import (
     ProviderAvailabilityResponse,
 )
 from open_notebook.ai.models import DefaultModels, Model
+from open_notebook.domain.user import User
 from open_notebook.exceptions import InvalidInputError
 
-router = APIRouter(dependencies=[Depends(require_admin)])
+router = APIRouter()
 
 
 def _check_openai_compatible_support(mode: str) -> bool:
@@ -64,6 +65,7 @@ def _check_azure_support(mode: str) -> bool:
 @router.get("/models", response_model=List[ModelResponse])
 async def get_models(
     type: Optional[str] = Query(None, description="Filter by model type"),
+    _user: User = Depends(get_current_user),
 ):
     """Get all configured models with optional type filtering."""
     try:
@@ -88,7 +90,7 @@ async def get_models(
         raise HTTPException(status_code=500, detail=f"Error fetching models: {str(e)}")
 
 
-@router.post("/models", response_model=ModelResponse)
+@router.post("/models", response_model=ModelResponse, dependencies=[Depends(require_admin)])
 async def create_model(model_data: ModelCreate):
     """Create a new model configuration."""
     try:
@@ -141,7 +143,7 @@ async def create_model(model_data: ModelCreate):
         raise HTTPException(status_code=500, detail=f"Error creating model: {str(e)}")
 
 
-@router.delete("/models/{model_id}")
+@router.delete("/models/{model_id}", dependencies=[Depends(require_admin)])
 async def delete_model(model_id: str):
     """Delete a model configuration."""
     try:
@@ -160,7 +162,7 @@ async def delete_model(model_id: str):
 
 
 @router.get("/models/defaults", response_model=DefaultModelsResponse)
-async def get_default_models():
+async def get_default_models(_user: User = Depends(get_current_user)):
     """Get default model assignments."""
     try:
         defaults = await DefaultModels.get_instance()
@@ -181,7 +183,7 @@ async def get_default_models():
         )
 
 
-@router.put("/models/defaults", response_model=DefaultModelsResponse)
+@router.put("/models/defaults", response_model=DefaultModelsResponse, dependencies=[Depends(require_admin)])
 async def update_default_models(defaults_data: DefaultModelsResponse):
     """Update default model assignments."""
     try:
@@ -232,7 +234,7 @@ async def update_default_models(defaults_data: DefaultModelsResponse):
 
 
 @router.get("/models/providers", response_model=ProviderAvailabilityResponse)
-async def get_provider_availability():
+async def get_provider_availability(_user: User = Depends(get_current_user)):
     """Get provider availability based on environment variables."""
     try:
         # Check which providers have API keys configured

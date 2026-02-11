@@ -282,7 +282,7 @@ async def get_podcast(podcast_id: str, user: User = Depends(get_current_user)):
     Story 7.5: Uses get_current_learner() for consistent company isolation.
     Used by InlineAudioPlayer component for artifact surfacing in chat.
     """
-    from open_notebook.database.repository import repo_query
+    from open_notebook.database.repository import repo_query, ensure_record_id
 
     try:
         podcast = await Podcast.get(podcast_id)
@@ -308,7 +308,7 @@ async def get_podcast(podcast_id: str, user: User = Depends(get_current_user)):
               AND company_id = $company_id
             LIMIT 1
             """,
-            {"notebook_id": podcast.notebook_id, "company_id": user.company_id},
+            {"notebook_id": ensure_record_id(podcast.notebook_id), "company_id": ensure_record_id(user.company_id)},
         )
 
         if not result:
@@ -344,7 +344,7 @@ async def stream_podcast_audio(podcast_id: str, user: User = Depends(get_current
     Story 4.6: Company scoping for learners - validates notebook assignment.
     Story 7.5: Uses get_current_learner() for consistent company isolation.
     """
-    from open_notebook.database.repository import repo_query
+    from open_notebook.database.repository import repo_query, ensure_record_id
 
     try:
         podcast = await Podcast.get(podcast_id)
@@ -368,7 +368,7 @@ async def stream_podcast_audio(podcast_id: str, user: User = Depends(get_current
               AND company_id = $company_id
             LIMIT 1
             """,
-            {"notebook_id": podcast.notebook_id, "company_id": user.company_id},
+            {"notebook_id": ensure_record_id(podcast.notebook_id), "company_id": ensure_record_id(user.company_id)},
         )
 
         if not result:
@@ -399,7 +399,7 @@ async def get_podcast_transcript(podcast_id: str, user: User = Depends(get_curre
     Story 4.6: Company scoping for learners - validates notebook assignment.
     Story 7.5: Uses get_current_learner() for consistent company isolation.
     """
-    from open_notebook.database.repository import repo_query
+    from open_notebook.database.repository import repo_query, ensure_record_id
 
     try:
         podcast = await Podcast.get(podcast_id)
@@ -423,7 +423,7 @@ async def get_podcast_transcript(podcast_id: str, user: User = Depends(get_curre
               AND company_id = $company_id
             LIMIT 1
             """,
-            {"notebook_id": podcast.notebook_id, "company_id": user.company_id},
+            {"notebook_id": ensure_record_id(podcast.notebook_id), "company_id": ensure_record_id(user.company_id)},
         )
 
         if not result:

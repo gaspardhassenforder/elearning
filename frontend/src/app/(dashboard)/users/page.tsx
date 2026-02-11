@@ -276,14 +276,14 @@ export default function UsersPage() {
             <div className="space-y-2">
               <Label htmlFor="company">{t.users.company}</Label>
               <Select
-                value={formData.company_id || ''}
-                onValueChange={(value) => setFormData({ ...formData, company_id: value || undefined })}
+                value={formData.company_id || '__none__'}
+                onValueChange={(value) => setFormData({ ...formData, company_id: value === '__none__' ? undefined : value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder={t.users.selectCompany} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">{t.users.noCompany}</SelectItem>
+                  <SelectItem value="__none__">{t.users.noCompany}</SelectItem>
                   {companies?.map((company) => (
                     <SelectItem key={company.id} value={company.id}>
                       {company.name}
@@ -362,14 +362,14 @@ export default function UsersPage() {
             <div className="space-y-2">
               <Label htmlFor="edit-company">{t.users.company}</Label>
               <Select
-                value={formData.company_id || ''}
-                onValueChange={(value) => setFormData({ ...formData, company_id: value || undefined })}
+                value={formData.company_id || '__none__'}
+                onValueChange={(value) => setFormData({ ...formData, company_id: value === '__none__' ? undefined : value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder={t.users.selectCompany} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">{t.users.noCompany}</SelectItem>
+                  <SelectItem value="__none__">{t.users.noCompany}</SelectItem>
                   {companies?.map((company) => (
                     <SelectItem key={company.id} value={company.id}>
                       {company.name}

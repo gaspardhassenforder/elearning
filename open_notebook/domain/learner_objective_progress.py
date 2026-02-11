@@ -12,7 +12,7 @@ from typing import ClassVar, Optional
 from loguru import logger
 from pydantic import field_validator
 
-from open_notebook.database.repository import repo_create, repo_query, repo_update
+from open_notebook.database.repository import repo_create, repo_query, repo_update, ensure_record_id
 from open_notebook.domain.base import ObjectModel
 from open_notebook.exceptions import DatabaseOperationError, InvalidInputError
 
@@ -128,8 +128,8 @@ class LearnerObjectiveProgress(ObjectModel):
 
             # Create new record
             data = {
-                "user_id": user_id,
-                "objective_id": objective_id,
+                "user_id": ensure_record_id(user_id),
+                "objective_id": ensure_record_id(objective_id),
                 "status": status.value,
                 "completed_via": completed_via.value,
                 "evidence": evidence,
@@ -169,7 +169,7 @@ class LearnerObjectiveProgress(ObjectModel):
                 SELECT * FROM learner_objective_progress
                 WHERE user_id = $user_id AND objective_id = $objective_id
             """
-            result = await repo_query(query, {"user_id": user_id, "objective_id": objective_id})
+            result = await repo_query(query, {"user_id": ensure_record_id(user_id), "objective_id": ensure_record_id(objective_id)})
 
             if result:
                 return cls(**result[0])
@@ -202,12 +202,13 @@ class LearnerObjectiveProgress(ObjectModel):
 
         try:
             query = """
-                SELECT lop.*
-                FROM learner_objective_progress AS lop
-                JOIN learning_objective AS lo ON lop.objective_id = lo.id
-                WHERE lop.user_id = $user_id AND lo.notebook_id = $notebook_id
+                SELECT * FROM learner_objective_progress
+                WHERE user_id = $user_id
+                  AND objective_id IN (
+                    SELECT VALUE id FROM learning_objective WHERE notebook_id = $notebook_id
+                  )
             """
-            result = await repo_query(query, {"user_id": user_id, "notebook_id": notebook_id})
+            result = await repo_query(query, {"user_id": ensure_record_id(user_id), "notebook_id": ensure_record_id(notebook_id)})
 
             return [cls(**item) for item in result]
 
@@ -282,14 +283,15 @@ class LearnerObjectiveProgress(ObjectModel):
         try:
             query = """
                 SELECT count() AS count
-                FROM learner_objective_progress AS lop
-                JOIN learning_objective AS lo ON lop.objective_id = lo.id
-                WHERE lop.user_id = $user_id
-                  AND lo.notebook_id = $notebook_id
-                  AND lop.status = 'completed'
+                FROM learner_objective_progress
+                WHERE user_id = $user_id
+                  AND objective_id IN (
+                    SELECT VALUE id FROM learning_objective WHERE notebook_id = $notebook_id
+                  )
+                  AND status = 'completed'
                 GROUP ALL
             """
-            result = await repo_query(query, {"user_id": user_id, "notebook_id": notebook_id})
+            result = await repo_query(query, {"user_id": ensure_record_id(user_id), "notebook_id": ensure_record_id(notebook_id)})
 
             return result[0]["count"] if result else 0
 

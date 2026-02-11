@@ -22,7 +22,7 @@ from api.learner_chat_service import (
     validate_learner_access_to_notebook,
 )
 from open_notebook.graphs.prompt import generate_re_engagement_greeting
-from open_notebook.graphs.chat import graph as chat_graph, memory as chat_memory
+from open_notebook.graphs.chat import get_async_graph, get_async_memory
 from open_notebook.observability.langsmith_handler import get_langsmith_callback
 from open_notebook.observability.langgraph_context_callback import ContextLoggingCallback
 from open_notebook.observability.token_tracking_callback import TokenTrackingCallback
@@ -159,13 +159,14 @@ async def get_chat_history(
         )
 
     # 2. Construct thread ID (same pattern as chat endpoint)
-    thread_id = f"user:{learner.user.id}:notebook:{notebook_id}"
+    thread_id = f"{learner.user.id}:{notebook_id}"
     logger.debug(f"Loading history for thread_id: {thread_id}")
 
     # 3. Load checkpoint from SqliteSaver
     try:
         checkpoint_config = {"configurable": {"thread_id": thread_id}}
-        checkpoint_tuple = chat_memory.get(checkpoint_config)
+        async_memory = await get_async_memory()
+        checkpoint_tuple = await async_memory.aget(checkpoint_config)
 
         if not checkpoint_tuple:
             logger.info(f"No history found for thread {thread_id} (first visit)")
@@ -354,7 +355,7 @@ async def stream_learner_chat(
         """
         try:
             # Thread ID pattern: user:{user_id}:notebook:{notebook_id}
-            thread_id = f"user:{learner.user.id}:notebook:{notebook_id}"
+            thread_id = f"{learner.user.id}:{notebook_id}"
             logger.info(f"Using thread_id: {thread_id}")
 
             # Story 4.2 + 4.8: Check if this is first visit or returning user
@@ -362,7 +363,8 @@ async def stream_learner_chat(
             is_returning_user = False
             try:
                 # Get thread state from checkpoint
-                thread_state = chat_memory.get({"configurable": {"thread_id": thread_id}})
+                async_memory = await get_async_memory()
+                thread_state = await async_memory.aget({"configurable": {"thread_id": thread_id}})
 
                 # Extract messages from checkpoint (handle dict structure from SqliteSaver)
                 messages = []
@@ -400,7 +402,7 @@ async def stream_learner_chat(
                         # Story 4.8: Re-engagement greeting for returning users
                         # Get learning objectives with status for progress context
                         from open_notebook.domain.learning_objective import LearningObjective
-                        objectives = await LearningObjective.get_by_notebook(notebook_id)
+                        objectives = await LearningObjective.get_for_notebook(notebook_id)
                         objectives_with_status = [
                             {
                                 "id": str(obj.id),
@@ -488,7 +490,8 @@ async def stream_learner_chat(
 
             # Stream events from chat graph with assembled system prompt
             # Story 4.4: Pass user_id for objective progress tracking
-            async for event in chat_graph.astream_events(
+            async_graph = await get_async_graph()
+            async for event in async_graph.astream_events(
                 {
                     "messages": [user_message],
                     "notebook": None,  # Will be loaded by graph if needed

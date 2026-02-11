@@ -18,7 +18,7 @@ async def _fetch_suggested_modules(user_id: str, current_notebook_id: str) -> Li
     Returns:
         List of suggested module dicts with id, title, description
     """
-    from open_notebook.database.repository import repo_query
+    from open_notebook.database.repository import repo_query, ensure_record_id
     from open_notebook.domain.user import User
 
     try:
@@ -31,20 +31,21 @@ async def _fetch_suggested_modules(user_id: str, current_notebook_id: str) -> Li
         # Query available modules for learner's company
         # Filter: published + unlocked + assigned to company + exclude current module
         query = """
-            SELECT notebook.id, notebook.title, notebook.description
+            SELECT id, title, description
             FROM notebook
-            JOIN module_assignment ON module_assignment.notebook_id = notebook.id
-            WHERE module_assignment.company_id = $company_id
-              AND module_assignment.is_locked = false
-              AND notebook.published = true
-              AND notebook.id != $current_notebook_id
-            ORDER BY notebook.created DESC
+            WHERE id IN (
+                SELECT VALUE notebook_id FROM module_assignment
+                WHERE company_id = $company_id AND is_locked = false
+            )
+              AND published = true
+              AND id != $current_notebook_id
+            ORDER BY created DESC
             LIMIT 3
         """
 
         results = await repo_query(
             query,
-            {"company_id": user.company_id, "current_notebook_id": current_notebook_id},
+            {"company_id": ensure_record_id(user.company_id), "current_notebook_id": ensure_record_id(current_notebook_id)},
         )
 
         # Format results
@@ -87,7 +88,7 @@ async def search_available_modules(
         Company scoping is enforced by extracting company_id from the authenticated user context
         passed via RunnableConfig. The navigation endpoint validates authentication before invoking.
     """
-    from open_notebook.database.repository import repo_query
+    from open_notebook.database.repository import repo_query, ensure_record_id
 
     # Extract company_id and current_notebook_id from config (passed by navigation graph)
     company_id = None
@@ -107,40 +108,37 @@ async def search_available_modules(
         query_lower = query.lower()
 
         # Build query with company scoping and published/unlocked filters
+        # Uses subquery instead of JOIN (SurrealDB doesn't support SQL-style JOINs)
         surql = """
-            SELECT
-              notebook.id,
-              notebook.title,
-              notebook.description,
-              notebook.created
+            SELECT id, title, description, created
             FROM notebook
-            JOIN module_assignment ON module_assignment.notebook_id = notebook.id
-            WHERE
-              module_assignment.company_id = $company_id
-              AND module_assignment.is_locked = false
-              AND notebook.published = true
+            WHERE id IN (
+                SELECT VALUE notebook_id FROM module_assignment
+                WHERE company_id = $company_id AND is_locked = false
+            )
+              AND published = true
               AND (
-                string::lowercase(notebook.title) CONTAINS $query OR
-                string::lowercase(notebook.description) CONTAINS $query
+                string::lowercase(title) CONTAINS $query OR
+                string::lowercase(description) CONTAINS $query
               )
         """
 
         # Optionally exclude current module
         if current_notebook_id:
-            surql += " AND notebook.id != $current_notebook_id"
+            surql += " AND id != $current_notebook_id"
 
         # Priority: title matches first, then by creation date
         surql += """
             ORDER BY
-              (string::lowercase(notebook.title) CONTAINS $query) DESC,
-              notebook.created DESC
+              (string::lowercase(title) CONTAINS $query) DESC,
+              created DESC
             LIMIT $limit;
         """
 
         params = {
-            "company_id": company_id,
+            "company_id": ensure_record_id(company_id),
             "query": query_lower,
-            "current_notebook_id": current_notebook_id,
+            "current_notebook_id": ensure_record_id(current_notebook_id) if current_notebook_id else None,
             "limit": limit
         }
 
@@ -393,7 +391,7 @@ async def surface_quiz(quiz_id: str, config: Optional[dict] = None) -> dict:
     """
     from open_notebook.domain.quiz import Quiz
     from open_notebook.domain.user import User
-    from open_notebook.database.repository import repo_query
+    from open_notebook.database.repository import repo_query, ensure_record_id
     from open_notebook.exceptions import NotFoundError
 
     logger.info(f"surface_quiz tool called for quiz_id: {quiz_id}")
@@ -438,7 +436,7 @@ async def surface_quiz(quiz_id: str, config: Optional[dict] = None) -> dict:
                 """
                 results = await repo_query(
                     query,
-                    {"notebook_id": quiz.notebook_id, "company_id": user.company_id},
+                    {"notebook_id": ensure_record_id(quiz.notebook_id), "company_id": ensure_record_id(user.company_id)},
                 )
 
                 if not results:
@@ -506,7 +504,7 @@ async def surface_podcast(podcast_id: str, config: Optional[dict] = None) -> dic
     """
     from open_notebook.domain.podcast import Podcast
     from open_notebook.domain.user import User
-    from open_notebook.database.repository import repo_query
+    from open_notebook.database.repository import repo_query, ensure_record_id
     from open_notebook.exceptions import NotFoundError
 
     logger.info(f"surface_podcast tool called for podcast_id: {podcast_id}")
@@ -551,7 +549,7 @@ async def surface_podcast(podcast_id: str, config: Optional[dict] = None) -> dic
                 """
                 results = await repo_query(
                     query,
-                    {"notebook_id": podcast.notebook_id, "company_id": user.company_id},
+                    {"notebook_id": ensure_record_id(podcast.notebook_id), "company_id": ensure_record_id(user.company_id)},
                 )
 
                 if not results:

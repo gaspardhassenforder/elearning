@@ -13,12 +13,14 @@ from fastapi import HTTPException
 from loguru import logger
 
 from api.auth import LearnerContext
+from open_notebook.database.repository import ensure_record_id
 from open_notebook.domain.notebook import Notebook
 from open_notebook.domain.module_assignment import ModuleAssignment
 from open_notebook.domain.learning_objective import LearningObjective
 from open_notebook.domain.learner_objective_progress import LearnerObjectiveProgress
 from open_notebook.graphs.prompt import assemble_system_prompt
 from open_notebook.ai.provision import provision_langchain_model
+from open_notebook.utils import extract_text_from_response
 
 
 async def get_learner_objectives_with_status(
@@ -46,36 +48,47 @@ async def get_learner_objectives_with_status(
         user_id = f"user:{user_id}"
 
     try:
-        # Single JOIN query to load objectives with progress (Story 4.4)
-        # Prevents N+1 by fetching all data in one query
-        result = await repo_query(
+        # Two separate queries to avoid unsupported LEFT JOIN syntax in SurrealDB
+        # Query 1: Load all objectives for notebook
+        objectives_result = await repo_query(
             """
-            SELECT
-                lo.id AS objective_id,
-                lo.text,
-                lo.order,
-                lo.auto_generated,
-                lop.status AS progress_status,
-                lop.completed_at,
-                lop.evidence
-            FROM learning_objective AS lo
-            LEFT JOIN learner_objective_progress AS lop
-                ON lop.objective_id = lo.id AND lop.user_id = $user_id
-            WHERE lo.notebook_id = $notebook_id
-            ORDER BY lo.order ASC
+            SELECT * FROM learning_objective
+            WHERE notebook_id = $notebook_id
+            ORDER BY order ASC
             """,
-            {"notebook_id": notebook_id, "user_id": user_id},
+            {"notebook_id": ensure_record_id(notebook_id)},
         )
 
+        # Query 2: Load progress for this user in this notebook
+        progress_result = await repo_query(
+            """
+            SELECT * FROM learner_objective_progress
+            WHERE user_id = $user_id
+              AND objective_id IN (
+                SELECT VALUE id FROM learning_objective WHERE notebook_id = $notebook_id
+              )
+            """,
+            {"notebook_id": ensure_record_id(notebook_id), "user_id": ensure_record_id(user_id)},
+        )
+
+        # Build progress lookup map
+        progress_map = {}
+        for p in progress_result:
+            obj_id = str(p.get("objective_id", ""))
+            progress_map[obj_id] = p
+
+        # Merge objectives with progress
         objectives_with_status = []
-        for row in result:
+        for row in objectives_result:
+            obj_id = str(row.get("id", ""))
+            progress = progress_map.get(obj_id)
             objectives_with_status.append({
-                "id": row.get("objective_id"),
+                "id": row.get("id"),
                 "text": row.get("text", ""),
                 "order": row.get("order", 0),
-                "status": row.get("progress_status") or "not_started",
-                "completed_at": row.get("completed_at"),
-                "evidence": row.get("evidence"),
+                "status": (progress.get("status") if progress else None) or "not_started",
+                "completed_at": progress.get("completed_at") if progress else None,
+                "evidence": progress.get("evidence") if progress else None,
             })
 
         logger.debug(
@@ -128,50 +141,32 @@ async def validate_learner_access_to_notebook(
     """
     from open_notebook.database.repository import repo_query
 
-    # Single query with JOIN to check all conditions at once (avoids N+1)
-    # This checks: notebook exists, assignment exists, published status, locked status
-    result = await repo_query(
+    # Step 1: Check assignment exists for learner's company
+    assignment_result = await repo_query(
         """
-        SELECT notebook.*, assignment.is_locked
-        FROM notebook
-        LEFT JOIN module_assignment AS assignment
-        ON assignment.notebook_id = notebook.id
-        WHERE notebook.id = $notebook_id
-        AND assignment.company_id = $company_id
+        SELECT * FROM module_assignment
+        WHERE notebook_id = $notebook_id
+          AND company_id = $company_id
         LIMIT 1
         """,
-        {"notebook_id": notebook_id, "company_id": learner_context.company_id},
+        {"notebook_id": ensure_record_id(notebook_id), "company_id": ensure_record_id(learner_context.company_id)},
     )
 
-    if not result:
-        # Either notebook doesn't exist OR not assigned to company
-        # Use consistent 403 to avoid leaking existence
+    if not assignment_result:
         logger.warning(
-            f"Learner {learner_context.user.id} attempted to access non-existent or unassigned notebook {notebook_id}"
+            f"Learner {learner_context.user.id} attempted to access unassigned notebook {notebook_id}"
         )
         raise HTTPException(
             status_code=403, detail="You do not have access to this module"
         )
 
-    notebook_data = result[0]
+    assignment_data = assignment_result[0]
 
-    # Validate published status (learners cannot see unpublished modules)
-    # Use .get() with explicit default for backward compatibility with old data
-    published = notebook_data.get("published", True)
-    if not published:
-        logger.warning(
-            f"Learner {learner_context.user.id} attempted to access unpublished notebook {notebook_id}"
-        )
-        raise HTTPException(
-            status_code=403, detail="You do not have access to this module"
-        )
-
-    # Validate locked status using typed check (Story 2.3)
-    # Extract is_locked from the JOIN result and validate type safety
-    is_locked = notebook_data.get("is_locked", False)
+    # Validate locked status (Story 2.3)
+    is_locked = assignment_data.get("is_locked", False)
     if not isinstance(is_locked, bool):
         logger.warning(f"Invalid is_locked type for notebook {notebook_id}: {type(is_locked)}")
-        is_locked = bool(is_locked)  # Coerce to bool
+        is_locked = bool(is_locked)
 
     if is_locked:
         logger.warning(
@@ -182,17 +177,34 @@ async def validate_learner_access_to_notebook(
             detail="This module is currently locked and not available",
         )
 
-    # Fetch full Notebook object (already validated via JOIN above)
-    # Note: Future optimization (Story 4.8+) could cache this per session
+    # Step 2: Fetch notebook and validate published status
     try:
         notebook = await Notebook.get(notebook_id)
-        logger.info(
-            f"Learner {learner_context.user.id} validated access to notebook {notebook_id}"
-        )
-        return notebook
     except Exception as e:
-        logger.error(f"Error fetching notebook {notebook_id} after validation: {e}")
+        logger.error(f"Error fetching notebook {notebook_id}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+    if not notebook:
+        logger.warning(
+            f"Learner {learner_context.user.id} attempted to access non-existent notebook {notebook_id}"
+        )
+        raise HTTPException(
+            status_code=403, detail="You do not have access to this module"
+        )
+
+    published = getattr(notebook, "published", True)
+    if not published:
+        logger.warning(
+            f"Learner {learner_context.user.id} attempted to access unpublished notebook {notebook_id}"
+        )
+        raise HTTPException(
+            status_code=403, detail="You do not have access to this module"
+        )
+
+    logger.info(
+        f"Learner {learner_context.user.id} validated access to notebook {notebook_id}"
+    )
+    return notebook
 
 
 async def prepare_chat_context(
@@ -292,7 +304,7 @@ async def generate_proactive_greeting(
 
     # 1. Load learning objectives for this notebook
     try:
-        objectives = await LearningObjective.list_by_notebook(notebook_id)
+        objectives = await LearningObjective.get_for_notebook(notebook_id)
         logger.debug(f"Found {len(objectives)} learning objectives for notebook {notebook_id}")
     except Exception as e:
         logger.warning(f"Failed to load learning objectives for notebook {notebook_id}: {e}")
@@ -323,13 +335,13 @@ Return ONLY the question, nothing else."""
         model = await provision_langchain_model(
             opening_question_prompt,
             model_id=None,  # Use default chat model
-            context_type="chat",
+            default_type="chat",
             max_tokens=150,  # Short response
         )
         opening_question = await model.ainvoke(opening_question_prompt)
-        # Extract text from AIMessage
+        # Extract text from AIMessage (handles structured content blocks)
         if hasattr(opening_question, "content"):
-            opening_question = opening_question.content
+            opening_question = extract_text_from_response(opening_question.content)
         opening_question = str(opening_question).strip()
         logger.debug(f"Generated opening question: {opening_question}")
     except Exception as e:
@@ -341,7 +353,7 @@ Return ONLY the question, nothing else."""
         greeting_text = Prompter(prompt_template="greeting_template").render(
             data={
                 "learner_profile": learner_profile,
-                "module_title": notebook.title,
+                "module_title": notebook.name,
                 "first_objective_text": first_objective_text,
                 "opening_question": opening_question,
             }
@@ -351,4 +363,4 @@ Return ONLY the question, nothing else."""
     except Exception as e:
         logger.error(f"Failed to render greeting template: {e}")
         # Fallback to simple greeting
-        return f"Hello {learner_profile.get('role', 'learner')}! Welcome to {notebook.title}. Let's get started!"
+        return f"Hello {learner_profile.get('role', 'learner')}! Welcome to {notebook.name}. Let's get started!"

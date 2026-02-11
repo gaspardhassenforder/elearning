@@ -263,35 +263,27 @@ async def get_learner_modules(company_id: str) -> List[LearnerModuleResponse]:
     """
     logger.info(f"Fetching learner modules for company {company_id}")
 
-    # Get unlocked assignments with joined notebook data
+    # Get unlocked assignments with notebook data (returns list of dicts)
     assignments = await ModuleAssignment.get_unlocked_for_company(company_id)
 
     # Build learner-safe responses (exclude admin fields)
     modules = []
-    for assignment in assignments:
-        # Extract notebook data attached by domain method (includes source_count and published from JOIN)
-        notebook_data = getattr(assignment, "notebook_data", {})
+    for entry in assignments:
+        notebook_data = entry.get("notebook_data", {})
 
-        # Check published status (Story 3.5 will enforce this strictly)
-        # Domain layer already joined notebook data, no additional query needed
-        is_published = notebook_data.get("published", False)
-        if not is_published:
-            # Skip unpublished modules - learners shouldn't see them
-            logger.debug(f"Skipping unpublished module {assignment.notebook_id} for learner visibility")
+        # Only show published modules to learners
+        if not notebook_data.get("published", False):
+            logger.info(f"Skipping unpublished module {entry.get('notebook_id')} for learner visibility")
             continue
-
-        # Source count already calculated in domain layer JOIN query
-        source_count = notebook_data.get("source_count", 0)
 
         modules.append(
             LearnerModuleResponse(
-                id=assignment.notebook_id,
+                id=entry.get("notebook_id"),
                 name=notebook_data.get("name", "Untitled Module"),
                 description=notebook_data.get("description"),
-                is_locked=assignment.is_locked,  # Should always be False in this query
-                source_count=source_count,
-                assigned_at=assignment.assigned_at or datetime.now(timezone.utc).isoformat(),
-                # DO NOT include assigned_by — learners don't need to see admin info
+                is_locked=entry.get("is_locked", False),
+                source_count=notebook_data.get("source_count", 0),
+                assigned_at=str(entry.get("assigned_at") or datetime.now(timezone.utc).isoformat()),
             )
         )
 

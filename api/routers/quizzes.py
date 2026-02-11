@@ -83,7 +83,7 @@ async def get_quiz(quiz_id: str, user: User = Depends(get_current_user)):
     Admins can access any quiz; learners can only access quizzes from assigned modules.
     """
     from loguru import logger
-    from open_notebook.database.repository import repo_query
+    from open_notebook.database.repository import repo_query, ensure_record_id
 
     quiz = await quiz_service.get_quiz(quiz_id)
     if not quiz:
@@ -104,7 +104,7 @@ async def get_quiz(quiz_id: str, user: User = Depends(get_current_user)):
               AND company_id = $company_id
             LIMIT 1
             """,
-            {"notebook_id": quiz.notebook_id, "company_id": user.company_id},
+            {"notebook_id": ensure_record_id(quiz.notebook_id), "company_id": ensure_record_id(user.company_id)},
         )
 
         if not result:
@@ -150,7 +150,7 @@ async def check_quiz_answers(quiz_id: str, request: QuizAnswersRequest, user: Us
     Returns score, percentage, and per-question results with explanations.
     """
     from loguru import logger
-    from open_notebook.database.repository import repo_query
+    from open_notebook.database.repository import repo_query, ensure_record_id
 
     try:
         # Fetch quiz first to validate access
@@ -173,7 +173,7 @@ async def check_quiz_answers(quiz_id: str, request: QuizAnswersRequest, user: Us
                   AND company_id = $company_id
                 LIMIT 1
                 """,
-                {"notebook_id": quiz.notebook_id, "company_id": user.company_id},
+                {"notebook_id": ensure_record_id(quiz.notebook_id), "company_id": ensure_record_id(user.company_id)},
             )
 
             if not result:

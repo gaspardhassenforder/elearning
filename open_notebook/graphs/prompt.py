@@ -83,7 +83,7 @@ async def _load_available_artifacts(notebook_id: str) -> str:
     try:
         # Load quizzes for this notebook
         quiz_query = """
-            SELECT id, title, questions_json
+            SELECT id, title, questions_json, created
             FROM quiz
             WHERE notebook_id = $notebook_id
             ORDER BY created DESC
@@ -110,7 +110,7 @@ async def _load_available_artifacts(notebook_id: str) -> str:
 
         # Load completed podcasts for this notebook
         podcast_query = """
-            SELECT id, title, length, speaker_format, status
+            SELECT id, title, length, speaker_format, status, created
             FROM podcast
             WHERE notebook_id = $notebook_id
               AND status = 'completed'
@@ -355,13 +355,14 @@ async def generate_re_engagement_greeting(
     """
     logger.info(f"Generating re-engagement greeting for thread {thread_id}")
 
-    # Import chat_memory here to avoid circular dependency
-    from open_notebook.graphs.chat import memory as chat_memory
+    # Import async memory getter to avoid circular dependency
+    from open_notebook.graphs.chat import get_async_memory
 
     # Load checkpoint history
     try:
         config = {"configurable": {"thread_id": thread_id}}
-        checkpoint_tuple = chat_memory.get(config)
+        async_memory = await get_async_memory()
+        checkpoint_tuple = await async_memory.aget(config)
 
         if not checkpoint_tuple:
             logger.warning(f"No checkpoint found for thread {thread_id}, falling back to standard greeting")

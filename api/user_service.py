@@ -122,7 +122,7 @@ async def list_users() -> List["UserListResponse"]:
                 onboarding_completed,
                 created,
                 updated,
-                (SELECT name FROM company WHERE id = $parent.company_id LIMIT 1)[0] AS company_name
+                (SELECT VALUE name FROM company WHERE id = $parent.company_id LIMIT 1)[0] AS company_name
             FROM user
             ORDER BY username
             """,

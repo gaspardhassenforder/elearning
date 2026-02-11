@@ -107,6 +107,12 @@ export const sourcesApi = {
     })
   },
 
+  downloadLearnerFile: async (id: string): Promise<AxiosResponse<Blob>> => {
+    return apiClient.get(`/sources/${id}/file`, {
+      responseType: 'blob',
+    })
+  },
+
   /**
    * Story 5.1: Get full document content for a source
    *
