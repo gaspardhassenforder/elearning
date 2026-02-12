@@ -333,7 +333,7 @@ export function AppSidebar() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div>
-                      <ThemeToggle iconOnly />
+                      <ThemeToggle iconOnly className="w-full sidebar-menu-item" />
                     </div>
                   </TooltipTrigger>
                   <TooltipContent side="right">{t.common.theme}</TooltipContent>
@@ -341,7 +341,7 @@ export function AppSidebar() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div>
-                      <LanguageToggle iconOnly />
+                      <LanguageToggle iconOnly className="w-full sidebar-menu-item" />
                     </div>
                   </TooltipTrigger>
                   <TooltipContent side="right">{t.common.language}</TooltipContent>
@@ -349,8 +349,8 @@ export function AppSidebar() {
               </>
             ) : (
               <>
-                <ThemeToggle />
-                <LanguageToggle />
+                <ThemeToggle className="sidebar-menu-item" />
+                <LanguageToggle className="sidebar-menu-item" />
               </>
             )}
           </div>

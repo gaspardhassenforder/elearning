@@ -55,7 +55,9 @@ class CommandService:
         """Get status of any command job"""
         logger.debug(f"Getting status for job: {job_id}")
         try:
-            status = await get_command_status(job_id)
+            # Ensure job_id has the command: prefix required by surreal_commands
+            full_job_id = job_id if job_id.startswith("command:") else f"command:{job_id}"
+            status = await get_command_status(full_job_id)
             status_str = status.status if status else "unknown"
             logger.debug(f"Job {job_id} status: {status_str}")
             return {

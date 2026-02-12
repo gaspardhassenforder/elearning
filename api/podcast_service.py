@@ -164,11 +164,11 @@ class PodcastService:
         """Get status of a podcast generation job"""
         logger.debug(f"Getting podcast job status for: {job_id}")
         try:
-            # Remove command: prefix if present for status lookup
-            clean_job_id = job_id.replace("command:", "") if job_id.startswith("command:") else job_id
+            # Ensure job_id has the command: prefix required by surreal_commands
+            clean_job_id = job_id if job_id.startswith("command:") else f"command:{job_id}"
             if clean_job_id != job_id:
-                logger.debug(f"Cleaned job_id: {job_id} -> {clean_job_id}")
-            
+                logger.debug(f"Added prefix to job_id: {job_id} -> {clean_job_id}")
+
             status = await get_command_status(clean_job_id)
             
             if not status:

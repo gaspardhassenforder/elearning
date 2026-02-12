@@ -1,3 +1,4 @@
+import os
 import re
 import time
 from pathlib import Path
@@ -140,128 +141,209 @@ logger.info("Applied podcast-creator content block handling patch to core and no
 def _fix_speaker_names_in_transcript(transcript_data: dict, valid_speakers: list[str]) -> dict:
     """
     Fix invalid speaker names in transcript by mapping them to valid speakers.
-    
-    This handles the case where LLMs (especially Gemini) generate dialogue with
-    generic speaker names like "Host" or "Interviewer" instead of using the
-    configured speaker names.
-    
+
+    This handles the case where LLMs generate dialogue with generic speaker names
+    like "Host", "Interviewer", or "Guest" instead of using the configured names.
+
     For single-speaker profiles, any invalid name is mapped to the single valid speaker.
-    For multi-speaker profiles, common interviewer names are mapped to the first speaker.
-    
+    For multi-speaker profiles:
+      - Common host/interviewer names map to the first speaker
+      - Common guest names map to the second speaker
+      - Partial matches (substring of a valid name) map to that speaker
+      - Consistent unknown names are tracked so the same invented name always maps
+        to the same valid speaker, preserving conversational turns
+
     Args:
         transcript_data: The transcript dict with 'transcript' key containing dialogue list
         valid_speakers: List of valid speaker names from the speaker profile
-    
+
     Returns:
         Modified transcript_data with corrected speaker names
     """
     if not transcript_data or "transcript" not in transcript_data:
         return transcript_data
-    
-    # Common names LLMs use for interviewers/hosts
-    common_host_names = {"host", "interviewer", "moderator", "narrator", "speaker", "speaker 1", "speaker 2"}
-    
+
+    if not valid_speakers:
+        return transcript_data
+
+    # Common generic names LLMs use, categorised by role
+    common_host_names = {
+        "host", "interviewer", "moderator", "narrator", "anchor",
+        "speaker 1", "speaker1",
+    }
+    common_guest_names = {
+        "guest", "expert", "panelist", "speaker 2", "speaker2",
+    }
+
     valid_speakers_lower = {s.lower(): s for s in valid_speakers}
-    
+
+    # Track invented names so each one maps consistently to the same valid speaker
+    invented_name_map: dict[str, str] = {}
+    # Round-robin counter for truly unknown names in multi-speaker profiles
+    unknown_counter = 0
+
     for entry in transcript_data.get("transcript", []):
         if "speaker" not in entry:
             continue
-        
+
         current_speaker = entry["speaker"]
-        current_speaker_lower = current_speaker.lower()
-        
-        # If speaker is valid, no fix needed
-        if current_speaker in valid_speakers or current_speaker_lower in valid_speakers_lower:
-            # Normalize case if needed
-            if current_speaker not in valid_speakers and current_speaker_lower in valid_speakers_lower:
-                entry["speaker"] = valid_speakers_lower[current_speaker_lower]
+        current_speaker_lower = current_speaker.lower().strip()
+
+        # 1. Exact match (case-sensitive)
+        if current_speaker in valid_speakers:
             continue
-        
-        # For single-speaker profiles, map any invalid name to the single speaker
+
+        # 2. Case-insensitive match
+        if current_speaker_lower in valid_speakers_lower:
+            entry["speaker"] = valid_speakers_lower[current_speaker_lower]
+            continue
+
+        # 3. Single-speaker profile: everything maps to the one speaker
         if len(valid_speakers) == 1:
             logger.warning(
-                f"Fixing invalid speaker name '{current_speaker}' -> '{valid_speakers[0]}' "
-                f"(single-speaker profile)"
+                "Fixing speaker '{}' -> '{}' (single-speaker profile)",
+                current_speaker, valid_speakers[0],
             )
             entry["speaker"] = valid_speakers[0]
             continue
-        
-        # For multi-speaker profiles, map common host/interviewer names to first speaker
-        if current_speaker_lower in common_host_names:
+
+        # --- Multi-speaker logic below ---
+
+        # 4. Reuse mapping if we've seen this invented name before
+        if current_speaker_lower in invented_name_map:
+            entry["speaker"] = invented_name_map[current_speaker_lower]
+            continue
+
+        mapped = None
+
+        # 5. Partial / substring match against valid names
+        #    e.g. "Sarah" matches "Professor Sarah Kim", "Dr. Chen" matches "Dr. Wei Chen"
+        for vs_lower, vs_original in valid_speakers_lower.items():
+            if current_speaker_lower in vs_lower or vs_lower in current_speaker_lower:
+                mapped = vs_original
+                logger.warning(
+                    "Fixing speaker '{}' -> '{}' (partial match)",
+                    current_speaker, mapped,
+                )
+                break
+
+        # 6. Common host names -> first speaker
+        if mapped is None and current_speaker_lower in common_host_names:
+            mapped = valid_speakers[0]
             logger.warning(
-                f"Fixing host/interviewer name '{current_speaker}' -> '{valid_speakers[0]}' "
-                f"(multi-speaker profile)"
+                "Fixing host/interviewer '{}' -> '{}' (multi-speaker profile)",
+                current_speaker, mapped,
             )
-            entry["speaker"] = valid_speakers[0]
-            continue
-        
-        # For other invalid names in multi-speaker, try fuzzy matching or use first speaker
-        logger.warning(
-            f"Unknown speaker '{current_speaker}' not in valid speakers {valid_speakers}. "
-            f"Mapping to first speaker: '{valid_speakers[0]}'"
-        )
-        entry["speaker"] = valid_speakers[0]
-    
+
+        # 7. Common guest names -> second speaker (or first if only one)
+        if mapped is None and current_speaker_lower in common_guest_names:
+            mapped = valid_speakers[1] if len(valid_speakers) > 1 else valid_speakers[0]
+            logger.warning(
+                "Fixing guest '{}' -> '{}' (multi-speaker profile)",
+                current_speaker, mapped,
+            )
+
+        # 8. Truly unknown: round-robin across valid speakers to preserve turns
+        if mapped is None:
+            mapped = valid_speakers[unknown_counter % len(valid_speakers)]
+            unknown_counter += 1
+            logger.warning(
+                "Unknown speaker '{}' not in {}. Mapping to '{}'",
+                current_speaker, valid_speakers, mapped,
+            )
+
+        invented_name_map[current_speaker_lower] = mapped
+        entry["speaker"] = mapped
+
     return transcript_data
 
 
-# Patch the transcript validation in podcast_creator to fix speaker names before validation
+# Patch the transcript validation in podcast_creator to fix speaker names before validation.
+#
+# The node calls parser.invoke(text), which goes through:
+#   invoke -> _call_with_config -> parse_result -> _parse_obj -> model_validate
+# It does NOT call parse() at all. Subclassing PydanticOutputParser and overriding
+# parse() alone has no effect. Additionally, skipping super().__init__() breaks the
+# Runnable internals that invoke() depends on.
+#
+# Instead we use a thin delegating wrapper that pre-processes text to fix speaker names
+# BEFORE handing it to the original parser. This avoids all inheritance pitfalls.
 try:
     _original_create_validated_transcript_parser = podcast_core.create_validated_transcript_parser
-    
+
     def _patched_create_validated_transcript_parser(speaker_names: list[str]):
         """
-        Patched version that creates a parser with a pre-processing step to fix speaker names.
+        Patched version that wraps the original parser with speaker-name pre-processing.
         """
-        from langchain_core.output_parsers import PydanticOutputParser
-        from langchain_core.exceptions import OutputParserException
-        import json
-        
-        # Get the original parser
+        import json as _json
+
         original_parser = _original_create_validated_transcript_parser(speaker_names)
-        
-        class FixingSpeakerNamesParser(PydanticOutputParser):
-            """Parser that fixes speaker names before validation."""
-            
+
+        class FixingSpeakerNamesParser:
+            """Delegating wrapper that fixes speaker names before the original parser validates."""
+
             def __init__(self, original, valid_speakers):
-                # Don't call super().__init__() - we're wrapping the original
                 self._original = original
                 self._valid_speakers = valid_speakers
+                # Expose attributes that callers or LangChain internals may inspect
                 self.pydantic_object = original.pydantic_object
-            
-            def parse(self, text: str):
-                """Parse with speaker name fixing."""
+
+            # ----------------------------------------------------------
+            # Pre-processing helper
+            # ----------------------------------------------------------
+            def _preprocess(self, text: str) -> str:
+                """Fix speaker names in JSON text before validation."""
                 try:
-                    # First try the original parser
-                    return self._original.parse(text)
-                except OutputParserException as e:
-                    # If it's a speaker validation error, try to fix it
-                    if "Invalid speaker name" in str(e):
-                        logger.warning(f"Speaker validation failed, attempting to fix speaker names...")
-                        try:
-                            # Extract JSON from text
-                            cleaned = _strip_thinking_tags_and_extract_json(text)
-                            data = json.loads(cleaned)
-                            
-                            # Fix speaker names
-                            fixed_data = _fix_speaker_names_in_transcript(data, self._valid_speakers)
-                            
-                            # Re-validate with fixed data
-                            return self.pydantic_object.model_validate(fixed_data)
-                        except Exception as fix_error:
-                            logger.error("Failed to fix speaker names: {}", str(fix_error))
-                            raise e
-                    raise
-            
+                    cleaned = _strip_thinking_tags_and_extract_json(text)
+                    data = _json.loads(cleaned)
+                    fixed = _fix_speaker_names_in_transcript(data, self._valid_speakers)
+                    return _json.dumps(fixed, ensure_ascii=False)
+                except Exception:
+                    # If pre-processing fails, return original text and let
+                    # the original parser produce a clear error.
+                    return text
+
+            # ----------------------------------------------------------
+            # Public API — every method the node or LangChain may call
+            # ----------------------------------------------------------
+            def invoke(self, input, config=None, **kwargs):
+                """Pre-process then delegate to original parser.invoke()."""
+                if isinstance(input, str):
+                    input = self._preprocess(input)
+                return self._original.invoke(input, config=config, **kwargs)
+
+            async def ainvoke(self, input, config=None, **kwargs):
+                """Async variant — pre-process then delegate."""
+                if isinstance(input, str):
+                    input = self._preprocess(input)
+                return await self._original.ainvoke(input, config=config, **kwargs)
+
+            def parse(self, text: str):
+                """Pre-process then delegate to original parser.parse()."""
+                return self._original.parse(self._preprocess(text))
+
+            def parse_result(self, result, *, partial=False):
+                """Delegate parse_result (called by invoke internally)."""
+                return self._original.parse_result(result, partial=partial)
+
             def get_format_instructions(self):
                 return self._original.get_format_instructions()
-        
+
+            # Delegate any other attribute access to the original parser
+            # (e.g. OutputFixingParser checks, LangChain tracing attributes, etc.)
+            def __getattr__(self, name):
+                return getattr(self._original, name)
+
         return FixingSpeakerNamesParser(original_parser, speaker_names)
-    
-    # Apply the patch
+
+    # Apply the patch to both the core module and the nodes module.
+    # The nodes module imports create_validated_transcript_parser at the top level
+    # (from .core import create_validated_transcript_parser), so it holds its own
+    # reference that must also be replaced.
     podcast_core.create_validated_transcript_parser = _patched_create_validated_transcript_parser
-    logger.info("Applied podcast-creator speaker name fixing patch")
-    
+    podcast_nodes.create_validated_transcript_parser = _patched_create_validated_transcript_parser
+    logger.info("Applied podcast-creator speaker name fixing patch to core and nodes modules")
+
 except AttributeError:
     logger.warning("Could not find create_validated_transcript_parser in podcast_creator.core - skipping speaker fix patch")
 except Exception as e:
@@ -351,6 +433,104 @@ except ImportError:
     logger.warning("Could not import esperanto.AIFactory - skipping model config patch")
 except Exception as e:
     logger.warning("Failed to patch AIFactory.create_language: {}", str(e))
+
+
+# Patch generate_single_audio_clip to add retry with backoff for TTS rate limits.
+#
+# Google's Gemini TTS has a low rate limit (e.g. 10 req/min). The podcast-creator
+# fires multiple TTS requests concurrently per batch. When the limit is hit, the
+# error message includes "Please retry in Xs", so we parse that delay and wait.
+import asyncio as _asyncio
+
+_RETRY_DELAY_PATTERN = re.compile(r"retry in ([\d.]+)s", re.IGNORECASE)
+_TTS_MAX_RETRIES = int(os.environ.get("TTS_MAX_RETRIES", "5"))
+_TTS_DEFAULT_RETRY_DELAY = float(os.environ.get("TTS_DEFAULT_RETRY_DELAY", "15"))
+
+try:
+    _original_generate_single_audio_clip = podcast_nodes.generate_single_audio_clip
+
+    # Exception types that are always retryable (network/connection issues).
+    # These often have empty str() representations so keyword matching won't work.
+    _RETRYABLE_EXCEPTION_TYPES: tuple = ()
+    try:
+        import httpx
+        import httpcore
+        _RETRYABLE_EXCEPTION_TYPES = (
+            httpx.ConnectError,
+            httpx.TimeoutException,
+            httpx.NetworkError,
+            httpcore.ConnectError,
+            httpcore.TimeoutException,
+            httpcore.NetworkError,
+            ConnectionError,
+            TimeoutError,
+            OSError,
+        )
+    except ImportError:
+        _RETRYABLE_EXCEPTION_TYPES = (ConnectionError, TimeoutError, OSError)
+
+    async def _retrying_generate_single_audio_clip(dialogue_info):
+        """Wrapper around generate_single_audio_clip with retry on transient TTS errors."""
+        import random
+
+        last_error = None
+        for attempt in range(1, _TTS_MAX_RETRIES + 1):
+            try:
+                return await _original_generate_single_audio_clip(dialogue_info)
+            except Exception as e:
+                # Check by exception type first (covers network/connection errors
+                # whose str() is often empty)
+                is_retryable = isinstance(e, _RETRYABLE_EXCEPTION_TYPES)
+
+                # Then check by error message keywords
+                if not is_retryable:
+                    error_msg = str(e).lower()
+                    is_retryable = (
+                        # Rate limits
+                        "quota" in error_msg
+                        or "rate" in error_msg
+                        or "429" in error_msg
+                        or "resource exhausted" in error_msg
+                        # Transient server errors
+                        or "internal error" in error_msg
+                        or "500" in error_msg
+                        or "503" in error_msg
+                        or "service unavailable" in error_msg
+                        or "please retry" in error_msg
+                        or "server error" in error_msg
+                        or "temporarily unavailable" in error_msg
+                        # Connection errors by message
+                        or "connect" in error_msg
+                        or "timeout" in error_msg
+                    )
+
+                if not is_retryable:
+                    raise  # Permanent error — don't retry
+
+                last_error = e
+
+                # Parse suggested delay from the error message, or use default
+                match = _RETRY_DELAY_PATTERN.search(str(e))
+                delay = float(match.group(1)) + 1.0 if match else _TTS_DEFAULT_RETRY_DELAY
+                # Add jitter: +0-3s to avoid thundering herd from concurrent clips
+                delay += random.uniform(0, 3)
+
+                logger.warning(
+                    "TTS error (attempt {}/{}): [{}] {}. Waiting {:.1f}s before retry...",
+                    attempt, _TTS_MAX_RETRIES, type(e).__name__, str(e)[:120], delay,
+                )
+                await _asyncio.sleep(delay)
+
+        # Exhausted all retries
+        raise last_error  # type: ignore[misc]
+
+    podcast_nodes.generate_single_audio_clip = _retrying_generate_single_audio_clip
+    logger.info("Applied TTS rate-limit retry patch to generate_single_audio_clip")
+
+except AttributeError:
+    logger.warning("Could not find generate_single_audio_clip in podcast_creator.nodes - skipping TTS retry patch")
+except Exception as e:
+    logger.warning("Failed to patch generate_single_audio_clip: {}", str(e))
 
 
 def full_model_dump(model):

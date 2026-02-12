@@ -100,10 +100,7 @@ async def get_podcast_job_status(job_id: str):
     """
     try:
         logger.debug(f"Getting podcast job status for job_id: {job_id}")
-        # Remove command: prefix if present (for compatibility)
-        clean_job_id = job_id.replace("command:", "") if job_id.startswith("command:") else job_id
-        logger.debug(f"Cleaned job_id: {clean_job_id}")
-        status_data = await PodcastService.get_job_status(clean_job_id)
+        status_data = await PodcastService.get_job_status(job_id)
         return status_data
 
     except HTTPException:
