@@ -92,7 +92,7 @@ async def generate_quiz_artifact(notebook_id: str) -> Tuple[str, Optional[str], 
         return ("completed", quiz_id, None)
 
     except Exception as e:
-        logger.error(f"Quiz generation exception: {e}")
+        logger.error("Quiz generation exception: {}", str(e))
         logger.exception(e)
         return ("error", None, str(e))
 
@@ -188,7 +188,7 @@ async def generate_summary_artifact(notebook_id: str) -> Tuple[str, Optional[str
         return ("completed", note.id, None)
 
     except Exception as e:
-        logger.error(f"Summary generation exception: {e}")
+        logger.error("Summary generation exception: {}", str(e))
         logger.exception(e)
         return ("error", None, str(e))
 
@@ -235,7 +235,7 @@ async def generate_podcast_artifact(notebook_id: str) -> Tuple[str, Optional[str
         return ("processing", command_id, artifact_ids, None)
 
     except Exception as e:
-        logger.error(f"Podcast generation exception: {e}")
+        logger.error("Podcast generation exception: {}", str(e))
         logger.exception(e)
         return ("error", None, [], str(e))
 
@@ -264,7 +264,7 @@ async def get_or_create_summary_transformation() -> Optional[Transformation]:
         return summary
 
     except Exception as e:
-        logger.error(f"Error getting/creating summary transformation: {e}")
+        logger.error("Error getting/creating summary transformation: {}", str(e))
         return None
 
 
@@ -312,7 +312,7 @@ async def generate_all_artifacts(notebook_id: str) -> BatchGenerationStatus:
         if isinstance(results[0], Exception):
             status.quiz_status = "error"
             status.quiz_error = str(results[0])
-            logger.error(f"Quiz generation failed with exception: {results[0]}")
+            logger.error("Quiz generation failed with exception: {}", str(results[0]))
         else:
             quiz_status, quiz_id, quiz_error = results[0]
             status.quiz_status = quiz_status
@@ -323,7 +323,7 @@ async def generate_all_artifacts(notebook_id: str) -> BatchGenerationStatus:
         if isinstance(results[1], Exception):
             status.summary_status = "error"
             status.summary_error = str(results[1])
-            logger.error(f"Summary generation failed with exception: {results[1]}")
+            logger.error("Summary generation failed with exception: {}", str(results[1]))
         else:
             summary_status, summary_id, summary_error = results[1]
             status.summary_status = summary_status
@@ -345,7 +345,7 @@ async def generate_all_artifacts(notebook_id: str) -> BatchGenerationStatus:
         return status
 
     except Exception as e:
-        logger.error(f"Batch generation failed with unexpected error: {e}")
+        logger.error("Batch generation failed with unexpected error: {}", str(e))
         logger.exception(e)
         status.quiz_status = "error"
         status.quiz_error = f"Unexpected error: {str(e)}"

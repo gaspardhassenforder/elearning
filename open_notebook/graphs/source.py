@@ -72,7 +72,7 @@ async def content_process(state: SourceState) -> dict:
                     f"Using speech-to-text model: {stt_model.provider}/{stt_model.name}"
                 )
     except Exception as e:
-        logger.warning(f"Failed to retrieve speech-to-text model configuration: {e}")
+        logger.warning("Failed to retrieve speech-to-text model configuration: {}", str(e))
         # Continue without custom audio model (content-core will use its default)
 
     processed_state = await extract_content(content_state)

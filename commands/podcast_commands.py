@@ -16,7 +16,7 @@ try:
     import podcast_creator.core as podcast_core
     import podcast_creator.nodes as podcast_nodes
 except ImportError as e:
-    logger.error(f"Failed to import podcast_creator: {e}")
+    logger.error("Failed to import podcast_creator: {}", str(e))
     raise ValueError("podcast_creator library not available")
 
 # Compile regex pattern once for better performance - handles both <think> and variations
@@ -249,7 +249,7 @@ try:
                             # Re-validate with fixed data
                             return self.pydantic_object.model_validate(fixed_data)
                         except Exception as fix_error:
-                            logger.error(f"Failed to fix speaker names: {fix_error}")
+                            logger.error("Failed to fix speaker names: {}", str(fix_error))
                             raise e
                     raise
             
@@ -265,7 +265,7 @@ try:
 except AttributeError:
     logger.warning("Could not find create_validated_transcript_parser in podcast_creator.core - skipping speaker fix patch")
 except Exception as e:
-    logger.warning(f"Failed to patch create_validated_transcript_parser: {e}")
+    logger.warning("Failed to patch create_validated_transcript_parser: {}", str(e))
 
 
 # Patch AIFactory.create_language to disable thinking for Gemini models
@@ -350,7 +350,7 @@ try:
 except ImportError:
     logger.warning("Could not import esperanto.AIFactory - skipping model config patch")
 except Exception as e:
-    logger.warning(f"Failed to patch AIFactory.create_language: {e}")
+    logger.warning("Failed to patch AIFactory.create_language: {}", str(e))
 
 
 def full_model_dump(model):
@@ -528,7 +528,7 @@ async def generate_podcast_command(
                         f"Created {len(input_data.notebook_ids)} new artifact links for podcast {episode.id}"
                     )
             except Exception as artifact_error:
-                logger.warning(f"Failed to update artifact records: {artifact_error}")
+                logger.warning("Failed to update artifact records: {}", str(artifact_error))
 
         processing_time = time.time() - start_time
         logger.info(
@@ -552,7 +552,7 @@ async def generate_podcast_command(
 
     except Exception as e:
         processing_time = time.time() - start_time
-        logger.error(f"Podcast generation failed: {e}")
+        logger.error("Podcast generation failed: {}", str(e))
         logger.exception(e)
 
         # Check for specific GPT-5 extended thinking issue

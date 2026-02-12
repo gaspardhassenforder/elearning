@@ -231,6 +231,9 @@ async def prepare_chat_context(
 
     # 1. Load learner profile from User.profile field (Story 1.4 questionnaire)
     learner_profile = {
+        "name": learner.user.profile.get("name", learner.user.username)
+        if learner.user.profile
+        else learner.user.username,
         "role": learner.user.profile.get("role", "Unknown")
         if learner.user.profile
         else "Unknown",

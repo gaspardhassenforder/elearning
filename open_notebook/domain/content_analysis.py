@@ -53,7 +53,7 @@ class ContentAnalysis(ObjectModel):
                 return cls(**result[0])
             return None
         except Exception as e:
-            logger.error(f"Error fetching content analysis for {content_id}: {e}")
+            logger.error("Error fetching content analysis for {}: {}", content_id, str(e))
             return None
 
     @classmethod
@@ -76,7 +76,7 @@ class ContentAnalysis(ObjectModel):
             )
             return [cls(**item) for item in result] if result else []
         except Exception as e:
-            logger.error(f"Error batch fetching content analyses: {e}")
+            logger.error("Error batch fetching content analyses: {}", str(e))
             return []
 
     @classmethod
@@ -97,5 +97,5 @@ class ContentAnalysis(ObjectModel):
             logger.info(f"Invalidated content analysis cache for {content_id}")
             return True
         except Exception as e:
-            logger.error(f"Error deleting content analysis for {content_id}: {e}")
+            logger.error("Error deleting content analysis for {}: {}", content_id, str(e))
             raise DatabaseOperationError(e)

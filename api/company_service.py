@@ -58,7 +58,7 @@ async def list_companies() -> List[CompanyResponse]:
                 if company_id:
                     user_counts[company_id] = row.get("count", 0)
         except Exception as e:
-            logger.warning(f"Error getting user counts: {e}")
+            logger.warning("Error getting user counts: {}", str(e))
 
         # Build response with counts
         response = []
@@ -75,7 +75,7 @@ async def list_companies() -> List[CompanyResponse]:
 
         return response
     except Exception as e:
-        logger.error(f"Error listing companies: {e}")
+        logger.error("Error listing companies: {}", str(e))
         raise
 
 
@@ -98,7 +98,7 @@ async def get_company(company_id: str) -> Optional[CompanyResponse]:
             updated=str(company.updated),
         )
     except Exception as e:
-        logger.error(f"Error getting company {company_id}: {e}")
+        logger.error("Error getting company {}: {}", company_id, str(e))
         raise
 
 
@@ -129,7 +129,7 @@ async def update_company(
         logger.info(f"Company updated: {company.name}")
         return company
     except Exception as e:
-        logger.error(f"Error updating company {company_id}: {e}")
+        logger.error("Error updating company {}: {}", company_id, str(e))
         raise
 
 
@@ -171,7 +171,7 @@ async def delete_company(company_id: str) -> bool:
     except ValueError:
         raise
     except Exception as e:
-        logger.error(f"Error deleting company {company_id}: {e}")
+        logger.error("Error deleting company {}: {}", company_id, str(e))
         # If module_assignment table doesn't exist yet, that's OK (Story 2.2 not done)
         if "does not exist" in str(e).lower() or "not found" in str(e).lower():
             logger.debug("module_assignment table not found - Story 2.2 not implemented yet")
@@ -181,6 +181,6 @@ async def delete_company(company_id: str) -> bool:
                 logger.info(f"Company deleted: {company.name}")
                 return True
             except Exception as delete_error:
-                logger.error(f"Final delete failed: {delete_error}")
+                logger.error("Final delete failed: {}", str(delete_error))
                 raise
         raise

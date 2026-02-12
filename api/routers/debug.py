@@ -183,7 +183,7 @@ async def get_errors(
         )
 
     except Exception as e:
-        logger.error(f"Error retrieving error logs: {e}", exc_info=True)
+        logger.error("Error retrieving error logs: {}", str(e), exc_info=True)
         raise HTTPException(
             status_code=500,
             detail="Failed to retrieve error logs. Check server logs for details."

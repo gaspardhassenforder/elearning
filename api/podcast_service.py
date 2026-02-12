@@ -83,7 +83,7 @@ class PodcastService:
                     )
                 except Exception as e:
                     logger.warning(
-                        f"Failed to get notebook content, using notebook_id as content: {e}"
+                        "Failed to get notebook content, using notebook_id as content: {}", str(e)
                     )
                     content = f"Notebook ID: {notebook_id}"
 
@@ -114,7 +114,7 @@ class PodcastService:
             try:
                 import commands.podcast_commands  # noqa: F401
             except ImportError as import_err:
-                logger.error(f"Failed to import podcast commands: {import_err}")
+                logger.error("Failed to import podcast commands: {}", str(import_err))
                 raise ValueError("Podcast commands not available")
 
             # Submit command to surreal-commands
@@ -144,7 +144,7 @@ class PodcastService:
                         f"Created artifact {artifact.id} for podcast job {job_id_str} in notebook {nb_id}"
                     )
                 except Exception as artifact_err:
-                    logger.warning(f"Failed to create artifact record for notebook {nb_id}: {artifact_err}")
+                    logger.warning("Failed to create artifact record for notebook {}: {}", nb_id, str(artifact_err))
             
             logger.info(
                 f"Submitted podcast generation job: {job_id_str} for episode '{episode_name}' "
@@ -153,7 +153,7 @@ class PodcastService:
             return job_id_str, artifact_ids
 
         except Exception as e:
-            logger.error(f"Failed to submit podcast generation job: {e}")
+            logger.error("Failed to submit podcast generation job: {}", str(e))
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to submit podcast generation job: {str(e)}",
@@ -199,7 +199,7 @@ class PodcastService:
                 "progress": getattr(status, "progress", None) if status else None,
             }
         except Exception as e:
-            logger.error(f"Failed to get podcast job status for {job_id}: {e}")
+            logger.error("Failed to get podcast job status for {}: {}", job_id, str(e))
             logger.exception(e)
             raise HTTPException(
                 status_code=500, detail=f"Failed to get job status: {str(e)}"
@@ -212,7 +212,7 @@ class PodcastService:
             episodes = await PodcastEpisode.get_all(order_by="created desc")
             return episodes
         except Exception as e:
-            logger.error(f"Failed to list podcast episodes: {e}")
+            logger.error("Failed to list podcast episodes: {}", str(e))
             raise HTTPException(
                 status_code=500, detail=f"Failed to list episodes: {str(e)}"
             )
@@ -224,7 +224,7 @@ class PodcastService:
             episode = await PodcastEpisode.get(episode_id)
             return episode
         except Exception as e:
-            logger.error(f"Failed to get podcast episode {episode_id}: {e}")
+            logger.error("Failed to get podcast episode {}: {}", episode_id, str(e))
             raise HTTPException(status_code=404, detail=f"Episode not found: {str(e)}")
 
 
@@ -249,7 +249,7 @@ class DefaultProfiles:
             return []
 
         except Exception as e:
-            logger.error(f"Failed to create default episode profiles: {e}")
+            logger.error("Failed to create default episode profiles: {}", str(e))
             raise
 
     @staticmethod
@@ -270,5 +270,5 @@ class DefaultProfiles:
             return []
 
         except Exception as e:
-            logger.error(f"Failed to create default speaker profiles: {e}")
+            logger.error("Failed to create default speaker profiles: {}", str(e))
             raise

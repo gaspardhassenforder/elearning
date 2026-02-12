@@ -60,7 +60,7 @@ async def delete_user_cascade(user_id: str) -> UserDeletionReport:
     try:
         report.deleted_checkpoints = delete_user_checkpoints(user_id)
     except Exception as e:
-        logger.warning(f"Failed to delete checkpoints for {user_id}: {e}")
+        logger.warning("Failed to delete checkpoints for {}: {}", user_id, str(e))
         # Continue deletion even if checkpoints fail
 
     # Delete user-created quizzes

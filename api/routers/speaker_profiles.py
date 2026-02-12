@@ -38,7 +38,7 @@ async def list_speaker_profiles():
         ]
 
     except Exception as e:
-        logger.error(f"Failed to fetch speaker profiles: {e}")
+        logger.error("Failed to fetch speaker profiles: {}", str(e))
         raise HTTPException(
             status_code=500, detail="Failed to fetch speaker profiles"
         )
@@ -67,7 +67,7 @@ async def get_speaker_profile(profile_name: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to fetch speaker profile '{profile_name}': {e}")
+        logger.error("Failed to fetch speaker profile '{}': {}", profile_name, str(e))
         raise HTTPException(
             status_code=500, detail="Failed to fetch speaker profile"
         )
@@ -107,7 +107,7 @@ async def create_speaker_profile(profile_data: SpeakerProfileCreate):
         )
 
     except Exception as e:
-        logger.error(f"Failed to create speaker profile: {e}")
+        logger.error("Failed to create speaker profile: {}", str(e))
         raise HTTPException(
             status_code=500, detail="Failed to create speaker profile"
         )
@@ -145,7 +145,7 @@ async def update_speaker_profile(profile_id: str, profile_data: SpeakerProfileCr
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to update speaker profile: {e}")
+        logger.error("Failed to update speaker profile: {}", str(e))
         raise HTTPException(
             status_code=500, detail="Failed to update speaker profile"
         )
@@ -169,7 +169,7 @@ async def delete_speaker_profile(profile_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to delete speaker profile: {e}")
+        logger.error("Failed to delete speaker profile: {}", str(e))
         raise HTTPException(
             status_code=500, detail="Failed to delete speaker profile"
         )
@@ -211,7 +211,7 @@ async def duplicate_speaker_profile(profile_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to duplicate speaker profile: {e}")
+        logger.error("Failed to duplicate speaker profile: {}", str(e))
         raise HTTPException(
             status_code=500, detail="Failed to duplicate speaker profile"
         )

@@ -59,11 +59,11 @@ class ObjectModel(BaseModel):
                 try:
                     objects.append(target_class(**obj))
                 except Exception as e:
-                    logger.critical(f"Error creating object: {str(e)}")
+                    logger.critical("Error creating object: {}", str(e))
 
             return objects
         except Exception as e:
-            logger.error(f"Error fetching all {cls.table_name}: {str(e)}")
+            logger.error("Error fetching all {}: {}", cls.table_name, str(e))
             logger.exception(e)
             raise DatabaseOperationError(e)
 
@@ -94,7 +94,7 @@ class ObjectModel(BaseModel):
             else:
                 raise NotFoundError(f"{table_name} with id {id} not found")
         except Exception as e:
-            logger.error(f"Error fetching object with id {id}: {str(e)}")
+            logger.error("Error fetching object with id {}: {}", id, str(e))
             logger.exception(e)
             raise NotFoundError(f"Object with id {id} not found - {str(e)}")
 
@@ -186,13 +186,13 @@ class ObjectModel(BaseModel):
                         setattr(self, key, value)
 
         except ValidationError as e:
-            logger.error(f"Validation failed: {e}")
+            logger.error("Validation failed: {}", str(e))
             raise
         except RuntimeError:
             # Transaction conflicts should propagate for retry
             raise
         except Exception as e:
-            logger.error(f"Error saving record: {e}")
+            logger.error("Error saving record: {}", str(e))
             raise DatabaseOperationError(e)
 
     def _prepare_save_data(self) -> Dict[str, Any]:
@@ -214,7 +214,7 @@ class ObjectModel(BaseModel):
             return await repo_delete(self.id)
         except Exception as e:
             logger.error(
-                f"Error deleting {self.__class__.table_name} with id {self.id}: {str(e)}"
+                "Error deleting {} with id {}: {}", self.__class__.table_name, self.id, str(e)
             )
             raise DatabaseOperationError(
                 f"Failed to delete {self.__class__.table_name}"
@@ -230,7 +230,7 @@ class ObjectModel(BaseModel):
                 source=self.id, relationship=relationship, target=target_id, data=data
             )
         except Exception as e:
-            logger.error(f"Error creating relationship: {str(e)}")
+            logger.error("Error creating relationship: {}", str(e))
             logger.exception(e)
             raise DatabaseOperationError(e)
 

@@ -289,7 +289,7 @@ async def analyze_all_content(state: ObjectiveGenerationState) -> dict:
                         analyses.append(analysis)
                 except Exception as e:
                     logger.warning(
-                        f"Failed to analyze artifact {artifact_id}: {e}"
+                        "Failed to analyze artifact {}: {}", artifact_id, str(e)
                     )
                     continue
 
@@ -307,7 +307,7 @@ async def analyze_all_content(state: ObjectiveGenerationState) -> dict:
         }
 
     except Exception as e:
-        logger.error(f"Error analyzing content: {e}")
+        logger.error("Error analyzing content: {}", str(e))
         logger.exception(e)
         return {
             "error": f"Failed to analyze content: {str(e)}",
@@ -382,7 +382,7 @@ async def aggregate_objectives(state: ObjectiveGenerationState) -> dict:
         }
 
     except Exception as e:
-        logger.error(f"Error aggregating objectives: {e}")
+        logger.error("Error aggregating objectives: {}", str(e))
         logger.exception(e)
         return {
             "error": f"Failed to aggregate objectives: {str(e)}",
@@ -430,7 +430,7 @@ async def save_objectives(state: ObjectiveGenerationState) -> dict:
         }
 
     except Exception as e:
-        logger.error(f"Error saving objectives: {e}")
+        logger.error("Error saving objectives: {}", str(e))
         logger.exception(e)
         return {
             "error": f"Failed to save objectives: {str(e)}",

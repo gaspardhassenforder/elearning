@@ -102,7 +102,7 @@ class TokenTrackingCallback(BaseCallbackHandler):
         except Exception as e:
             # Log error but don't raise - token tracking failure should not block workflow
             logger.warning(
-                f"Failed to capture token usage for {self.operation_type}: {e}"
+                "Failed to capture token usage for {}: {}", self.operation_type, str(e)
             )
 
     def _extract_token_usage(self, response: LLMResult) -> Optional[Dict[str, int]]:
@@ -208,7 +208,7 @@ class TokenTrackingCallback(BaseCallbackHandler):
                 f"{usage_record.output_tokens} out ({usage_record.operation_type})"
             )
         except Exception as e:
-            logger.error(f"Failed to save TokenUsage record: {e}")
+            logger.error("Failed to save TokenUsage record: {}", str(e))
 
     def _handle_task_exception(self, task) -> None:
         """
@@ -221,8 +221,8 @@ class TokenTrackingCallback(BaseCallbackHandler):
             exception = task.exception()
             if exception:
                 logger.error(
-                    f"Unhandled exception in token usage save task: {exception}"
+                    "Unhandled exception in token usage save task: {}", str(exception)
                 )
         except Exception as e:
             # task.exception() itself can raise if task was cancelled
-            logger.error(f"Error checking task exception: {e}")
+            logger.error("Error checking task exception: {}", str(e))

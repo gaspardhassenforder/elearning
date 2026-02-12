@@ -175,7 +175,7 @@ async def assemble_system_prompt(
 
     Args:
         notebook_id: Notebook/module record ID
-        learner_profile: Dict with 'role', 'ai_familiarity', 'job' (optional)
+        learner_profile: Dict with 'name', 'role', 'ai_familiarity', 'job_description' (optional)
         objectives_with_status: List of dicts with 'text' and 'status'
         context: Optional context string (available documents, etc.)
         current_focus_objective: Optional explicit focus objective (auto-determined if None)

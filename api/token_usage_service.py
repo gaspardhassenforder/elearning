@@ -51,7 +51,7 @@ async def get_company_token_usage(
         if not company:
             raise ValueError(f"Company {company_id} not found")
     except Exception as e:
-        logger.error(f"Error loading company {company_id}: {e}")
+        logger.error("Error loading company {}: {}", company_id, str(e))
         raise ValueError(f"Company {company_id} not found")
 
     # Get aggregated usage
@@ -105,7 +105,7 @@ async def get_notebook_token_usage(
         if not notebook:
             raise ValueError(f"Notebook {notebook_id} not found")
     except Exception as e:
-        logger.error(f"Error loading notebook {notebook_id}: {e}")
+        logger.error("Error loading notebook {}: {}", notebook_id, str(e))
         raise ValueError(f"Notebook {notebook_id} not found")
 
     # Get aggregated usage from domain model
@@ -243,7 +243,7 @@ async def get_platform_token_usage(
             company = await Company.get(company_id)
             company_name = company.name if company else None
         except Exception as e:
-            logger.warning(f"Could not load company {company_id}: {e}")
+            logger.warning("Could not load company {}: {}", company_id, str(e))
             company_name = None
 
         total_ops = sum(op["count"] for op in data["by_operation"].values())

@@ -146,7 +146,7 @@ async def list_users() -> List["UserListResponse"]:
 
         return users
     except Exception as e:
-        logger.error(f"Error listing users: {e}")
+        logger.error("Error listing users: {}", str(e))
         raise
 
 

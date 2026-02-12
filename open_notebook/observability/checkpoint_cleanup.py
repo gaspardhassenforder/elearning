@@ -52,7 +52,7 @@ def delete_user_checkpoints(user_id: str) -> int:
         return thread_count
 
     except sqlite3.Error as e:
-        logger.warning(f"Failed to delete checkpoints for {user_id}: {e}")
+        logger.warning("Failed to delete checkpoints for {}: {}", user_id, str(e))
         return 0
 
 
@@ -81,5 +81,5 @@ def list_user_checkpoint_threads(user_id: str) -> List[str]:
         return threads
 
     except sqlite3.Error as e:
-        logger.error(f"Failed to list checkpoints for {user_id}: {e}")
+        logger.error("Failed to list checkpoints for {}: {}", user_id, str(e))
         return []

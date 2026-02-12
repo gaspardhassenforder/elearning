@@ -84,7 +84,7 @@ async def update_module_prompt(
         return prompt
 
     except Exception as e:
-        logger.error(f"Failed to update module prompt for notebook {notebook_id}: {e}")
+        logger.error("Failed to update module prompt for notebook {}: {}", notebook_id, str(e))
         logger.exception(e)
         raise HTTPException(
             status_code=500,

@@ -283,7 +283,7 @@ async def get_objectives_with_progress(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error validating learner access to notebook {notebook_id}: {e}")
+        logger.error("Error validating learner access to notebook {}: {}", notebook_id, str(e))
         raise HTTPException(status_code=500, detail="Failed to validate notebook access")
 
     try:
@@ -308,7 +308,7 @@ async def get_objectives_with_progress(
         ]
 
     except Exception as e:
-        logger.error(f"Error fetching objectives with progress for notebook {notebook_id}: {e}")
+        logger.error("Error fetching objectives with progress for notebook {}: {}", notebook_id, str(e))
         raise HTTPException(
             status_code=500, detail="Failed to fetch learning objectives"
         )

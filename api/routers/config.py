@@ -36,7 +36,7 @@ def get_version() -> str:
             pyproject = tomllib.load(f)
             return pyproject.get("project", {}).get("version", "unknown")
     except Exception as e:
-        logger.warning(f"Could not read version from pyproject.toml: {e}")
+        logger.warning("Could not read version from pyproject.toml: {}", str(e))
         return "unknown"
 
 
@@ -88,7 +88,7 @@ async def get_latest_version_cached(current_version: str) -> tuple[Optional[str]
         return latest_version, has_update
 
     except Exception as e:
-        logger.warning(f"Version check failed: {e}")
+        logger.warning("Version check failed: {}", str(e))
 
         # Cache the failure to avoid repeated attempts
         _version_cache["latest_version"] = None
@@ -116,7 +116,7 @@ async def check_database_health() -> dict:
         logger.warning("Database health check timed out after 2 seconds")
         return {"status": "offline", "error": "Health check timeout"}
     except Exception as e:
-        logger.warning(f"Database health check failed: {e}")
+        logger.warning("Database health check failed: {}", str(e))
         return {"status": "offline", "error": str(e)}
 
 
@@ -143,7 +143,7 @@ async def get_config(request: Request):
         latest_version, has_update = await get_latest_version_cached(current_version)
     except Exception as e:
         # Extra safety: ensure version check never breaks the config endpoint
-        logger.error(f"Unexpected error during version check: {e}")
+        logger.error("Unexpected error during version check: {}", str(e))
 
     # Check database health
     db_health = await check_database_health()

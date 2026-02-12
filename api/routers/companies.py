@@ -40,10 +40,10 @@ async def create_company_endpoint(
             updated=str(company.updated),
         )
     except ValueError as e:
-        logger.error(f"Company creation failed: {e}")
+        logger.error("Company creation failed: {}", str(e))
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Unexpected error creating company: {e}")
+        logger.error("Unexpected error creating company: {}", str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -53,7 +53,7 @@ async def get_companies(_admin: User = Depends(require_admin)):
     try:
         return await list_companies()
     except Exception as e:
-        logger.error(f"Error listing companies: {e}")
+        logger.error("Error listing companies: {}", str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -68,7 +68,7 @@ async def get_company_endpoint(company_id: str, _admin: User = Depends(require_a
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error fetching company {company_id}: {e}")
+        logger.error("Error fetching company {}: {}", company_id, str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -94,12 +94,12 @@ async def update_company_endpoint(
             updated=str(company.updated),
         )
     except ValueError as e:
-        logger.error(f"Company update failed: {e}")
+        logger.error("Company update failed: {}", str(e))
         raise HTTPException(status_code=400, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Unexpected error updating company: {e}")
+        logger.error("Unexpected error updating company: {}", str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -124,7 +124,7 @@ async def preview_company_deletion(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        logger.error(f"Error getting deletion summary for {company_id}: {e}")
+        logger.error("Error getting deletion summary for {}: {}", company_id, str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -178,5 +178,5 @@ async def delete_company_endpoint(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        logger.error(f"Error deleting company {company_id}: {e}")
+        logger.error("Error deleting company {}: {}", company_id, str(e))
         raise HTTPException(status_code=500, detail="Internal server error")

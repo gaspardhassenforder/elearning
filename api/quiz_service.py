@@ -66,7 +66,7 @@ async def get_quiz(quiz_id: str) -> Optional[Quiz]:
             logger.info(f"First question: {quiz.questions[0].question[:50]}...")
         return quiz
     except Exception as e:
-        logger.error(f"Error getting quiz {quiz_id}: {e}")
+        logger.error("Error getting quiz {}: {}", quiz_id, str(e))
         logger.exception(e)
         return None
 
@@ -86,7 +86,7 @@ async def get_notebook_quizzes(notebook_id: str) -> List[Quiz]:
         )
         return [Quiz(**r) for r in result] if result else []
     except Exception as e:
-        logger.error(f"Error getting quizzes for notebook {notebook_id}: {e}")
+        logger.error("Error getting quizzes for notebook {}: {}", notebook_id, str(e))
         return []
 
 
@@ -110,7 +110,7 @@ async def delete_quiz(quiz_id: str) -> bool:
         logger.info(f"Deleted quiz {quiz_id}")
         return True
     except Exception as e:
-        logger.error(f"Error deleting quiz {quiz_id}: {e}")
+        logger.error("Error deleting quiz {}: {}", quiz_id, str(e))
         return False
 
 

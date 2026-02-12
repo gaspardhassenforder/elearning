@@ -60,7 +60,7 @@ async def get_notebooks(
                 count = await LearningObjective.count_for_notebook(nb_id)
                 objectives_counts[nb_id] = count
             except Exception as e:
-                logger.warning(f"Failed to get objectives count for {nb_id}: {e}")
+                logger.warning("Failed to get objectives count for {}: {}", nb_id, str(e))
                 objectives_counts[nb_id] = 0
 
         return [
@@ -79,7 +79,7 @@ async def get_notebooks(
             for nb in result
         ]
     except Exception as e:
-        logger.error(f"Error fetching notebooks: {str(e)}")
+        logger.error("Error fetching notebooks: {}", str(e))
         raise HTTPException(
             status_code=500, detail=f"Error fetching notebooks: {str(e)}"
         )
@@ -110,7 +110,7 @@ async def create_notebook(notebook: NotebookCreate, admin: User = Depends(requir
     except InvalidInputError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Error creating notebook: {str(e)}")
+        logger.error("Error creating notebook: {}", str(e))
         raise HTTPException(
             status_code=500, detail=f"Error creating notebook: {str(e)}"
         )
@@ -140,7 +140,7 @@ async def get_notebook(notebook_id: str):
         try:
             objectives_count = await LearningObjective.count_for_notebook(nb_id)
         except Exception as e:
-            logger.warning(f"Failed to get objectives count for {nb_id}: {e}")
+            logger.warning("Failed to get objectives count for {}: {}", nb_id, str(e))
 
         return NotebookResponse(
             id=nb_id,
@@ -157,7 +157,7 @@ async def get_notebook(notebook_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error fetching notebook {notebook_id}: {str(e)}")
+        logger.error("Error fetching notebook {}: {}", notebook_id, str(e))
         raise HTTPException(
             status_code=500, detail=f"Error fetching notebook: {str(e)}"
         )
@@ -199,7 +199,7 @@ async def update_notebook(notebook_id: str, notebook_update: NotebookUpdate, adm
             try:
                 objectives_count = await LearningObjective.count_for_notebook(nb_id)
             except Exception as e:
-                logger.warning(f"Failed to get objectives count for {nb_id}: {e}")
+                logger.warning("Failed to get objectives count for {}: {}", nb_id, str(e))
 
             return NotebookResponse(
                 id=nb_id,
@@ -232,7 +232,7 @@ async def update_notebook(notebook_id: str, notebook_update: NotebookUpdate, adm
     except InvalidInputError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Error updating notebook {notebook_id}: {str(e)}")
+        logger.error("Error updating notebook {}: {}", notebook_id, str(e))
         raise HTTPException(
             status_code=500, detail=f"Error updating notebook: {str(e)}"
         )
@@ -276,7 +276,7 @@ async def add_source_to_notebook(notebook_id: str, source_id: str, admin: User =
         raise
     except Exception as e:
         logger.error(
-            f"Error linking source {source_id} to notebook {notebook_id}: {str(e)}"
+            "Error linking source {} to notebook {}: {}", source_id, notebook_id, str(e)
         )
         raise HTTPException(
             status_code=500, detail=f"Error linking source to notebook: {str(e)}"
@@ -306,7 +306,7 @@ async def remove_source_from_notebook(notebook_id: str, source_id: str, admin: U
         raise
     except Exception as e:
         logger.error(
-            f"Error removing source {source_id} from notebook {notebook_id}: {str(e)}"
+            "Error removing source {} from notebook {}: {}", source_id, notebook_id, str(e)
         )
         raise HTTPException(
             status_code=500, detail=f"Error removing source from notebook: {str(e)}"
@@ -409,7 +409,7 @@ async def upload_document_to_notebook(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error uploading document to notebook {notebook_id}: {str(e)}")
+        logger.error("Error uploading document to notebook {}: {}", notebook_id, str(e))
         logger.exception(e)
         raise HTTPException(
             status_code=500, detail=f"Error uploading document: {str(e)}"
@@ -443,7 +443,7 @@ async def get_notebook_documents(
             try:
                 status = await source.get_status()
             except Exception as e:
-                logger.warning(f"Failed to get status for source {source.id}: {e}")
+                logger.warning("Failed to get status for source {}: {}", source.id, str(e))
                 status = "unknown"
 
             # Extract error message if available (from command result)
@@ -457,7 +457,7 @@ async def get_notebook_documents(
                         if isinstance(result, dict) and "error" in result:
                             error_message = str(result["error"])
                 except Exception as e:
-                    logger.warning(f"Failed to extract error message: {e}")
+                    logger.warning("Failed to extract error message: {}", str(e))
 
             documents.append(
                 DocumentStatusResponse(
@@ -476,7 +476,7 @@ async def get_notebook_documents(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error fetching documents for notebook {notebook_id}: {str(e)}")
+        logger.error("Error fetching documents for notebook {}: {}", notebook_id, str(e))
         logger.exception(e)
         raise HTTPException(
             status_code=500, detail=f"Error fetching documents: {str(e)}"
@@ -602,7 +602,7 @@ async def generate_transformation(notebook_id: str, request: NotebookTransformat
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error generating transformation: {e}")
+        logger.error("Error generating transformation: {}", str(e))
         logger.exception(e)
         raise HTTPException(status_code=500, detail=f"Failed to generate transformation: {str(e)}")
 
@@ -621,7 +621,7 @@ async def delete_notebook(notebook_id: str, admin: User = Depends(require_admin)
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error deleting notebook {notebook_id}: {str(e)}")
+        logger.error("Error deleting notebook {}: {}", notebook_id, str(e))
         raise HTTPException(
             status_code=500, detail=f"Error deleting notebook: {str(e)}"
         )
@@ -692,7 +692,7 @@ async def generate_artifacts(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error generating artifacts for notebook {notebook_id}: {str(e)}")
+        logger.error("Error generating artifacts for notebook {}: {}", notebook_id, str(e))
         logger.exception(e)
         raise HTTPException(
             status_code=500, detail=f"Error generating artifacts: {str(e)}"
@@ -797,7 +797,7 @@ async def publish_notebook(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error publishing notebook {notebook_id}: {str(e)}")
+        logger.error("Error publishing notebook {}: {}", notebook_id, str(e))
         logger.exception(e)
         raise HTTPException(
             status_code=500, detail=f"Error publishing notebook: {str(e)}"
@@ -860,7 +860,7 @@ async def unpublish_notebook(
             try:
                 objectives_count = await LearningObjective.count_for_notebook(nb_id)
             except Exception as e:
-                logger.warning(f"Failed to get objectives count for {nb_id}: {e}")
+                logger.warning("Failed to get objectives count for {}: {}", nb_id, str(e))
 
             # Check for module prompt
             has_prompt = False
@@ -868,7 +868,7 @@ async def unpublish_notebook(
                 module_prompt = await ModulePrompt.get_by_notebook(nb_id)
                 has_prompt = module_prompt is not None and bool(module_prompt.system_prompt)
             except Exception as e:
-                logger.warning(f"Failed to check prompt status for {nb_id}: {e}")
+                logger.warning("Failed to check prompt status for {}: {}", nb_id, str(e))
 
             return NotebookResponse(
                 id=nb_id,
@@ -901,7 +901,7 @@ async def unpublish_notebook(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error unpublishing notebook {notebook_id}: {str(e)}")
+        logger.error("Error unpublishing notebook {}: {}", notebook_id, str(e))
         raise HTTPException(
             status_code=500, detail=f"Error unpublishing notebook: {str(e)}"
         )

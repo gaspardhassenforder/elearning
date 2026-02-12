@@ -28,7 +28,7 @@ class PodcastAPIService:
             api_client._make_request("DELETE", f"/api/podcasts/episodes/{episode_id}")
             return True
         except Exception as e:
-            logger.error(f"Failed to delete episode: {e}")
+            logger.error("Failed to delete episode: {}", str(e))
             return False
 
     # Episode Profile methods
@@ -42,7 +42,7 @@ class PodcastAPIService:
             api_client.create_episode_profile(**profile_data)
             return True
         except Exception as e:
-            logger.error(f"Failed to create episode profile: {e}")
+            logger.error("Failed to create episode profile: {}", str(e))
             return False
 
     def update_episode_profile(self, profile_id: str, profile_data: Dict) -> bool:
@@ -51,7 +51,7 @@ class PodcastAPIService:
             api_client.update_episode_profile(profile_id, **profile_data)
             return True
         except Exception as e:
-            logger.error(f"Failed to update episode profile: {e}")
+            logger.error("Failed to update episode profile: {}", str(e))
             return False
 
     def delete_episode_profile(self, profile_id: str) -> bool:
@@ -60,7 +60,7 @@ class PodcastAPIService:
             api_client.delete_episode_profile(profile_id)
             return True
         except Exception as e:
-            logger.error(f"Failed to delete episode profile: {e}")
+            logger.error("Failed to delete episode profile: {}", str(e))
             return False
 
     def duplicate_episode_profile(self, profile_id: str) -> bool:
@@ -71,7 +71,7 @@ class PodcastAPIService:
             )
             return True
         except Exception as e:
-            logger.error(f"Failed to duplicate episode profile: {e}")
+            logger.error("Failed to duplicate episode profile: {}", str(e))
             return False
 
     # Speaker Profile methods
@@ -86,7 +86,7 @@ class PodcastAPIService:
             api_client._make_request("POST", "/api/speaker-profiles", json=profile_data)
             return True
         except Exception as e:
-            logger.error(f"Failed to create speaker profile: {e}")
+            logger.error("Failed to create speaker profile: {}", str(e))
             return False
 
     def update_speaker_profile(self, profile_id: str, profile_data: Dict) -> bool:
@@ -97,7 +97,7 @@ class PodcastAPIService:
             )
             return True
         except Exception as e:
-            logger.error(f"Failed to update speaker profile: {e}")
+            logger.error("Failed to update speaker profile: {}", str(e))
             return False
 
     def delete_speaker_profile(self, profile_id: str) -> bool:
@@ -106,7 +106,7 @@ class PodcastAPIService:
             api_client._make_request("DELETE", f"/api/speaker-profiles/{profile_id}")
             return True
         except Exception as e:
-            logger.error(f"Failed to delete speaker profile: {e}")
+            logger.error("Failed to delete speaker profile: {}", str(e))
             return False
 
     def duplicate_speaker_profile(self, profile_id: str) -> bool:
@@ -117,7 +117,7 @@ class PodcastAPIService:
             )
             return True
         except Exception as e:
-            logger.error(f"Failed to duplicate speaker profile: {e}")
+            logger.error("Failed to duplicate speaker profile: {}", str(e))
             return False
 
 

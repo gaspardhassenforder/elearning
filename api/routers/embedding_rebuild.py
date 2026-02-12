@@ -114,7 +114,7 @@ async def start_rebuild(request: RebuildRequest):
         )
 
     except Exception as e:
-        logger.error(f"Failed to start rebuild: {e}")
+        logger.error("Failed to start rebuild: {}", str(e))
         logger.exception(e)
         raise HTTPException(
             status_code=500, detail=f"Failed to start rebuild operation: {str(e)}"
@@ -186,7 +186,7 @@ async def get_rebuild_status(command_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get rebuild status: {e}")
+        logger.error("Failed to get rebuild status: {}", str(e))
         logger.exception(e)
         raise HTTPException(
             status_code=500, detail=f"Failed to get rebuild status: {str(e)}"

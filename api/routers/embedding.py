@@ -57,7 +57,7 @@ async def embed_content(embed_request: EmbedRequest):
                 )
 
             except Exception as e:
-                logger.error(f"Failed to submit async embedding command: {e}")
+                logger.error("Failed to submit async embedding command: {}", str(e))
                 raise HTTPException(
                     status_code=500, detail=f"Failed to queue embedding: {str(e)}"
                 )
@@ -100,7 +100,7 @@ async def embed_content(embed_request: EmbedRequest):
         raise
     except Exception as e:
         logger.error(
-            f"Error embedding {embed_request.item_type} {embed_request.item_id}: {str(e)}"
+            "Error embedding {} {}: {}", embed_request.item_type, embed_request.item_id, str(e)
         )
         raise HTTPException(
             status_code=500, detail=f"Error embedding content: {str(e)}"

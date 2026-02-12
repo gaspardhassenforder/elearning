@@ -80,6 +80,8 @@ export function useVoiceInput(language?: string): UseVoiceInputReturn {
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
+  const shouldRestartRef = useRef(false)  // Track if we should auto-restart on no-speech
+  const noSpeechCountRef = useRef(0)  // Count consecutive no-speech errors
 
   // Determine effective language for STT
   const effectiveLang = language || navigator.language || 'en-US'
@@ -125,14 +127,40 @@ export function useVoiceInput(language?: string): UseVoiceInputReturn {
     }
 
     recognition.onend = () => {
+      // Auto-restart on no-speech timeout in continuous mode
+      if (shouldRestartRef.current && noSpeechCountRef.current < 3) {
+        try {
+          recognition.start()
+          return  // Don't clean up - we're restarting
+        } catch {
+          // Failed to restart - fall through to normal cleanup
+        }
+      }
+      shouldRestartRef.current = false
+      noSpeechCountRef.current = 0
       setIsListening(false)
       setIsRequestingPermission(false)
       cleanupAudio()
     }
 
     recognition.onerror = (event) => {
-      setIsListening(false)
       setIsRequestingPermission(false)
+
+      // Handle no-speech in continuous mode: auto-restart instead of stopping
+      if (event.error === 'no-speech') {
+        noSpeechCountRef.current++
+        if (noSpeechCountRef.current < 3) {
+          // Signal onend to restart recognition
+          shouldRestartRef.current = true
+          return  // Don't set error - let onend handle restart
+        }
+        // After 3 consecutive no-speech, stop gracefully
+        shouldRestartRef.current = false
+      }
+
+      // Fatal errors stop recognition
+      shouldRestartRef.current = false
+      setIsListening(false)
       cleanupAudio()
 
       // Map error codes to user-friendly messages
@@ -150,12 +178,18 @@ export function useVoiceInput(language?: string): UseVoiceInputReturn {
         case 'audio-capture':
           setError('no-microphone')
           break
+        case 'aborted':
+          // Aborted is expected when user stops - no error
+          break
         default:
           setError('unknown-error')
       }
     }
 
     recognition.onresult = (event) => {
+      // Reset no-speech counter when we get actual results
+      noSpeechCountRef.current = 0
+
       let newFinal = ''
       let newInterim = ''
 
@@ -219,6 +253,8 @@ export function useVoiceInput(language?: string): UseVoiceInputReturn {
       setFinalTranscript('')  // Clear previous transcript
       setInterimTranscript('')
       setIsRequestingPermission(true)
+      shouldRestartRef.current = true  // Enable auto-restart on no-speech
+      noSpeechCountRef.current = 0
 
       // Start audio analyser for waveform (fire-and-forget)
       startAudioAnalyser()
@@ -237,6 +273,8 @@ export function useVoiceInput(language?: string): UseVoiceInputReturn {
   const stopListening = useCallback(() => {
     if (!recognitionRef.current) return
 
+    shouldRestartRef.current = false  // Disable auto-restart on explicit stop
+    noSpeechCountRef.current = 0
     try {
       recognitionRef.current.stop()
     } catch (err) {

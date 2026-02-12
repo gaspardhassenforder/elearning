@@ -47,10 +47,10 @@ async def register(user_data: UserCreate):
             onboarding_completed=user.onboarding_completed,
         )
     except ValueError as e:
-        logger.error(f"Registration failed: {e}")
+        logger.error("Registration failed: {}", str(e))
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Registration error: {e}")
+        logger.error("Registration error: {}", str(e))
         raise HTTPException(status_code=500, detail="Registration failed")
 
 
@@ -101,7 +101,7 @@ async def login(user_data: UserLogin, response: Response):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Login error: {e}")
+        logger.error("Login error: {}", str(e))
         raise HTTPException(status_code=500, detail="Login failed")
 
 
@@ -145,7 +145,7 @@ async def refresh(request: Request, response: Response):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Token refresh error: {e}")
+        logger.error("Token refresh error: {}", str(e))
         raise HTTPException(status_code=401, detail="Invalid refresh token")
 
 
@@ -216,5 +216,5 @@ async def submit_onboarding(
             profile=profile,
         )
     except Exception as e:
-        logger.error(f"Onboarding submission failed for {current_user.username}: {e}")
+        logger.error("Onboarding submission failed for {}: {}", current_user.username, str(e))
         raise HTTPException(status_code=500, detail="Failed to save onboarding data")

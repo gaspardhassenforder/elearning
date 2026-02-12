@@ -13,7 +13,7 @@ from open_notebook.observability.langsmith_handler import get_langsmith_callback
 try:
     from open_notebook.graphs.source import source_graph
 except ImportError as e:
-    logger.error(f"Failed to import source_graph: {e}")
+    logger.error("Failed to import source_graph: {}", str(e))
     raise ValueError("source_graph not available")
 
 
@@ -153,13 +153,13 @@ async def process_source_command(
 
     except RuntimeError as e:
         # Transaction conflicts should be retried by surreal-commands
-        logger.debug(f"Transaction conflict, will retry: {e}")
+        logger.debug("Transaction conflict, will retry: {}", str(e))
         raise
 
     except Exception as e:
         # Other errors are permanent failures
         processing_time = time.time() - start_time
-        logger.error(f"Source processing failed: {e}")
+        logger.error("Source processing failed: {}", str(e))
 
         return SourceProcessingOutput(
             success=False,

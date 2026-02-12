@@ -84,7 +84,7 @@ async def generate_podcast(request: PodcastGenerationRequest, admin: User = Depe
 
     except Exception as e:
         logger.error("=" * 80)
-        logger.error(f"✗ ERROR generating podcast: {str(e)}")
+        logger.error("ERROR generating podcast: {}", str(e))
         logger.exception(e)
         logger.error("=" * 80)
         raise HTTPException(
@@ -110,7 +110,7 @@ async def get_podcast_job_status(job_id: str):
         # Re-raise HTTP exceptions as-is
         raise
     except Exception as e:
-        logger.error(f"Error fetching podcast job status for {job_id}: {str(e)}")
+        logger.error("Error fetching podcast job status for {}: {}", job_id, str(e))
         logger.exception(e)
         raise HTTPException(
             status_code=500, detail=f"Failed to fetch job status: {str(e)}"
@@ -165,7 +165,7 @@ async def list_podcast_episodes():
         return response_episodes
 
     except Exception as e:
-        logger.error(f"Error listing podcast episodes: {str(e)}")
+        logger.error("Error listing podcast episodes: {}", str(e))
         raise HTTPException(
             status_code=500, detail="Failed to list podcast episodes"
         )
@@ -209,7 +209,7 @@ async def get_podcast_episode(episode_id: str):
         )
 
     except Exception as e:
-        logger.error(f"Error fetching podcast episode: {str(e)}")
+        logger.error("Error fetching podcast episode: {}", str(e))
         raise HTTPException(status_code=404, detail="Episode not found")
 
 
@@ -221,7 +221,7 @@ async def stream_podcast_episode_audio(episode_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error fetching podcast episode for audio: {str(e)}")
+        logger.error("Error fetching podcast episode for audio: {}", str(e))
         raise HTTPException(status_code=404, detail="Episode not found")
 
     if not episode.audio_file:
@@ -253,7 +253,7 @@ async def delete_podcast_episode(episode_id: str, admin: User = Depends(require_
                     audio_path.unlink()
                     logger.info(f"Deleted audio file: {audio_path}")
                 except Exception as e:
-                    logger.warning(f"Failed to delete audio file {audio_path}: {e}")
+                    logger.warning("Failed to delete audio file {}: {}", audio_path, str(e))
 
         # Delete the episode from the database
         await episode.delete()
@@ -262,7 +262,7 @@ async def delete_podcast_episode(episode_id: str, admin: User = Depends(require_
         return {"message": "Episode deleted successfully", "episode_id": episode_id}
 
     except Exception as e:
-        logger.error(f"Error deleting podcast episode: {str(e)}")
+        logger.error("Error deleting podcast episode: {}", str(e))
         raise HTTPException(
             status_code=500, detail="Failed to delete episode"
         )
@@ -287,7 +287,7 @@ async def get_podcast(podcast_id: str, user: User = Depends(get_current_user)):
     try:
         podcast = await Podcast.get(podcast_id)
     except Exception as e:
-        logger.error(f"Error fetching podcast {podcast_id}: {e}")
+        logger.error("Error fetching podcast {}: {}", podcast_id, str(e))
         raise HTTPException(status_code=404, detail="Podcast not found")
 
     if not podcast:
@@ -349,7 +349,7 @@ async def stream_podcast_audio(podcast_id: str, user: User = Depends(get_current
     try:
         podcast = await Podcast.get(podcast_id)
     except Exception as e:
-        logger.error(f"Error fetching podcast {podcast_id} for audio: {e}")
+        logger.error("Error fetching podcast {} for audio: {}", podcast_id, str(e))
         raise HTTPException(status_code=404, detail="Podcast not found")
 
     if not podcast:
@@ -404,7 +404,7 @@ async def get_podcast_transcript(podcast_id: str, user: User = Depends(get_curre
     try:
         podcast = await Podcast.get(podcast_id)
     except Exception as e:
-        logger.error(f"Error fetching podcast {podcast_id} for transcript: {e}")
+        logger.error("Error fetching podcast {} for transcript: {}", podcast_id, str(e))
         raise HTTPException(status_code=404, detail="Podcast not found")
 
     if not podcast:

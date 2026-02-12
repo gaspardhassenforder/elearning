@@ -46,7 +46,7 @@ async def list_episode_profiles():
         ]
 
     except Exception as e:
-        logger.error(f"Failed to fetch episode profiles: {e}")
+        logger.error("Failed to fetch episode profiles: {}", str(e))
         raise HTTPException(
             status_code=500, detail="Failed to fetch episode profiles"
         )
@@ -79,7 +79,7 @@ async def get_episode_profile(profile_name: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to fetch episode profile '{profile_name}': {e}")
+        logger.error("Failed to fetch episode profile '{}': {}", profile_name, str(e))
         raise HTTPException(
             status_code=500, detail="Failed to fetch episode profile"
         )
@@ -131,7 +131,7 @@ async def create_episode_profile(profile_data: EpisodeProfileCreate):
         )
 
     except Exception as e:
-        logger.error(f"Failed to create episode profile: {e}")
+        logger.error("Failed to create episode profile: {}", str(e))
         raise HTTPException(
             status_code=500, detail="Failed to create episode profile"
         )
@@ -177,7 +177,7 @@ async def update_episode_profile(profile_id: str, profile_data: EpisodeProfileCr
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to update episode profile: {e}")
+        logger.error("Failed to update episode profile: {}", str(e))
         raise HTTPException(
             status_code=500, detail="Failed to update episode profile"
         )
@@ -201,7 +201,7 @@ async def delete_episode_profile(profile_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to delete episode profile: {e}")
+        logger.error("Failed to delete episode profile: {}", str(e))
         raise HTTPException(
             status_code=500, detail="Failed to delete episode profile"
         )
@@ -251,7 +251,7 @@ async def duplicate_episode_profile(profile_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to duplicate episode profile: {e}")
+        logger.error("Failed to duplicate episode profile: {}", str(e))
         raise HTTPException(
             status_code=500, detail="Failed to duplicate episode profile"
         )

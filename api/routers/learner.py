@@ -182,7 +182,7 @@ async def navigation_chat(
             notebook = await Notebook.get(request.current_notebook_id)
             current_module_title = notebook.name if notebook else None
         except Exception as e:
-            logger.warning(f"Failed to load current module {request.current_notebook_id}: {e}")
+            logger.warning("Failed to load current module {}: {}", request.current_notebook_id, str(e))
 
     # Count available modules for prompt context
     try:
@@ -275,7 +275,7 @@ async def navigation_chat(
         )
 
     except Exception as e:
-        logger.error(f"Navigation assistant error for learner {learner.user.id}: {e}", exc_info=True)
+        logger.error("Navigation assistant error for learner {}: {}", learner.user.id, str(e), exc_info=True)
         return NavigationChatResponse(
             message="I'm having trouble searching right now. Please try again in a moment.",
             suggested_modules=[]
@@ -334,6 +334,6 @@ async def get_navigation_history(
         return history
 
     except Exception as e:
-        logger.error(f"Error fetching navigation history for learner {learner.user.id}: {e}", exc_info=True)
+        logger.error("Error fetching navigation history for learner {}: {}", learner.user.id, str(e), exc_info=True)
         # Return empty history on error (graceful fallback)
         return []

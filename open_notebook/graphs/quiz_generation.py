@@ -118,7 +118,7 @@ async def generate_rag_queries(state: QuizGenerationState) -> dict:
         }
 
     except Exception as e:
-        logger.error(f"Error generating RAG queries: {e}")
+        logger.error("Error generating RAG queries: {}", str(e))
         logger.exception(e)
         return {
             "error": f"Failed to generate RAG queries: {str(e)}",
@@ -162,7 +162,7 @@ async def retrieve_relevant_chunks(state: QuizGenerationState) -> dict:
                 logger.debug(f"Retrieved {len(chunks)} chunks for query: {query[:50]}...")
 
             except Exception as e:
-                logger.warning(f"Error retrieving chunks for query '{query}': {e}")
+                logger.warning("Error retrieving chunks for query '{}': {}", query, str(e))
                 continue
 
         logger.info(f"Retrieved {len(all_chunks)} unique chunks total")
@@ -173,7 +173,7 @@ async def retrieve_relevant_chunks(state: QuizGenerationState) -> dict:
         }
 
     except Exception as e:
-        logger.error(f"Error retrieving relevant chunks: {e}")
+        logger.error("Error retrieving relevant chunks: {}", str(e))
         logger.exception(e)
         return {
             "error": f"Failed to retrieve relevant chunks: {str(e)}",
@@ -268,7 +268,7 @@ async def gather_sources(state: QuizGenerationState) -> dict:
             if embedding_check and embedding_check[0] and embedding_check[0].get("count", 0) > 0:
                 has_embeddings = True
         except Exception as e:
-            logger.debug(f"Could not check embeddings: {e}")
+            logger.debug("Could not check embeddings: {}", str(e))
 
         if has_embeddings:
             logger.info("Sources have embeddings but RAG retrieval was not used, using full sources as fallback")
@@ -302,7 +302,7 @@ async def gather_sources(state: QuizGenerationState) -> dict:
         }
 
     except Exception as e:
-        logger.error(f"Error gathering sources: {e}")
+        logger.error("Error gathering sources: {}", str(e))
         return {
             "error": f"Failed to gather sources: {str(e)}",
             "status": "failed",
@@ -381,7 +381,7 @@ async def generate_questions(state: QuizGenerationState) -> dict:
         }
 
     except Exception as e:
-        logger.error(f"Error generating questions: {e}")
+        logger.error("Error generating questions: {}", str(e))
         logger.exception(e)
         return {
             "error": f"Failed to generate questions: {str(e)}",
@@ -481,7 +481,7 @@ async def save_quiz(state: QuizGenerationState) -> dict:
         }
 
     except Exception as e:
-        logger.error(f"Error saving quiz: {e}")
+        logger.error("Error saving quiz: {}", str(e))
         logger.exception(e)
         return {
             "error": f"Failed to save quiz: {str(e)}",

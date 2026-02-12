@@ -61,7 +61,7 @@ async def _fetch_suggested_modules(user_id: str, current_notebook_id: str) -> Li
         return suggestions
 
     except Exception as e:
-        logger.error(f"Error fetching suggested modules: {e}")
+        logger.error("Error fetching suggested modules: {}", str(e))
         return []
 
 
@@ -162,7 +162,7 @@ async def search_available_modules(
         return module_suggestions
 
     except Exception as e:
-        logger.error(f"Error in search_available_modules: {e}", exc_info=True)
+        logger.error("Error in search_available_modules: {}", str(e), exc_info=True)
         raise  # Re-raise to let caller handle gracefully
 
 
@@ -250,7 +250,7 @@ async def surface_document(source_id: str, excerpt_text: str, relevance_reason: 
         return result
 
     except Exception as e:
-        logger.error(f"Error in surface_document tool for source {source_id}: {e}", exc_info=True)
+        logger.error("Error in surface_document tool for source {}: {}", source_id, str(e), exc_info=True)
         return {
             "error": "I had trouble accessing that document",
             "error_type": "service_error",
@@ -363,7 +363,7 @@ async def check_off_objective(
         return result
 
     except Exception as e:
-        logger.error(f"Error in check_off_objective tool for objective {objective_id}: {e}", exc_info=True)
+        logger.error("Error in check_off_objective tool for objective {}: {}", objective_id, str(e), exc_info=True)
         return {
             "error": "I had trouble recording your progress",
             "error_type": "service_error",
@@ -473,7 +473,7 @@ async def surface_quiz(quiz_id: str, config: Optional[dict] = None) -> dict:
         return result
 
     except Exception as e:
-        logger.error(f"Error in surface_quiz tool for quiz {quiz_id}: {e}", exc_info=True)
+        logger.error("Error in surface_quiz tool for quiz {}: {}", quiz_id, str(e), exc_info=True)
         return {
             "error": "I had trouble loading that quiz",
             "error_type": "service_error",
@@ -583,7 +583,7 @@ async def surface_podcast(podcast_id: str, config: Optional[dict] = None) -> dic
         return result
 
     except Exception as e:
-        logger.error(f"Error in surface_podcast tool for podcast {podcast_id}: {e}", exc_info=True)
+        logger.error("Error in surface_podcast tool for podcast {}: {}", podcast_id, str(e), exc_info=True)
         return {
             "error": "I had trouble loading that podcast",
             "error_type": "service_error",
@@ -648,7 +648,7 @@ async def search_documents(
         return formatted
 
     except Exception as e:
-        logger.error(f"Error in search_documents: {e}", exc_info=True)
+        logger.error("Error in search_documents: {}", str(e), exc_info=True)
         return []
 
 
@@ -849,7 +849,7 @@ async def generate_artifact(
         return result
 
     except Exception as e:
-        logger.error(f"Error in generate_artifact tool: {e}", exc_info=True)
+        logger.error("Error in generate_artifact tool: {}", str(e), exc_info=True)
         return {
             "error": "I had trouble creating that for you",
             "error_type": "service_error",

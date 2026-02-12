@@ -62,7 +62,7 @@ def verify_token(token: str) -> dict:
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
         return payload
     except JWTError as e:
-        logger.error(f"Token verification failed: {e}")
+        logger.error("Token verification failed: {}", str(e))
         raise HTTPException(status_code=401, detail="Invalid token")
 
 
@@ -84,10 +84,10 @@ async def get_current_user(request: Request) -> User:
             user = await User.get(user_id)
             return user
         except Exception as e:
-            logger.error(f"User not found for id {user_id}: {e}")
+            logger.error("User not found for id {}: {}", user_id, str(e))
             raise HTTPException(status_code=401, detail="User not found")
     except JWTError as e:
-        logger.error(f"JWT decode failed: {e}")
+        logger.error("JWT decode failed: {}", str(e))
         raise HTTPException(status_code=401, detail="Invalid token")
 
 

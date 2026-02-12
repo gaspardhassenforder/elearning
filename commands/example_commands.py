@@ -82,7 +82,7 @@ async def process_text_command(input_data: TextProcessingInput) -> TextProcessin
 
     except Exception as e:
         processing_time = time.time() - start_time
-        logger.error(f"Text processing failed: {e}")
+        logger.error("Text processing failed: {}", str(e))
         return TextProcessingOutput(
             success=False,
             original_text=input_data.text,
@@ -132,7 +132,7 @@ async def analyze_data_command(input_data: DataAnalysisInput) -> DataAnalysisOut
 
     except Exception as e:
         processing_time = time.time() - start_time
-        logger.error(f"Data analysis failed: {e}")
+        logger.error("Data analysis failed: {}", str(e))
         return DataAnalysisOutput(
             success=False,
             analysis_type=input_data.analysis_type,

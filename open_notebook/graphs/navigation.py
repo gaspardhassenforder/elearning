@@ -51,7 +51,7 @@ def navigation_node(state: NavigationState, config: RunnableConfig) -> dict:
             data=prompt_data
         )
     except Exception as e:
-        logger.error(f"Failed to render navigation prompt: {e}", exc_info=True)
+        logger.error("Failed to render navigation prompt: {}", str(e), exc_info=True)
         # Fallback to minimal prompt
         system_prompt = "You are a helpful navigation assistant. Help learners find the right module."
 

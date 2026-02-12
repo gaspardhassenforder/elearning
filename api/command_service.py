@@ -25,7 +25,7 @@ class CommandService:
                 import commands.podcast_commands  # noqa: F401
                 logger.debug("Command modules imported successfully")
             except ImportError as import_err:
-                logger.error(f"Failed to import command modules: {import_err}")
+                logger.error("Failed to import command modules: {}", str(import_err))
                 raise ValueError("Command modules not available")
 
             # surreal-commands expects: submit_command(app_name, command_name, args)
@@ -46,7 +46,7 @@ class CommandService:
             return cmd_id_str
 
         except Exception as e:
-            logger.error(f"Failed to submit command job {module_name}.{command_name}: {e}")
+            logger.error("Failed to submit command job {}.{}: {}", module_name, command_name, str(e))
             logger.exception(e)
             raise
 
@@ -74,7 +74,7 @@ class CommandService:
                 "progress": getattr(status, "progress", None) if status else None,
             }
         except Exception as e:
-            logger.error(f"Failed to get command status for job {job_id}: {e}")
+            logger.error("Failed to get command status for job {}: {}", job_id, str(e))
             raise
 
     @staticmethod
@@ -133,6 +133,6 @@ class CommandService:
                 logger.warning(f"Cancellation returned false for job: {job_id}")
             return success
         except Exception as e:
-            logger.error(f"Failed to cancel command job {job_id}: {e}")
+            logger.error("Failed to cancel command job {}: {}", job_id, str(e))
             logger.exception(e)
             raise

@@ -43,7 +43,7 @@ class Notebook(ObjectModel):
             )
             return [Source(**src["source"]) for src in srcs] if srcs else []
         except Exception as e:
-            logger.error(f"Error fetching sources for notebook {self.id}: {str(e)}")
+            logger.error("Error fetching sources for notebook {}: {}", self.id, str(e))
             logger.exception(e)
             raise DatabaseOperationError(e)
 
@@ -72,11 +72,11 @@ class Notebook(ObjectModel):
                         note = await Note.get(note_id)
                         notes.append(note)
                     except Exception as e:
-                        logger.warning(f"Failed to fetch note {note_id}: {e}")
+                        logger.warning("Failed to fetch note {}: {}", note_id, str(e))
             
             return notes
         except Exception as e:
-            logger.error(f"Error fetching notes for notebook {self.id}: {str(e)}")
+            logger.error("Error fetching notes for notebook {}: {}", self.id, str(e))
             logger.exception(e)
             raise DatabaseOperationError(e)
 
@@ -100,7 +100,7 @@ class Notebook(ObjectModel):
             )
         except Exception as e:
             logger.error(
-                f"Error fetching chat sessions for notebook {self.id}: {str(e)}"
+                "Error fetching chat sessions for notebook {}: {}", self.id, str(e)
             )
             logger.exception(e)
             raise DatabaseOperationError(e)
@@ -120,7 +120,7 @@ class Notebook(ObjectModel):
             )
             return [Artifact(**r) for r in result] if result else []
         except Exception as e:
-            logger.error(f"Error fetching artifacts for notebook {self.id}: {str(e)}")
+            logger.error("Error fetching artifacts for notebook {}: {}", self.id, str(e))
             logger.exception(e)
             raise DatabaseOperationError(e)
 
@@ -139,7 +139,7 @@ class Notebook(ObjectModel):
             )
             return [Quiz(**r) for r in result] if result else []
         except Exception as e:
-            logger.error(f"Error fetching quizzes for notebook {self.id}: {str(e)}")
+            logger.error("Error fetching quizzes for notebook {}: {}", self.id, str(e))
             logger.exception(e)
             raise DatabaseOperationError(e)
 
@@ -158,7 +158,7 @@ class Notebook(ObjectModel):
             )
             return [Podcast(**r) for r in result] if result else []
         except Exception as e:
-            logger.error(f"Error fetching podcasts for notebook {self.id}: {str(e)}")
+            logger.error("Error fetching podcasts for notebook {}: {}", self.id, str(e))
             logger.exception(e)
             raise DatabaseOperationError(e)
 
@@ -182,7 +182,7 @@ class SourceEmbedding(ObjectModel):
             )
             return Source(**src[0]["source"])
         except Exception as e:
-            logger.error(f"Error fetching source for embedding {self.id}: {str(e)}")
+            logger.error("Error fetching source for embedding {}: {}", self.id, str(e))
             logger.exception(e)
             raise DatabaseOperationError(e)
 
@@ -202,7 +202,7 @@ class SourceInsight(ObjectModel):
             )
             return Source(**src[0]["source"])
         except Exception as e:
-            logger.error(f"Error fetching source for insight {self.id}: {str(e)}")
+            logger.error("Error fetching source for insight {}: {}", self.id, str(e))
             logger.exception(e)
             raise DatabaseOperationError(e)
 
@@ -259,7 +259,7 @@ class Source(ObjectModel):
             status = await get_command_status(str(self.command))
             return status.status if status else "unknown"
         except Exception as e:
-            logger.warning(f"Failed to get command status for {self.command}: {e}")
+            logger.warning("Failed to get command status for {}: {}", self.command, str(e))
             return "unknown"
 
     async def get_processing_progress(self) -> Optional[Dict[str, Any]]:
@@ -288,7 +288,7 @@ class Source(ObjectModel):
                 "result": result,
             }
         except Exception as e:
-            logger.warning(f"Failed to get command progress for {self.command}: {e}")
+            logger.warning("Failed to get command progress for {}: {}", self.command, str(e))
             return None
 
     async def get_context(
@@ -318,7 +318,7 @@ class Source(ObjectModel):
                 return 0
             return result[0]["chunks"]
         except Exception as e:
-            logger.error(f"Error fetching chunks count for source {self.id}: {str(e)}")
+            logger.error("Error fetching chunks count for source {}: {}", self.id, str(e))
             logger.exception(e)
             raise DatabaseOperationError(f"Failed to count chunks for source: {str(e)}")
 
@@ -332,7 +332,7 @@ class Source(ObjectModel):
             )
             return [SourceInsight(**insight) for insight in result]
         except Exception as e:
-            logger.error(f"Error fetching insights for source {self.id}: {str(e)}")
+            logger.error("Error fetching insights for source {}: {}", self.id, str(e))
             logger.exception(e)
             raise DatabaseOperationError("Failed to fetch insights for source")
 
@@ -384,7 +384,7 @@ class Source(ObjectModel):
 
         except Exception as e:
             logger.error(
-                f"Failed to submit vectorization job for source {self.id}: {e}"
+                "Failed to submit vectorization job for source {}: {}", self.id, str(e)
             )
             logger.exception(e)
             raise DatabaseOperationError(e)
@@ -416,7 +416,7 @@ class Source(ObjectModel):
                 },
             )
         except Exception as e:
-            logger.error(f"Error adding insight to source {self.id}: {str(e)}")
+            logger.error("Error adding insight to source {}: {}", self.id, str(e))
             raise  # DatabaseOperationError(e)
 
     def _prepare_save_data(self) -> dict:
@@ -440,8 +440,9 @@ class Source(ObjectModel):
                     logger.info(f"Deleted file for source {self.id}: {file_path}")
                 except Exception as e:
                     logger.warning(
-                        f"Failed to delete file {file_path} for source {self.id}: {e}. "
-                        "Continuing with database deletion."
+                        "Failed to delete file {} for source {}: {}. "
+                        "Continuing with database deletion.",
+                        file_path, self.id, str(e)
                     )
             else:
                 logger.debug(
@@ -532,7 +533,7 @@ async def text_search(
         )
         return search_results
     except Exception as e:
-        logger.error(f"Error performing text search: {str(e)}")
+        logger.error("Error performing text search: {}", str(e))
         logger.exception(e)
         raise DatabaseOperationError(e)
 
@@ -565,7 +566,7 @@ async def vector_search(
         )
         return search_results
     except Exception as e:
-        logger.error(f"Error performing vector search: {str(e)}")
+        logger.error("Error performing vector search: {}", str(e))
         logger.exception(e)
         raise DatabaseOperationError(e)
 
@@ -694,6 +695,6 @@ async def vector_search_for_notebook(
         return all_results[:results]
         
     except Exception as e:
-        logger.error(f"Error performing notebook-filtered vector search: {str(e)}")
+        logger.error("Error performing notebook-filtered vector search: {}", str(e))
         logger.exception(e)
         raise DatabaseOperationError(e)

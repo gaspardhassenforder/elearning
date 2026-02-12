@@ -24,7 +24,7 @@ async def get_notebook_artifacts(notebook_id: str) -> List[Artifact]:
         logger.info(f"Found {len(artifacts)} artifacts for notebook {notebook_id}")
         return artifacts
     except Exception as e:
-        logger.error(f"Error getting artifacts for notebook {notebook_id}: {e}")
+        logger.error("Error getting artifacts for notebook {}: {}", notebook_id, str(e))
         return []
 
 
@@ -50,7 +50,7 @@ async def get_notebook_artifacts_by_type(
         return artifacts
     except Exception as e:
         logger.error(
-            f"Error getting {artifact_type} artifacts for notebook {notebook_id}: {e}"
+            "Error getting {} artifacts for notebook {}: {}", artifact_type, notebook_id, str(e)
         )
         return []
 
@@ -66,7 +66,7 @@ async def get_artifact(artifact_id: str) -> Optional[Artifact]:
             logger.warning(f"Artifact not found: {artifact_id}")
         return artifact
     except Exception as e:
-        logger.error(f"Error getting artifact {artifact_id}: {e}")
+        logger.error("Error getting artifact {}: {}", artifact_id, str(e))
         return None
 
 
@@ -87,7 +87,7 @@ async def delete_artifact(artifact_id: str) -> bool:
             logger.warning(f"Failed to delete artifact {artifact_id}")
         return success
     except Exception as e:
-        logger.error(f"Error deleting artifact {artifact_id}: {e}")
+        logger.error("Error deleting artifact {}: {}", artifact_id, str(e))
         return False
 
 
@@ -113,7 +113,7 @@ async def get_artifact_with_preview(artifact_id: str) -> Optional[dict]:
         return preview_data
 
     except Exception as e:
-        logger.error(f"Error getting artifact preview {artifact_id}: {e}")
+        logger.error("Error getting artifact preview {}: {}", artifact_id, str(e))
         return None
 
 
@@ -213,7 +213,7 @@ async def regenerate_artifact(artifact_id: str) -> dict:
             }
 
     except Exception as e:
-        logger.error(f"Error regenerating artifact {artifact_id}: {e}")
+        logger.error("Error regenerating artifact {}: {}", artifact_id, str(e))
         logger.exception(e)
         return {
             "status": "error",
@@ -322,7 +322,7 @@ async def get_artifact_preview_data(artifact: Artifact) -> dict:
             }
 
     except Exception as e:
-        logger.error(f"Error getting preview data for artifact {artifact.id}: {e}")
+        logger.error("Error getting preview data for artifact {}: {}", artifact.id, str(e))
         return {
             "artifact_type": artifact_type,
             "error": str(e),

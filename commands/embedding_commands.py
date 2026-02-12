@@ -175,7 +175,7 @@ async def embed_single_item_command(
     except Exception as e:
         processing_time = time.time() - start_time
         logger.error(
-            f"Embedding failed for {input_data.item_type} {input_data.item_id}: {e}"
+            "Embedding failed for {} {}: {}", input_data.item_type, input_data.item_id, str(e)
         )
         logger.exception(e)
 
@@ -283,7 +283,7 @@ async def embed_chunk_command(
     except Exception as e:
         # Catch other exceptions (ValueError, etc.) as permanent failures
         logger.error(
-            f"Failed to embed chunk {input_data.chunk_index} for source {input_data.source_id}: {e}"
+            "Failed to embed chunk {} for source {}: {}", input_data.chunk_index, input_data.source_id, str(e)
         )
         logger.exception(e)
 
@@ -371,7 +371,7 @@ async def vectorize_source_command(
                     logger.info(f"  Submitted {idx + 1}/{total_chunks} chunk jobs")
 
             except Exception as e:
-                logger.error(f"Failed to submit chunk job {idx}: {e}")
+                logger.error("Failed to submit chunk job {}: {}", idx, str(e))
                 # Continue submitting other chunks even if one fails
 
         processing_time = time.time() - start_time
@@ -392,7 +392,7 @@ async def vectorize_source_command(
     except Exception as e:
         processing_time = time.time() - start_time
         logger.error(
-            f"Vectorization orchestration failed for source {input_data.source_id}: {e}"
+            "Vectorization orchestration failed for source {}: {}", input_data.source_id, str(e)
         )
         logger.exception(e)
 
@@ -552,7 +552,7 @@ async def rebuild_embeddings_command(
                     )
 
             except Exception as e:
-                logger.error(f"Failed to re-embed source {source_id}: {e}")
+                logger.error("Failed to re-embed source {}: {}", source_id, str(e))
                 failed_items += 1
 
         # Process notes
@@ -574,7 +574,7 @@ async def rebuild_embeddings_command(
                     )
 
             except Exception as e:
-                logger.error(f"Failed to re-embed note {note_id}: {e}")
+                logger.error("Failed to re-embed note {}: {}", note_id, str(e))
                 failed_items += 1
 
         # Process insights
@@ -606,7 +606,7 @@ async def rebuild_embeddings_command(
                     )
 
             except Exception as e:
-                logger.error(f"Failed to re-embed insight {insight_id}: {e}")
+                logger.error("Failed to re-embed insight {}: {}", insight_id, str(e))
                 failed_items += 1
 
         processing_time = time.time() - start_time
@@ -635,7 +635,7 @@ async def rebuild_embeddings_command(
 
     except Exception as e:
         processing_time = time.time() - start_time
-        logger.error(f"Rebuild embeddings failed: {e}")
+        logger.error("Rebuild embeddings failed: {}", str(e))
         logger.exception(e)
 
         return RebuildEmbeddingsOutput(

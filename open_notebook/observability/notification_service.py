@@ -455,7 +455,7 @@ def create_notification_backend(config: Optional[NotificationConfig] = None) -> 
             return NullBackend()
 
     except Exception as e:
-        logger.error(f"Failed to create notification backend ({backend_type}): {e} - falling back to NullBackend")
+        logger.error("Failed to create notification backend ({}): {} - falling back to NullBackend", backend_type, str(e))
         return NullBackend()
 
 
@@ -565,7 +565,8 @@ class WebhookBackend(NotificationBackend):
 
             except (httpx.HTTPError, httpx.TimeoutException) as e:
                 logger.warning(
-                    f"Webhook notification failed (attempt {attempt}/4): {e}",
+                    "Webhook notification failed (attempt {}/4): {}",
+                    attempt, str(e),
                     extra={"webhook_url": self.webhook_url},
                 )
 
@@ -625,7 +626,8 @@ class SlackBackend(NotificationBackend):
 
             except (httpx.HTTPError, httpx.TimeoutException) as e:
                 logger.warning(
-                    f"Slack notification failed (attempt {attempt}/4): {e}",
+                    "Slack notification failed (attempt {}/4): {}",
+                    attempt, str(e),
                     extra={"slack_webhook_url": self.webhook_url[:30] + "..."},
                 )
                 if attempt < 4:
@@ -717,7 +719,8 @@ class EmailBackend(NotificationBackend):
             self.last_failure = datetime.now(datetime.UTC if hasattr(datetime, "UTC") else timezone.utc)
             self.failure_count_24h += 1
             logger.error(
-                f"Email notification failed: {e}",
+                "Email notification failed: {}",
+                str(e),
                 extra={"smtp_host": self.smtp_host, "admin_email": self.admin_email},
             )
             return False

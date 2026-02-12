@@ -280,7 +280,7 @@ class SourcesService:
                 None,
             ]  # None indicates legacy/sync source
         except Exception as e:
-            logger.error(f"Error checking source processing status: {e}")
+            logger.error("Error checking source processing status: {}", str(e))
             return True  # Assume complete on error
 
     def update_source(self, source: Source) -> Source:

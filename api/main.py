@@ -59,7 +59,7 @@ from open_notebook.database.async_migrate import AsyncMigrationManager
 try:
     logger.info("Commands imported in API process")
 except Exception as e:
-    logger.error(f"Failed to import commands in API process: {e}")
+    logger.error("Failed to import commands in API process: {}", str(e))
 
 
 async def seed_admin_user():
@@ -118,7 +118,7 @@ async def lifespan(app: FastAPI):
                 "Database is already at the latest version. No migrations needed."
             )
     except Exception as e:
-        logger.error(f"CRITICAL: Database migration failed: {str(e)}")
+        logger.error("CRITICAL: Database migration failed: {}", str(e))
         logger.exception(e)
         # Fail fast - don't start the API with an outdated database schema
         raise RuntimeError(f"Failed to run database migrations: {str(e)}") from e
@@ -127,7 +127,7 @@ async def lifespan(app: FastAPI):
     try:
         await seed_admin_user()
     except Exception as e:
-        logger.error(f"Failed to seed admin user: {str(e)}")
+        logger.error("Failed to seed admin user: {}", str(e))
         # Non-fatal - continue startup even if seeding fails
 
     logger.success("API initialization completed successfully")

@@ -37,10 +37,10 @@ async def create_user(data: AdminUserCreate, _admin: User = Depends(require_admi
             onboarding_completed=user.onboarding_completed,
         )
     except ValueError as e:
-        logger.error(f"User creation failed: {e}")
+        logger.error("User creation failed: {}", str(e))
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Unexpected error creating user: {e}")
+        logger.error("Unexpected error creating user: {}", str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -50,7 +50,7 @@ async def get_users(_admin: User = Depends(require_admin)):
     try:
         return await list_users()
     except Exception as e:
-        logger.error(f"Error listing users: {e}")
+        logger.error("Error listing users: {}", str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -72,7 +72,7 @@ async def get_user(user_id: str, _admin: User = Depends(require_admin)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error fetching user {user_id}: {e}")
+        logger.error("Error fetching user {}: {}", user_id, str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -102,12 +102,12 @@ async def update_user_endpoint(
             onboarding_completed=user.onboarding_completed,
         )
     except ValueError as e:
-        logger.error(f"User update failed: {e}")
+        logger.error("User update failed: {}", str(e))
         raise HTTPException(status_code=400, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Unexpected error updating user: {e}")
+        logger.error("Unexpected error updating user: {}", str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -146,5 +146,5 @@ async def delete_user_endpoint(user_id: str, admin: User = Depends(require_admin
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        logger.error(f"Error deleting user {user_id}: {e}")
+        logger.error("Error deleting user {}: {}", user_id, str(e))
         raise HTTPException(status_code=500, detail="Internal server error")

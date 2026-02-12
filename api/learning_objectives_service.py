@@ -106,7 +106,7 @@ async def generate_objectives(notebook_id: str) -> Dict:
         }
 
     except Exception as e:
-        logger.error(f"Error generating objectives for notebook {notebook_id}: {e}")
+        logger.error("Error generating objectives for notebook {}: {}", notebook_id, str(e))
         logger.exception(e)
         return {
             "status": "failed",
@@ -160,7 +160,7 @@ async def create_objective(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error creating objective for notebook {notebook_id}: {e}")
+        logger.error("Error creating objective for notebook {}: {}", notebook_id, str(e))
         logger.exception(e)
         return None
 
@@ -195,7 +195,7 @@ async def update_objective(
         return objective
 
     except Exception as e:
-        logger.error(f"Error updating objective {objective_id}: {e}")
+        logger.error("Error updating objective {}: {}", objective_id, str(e))
         logger.exception(e)
         return None
 
@@ -225,7 +225,7 @@ async def delete_objective(objective_id: str) -> bool:
         return True
 
     except Exception as e:
-        logger.error(f"Error deleting objective {objective_id}: {e}")
+        logger.error("Error deleting objective {}: {}", objective_id, str(e))
         logger.exception(e)
         return False
 
@@ -247,6 +247,6 @@ async def reorder_objectives(objective_updates: List[Dict[str, int]]) -> bool:
         return True
 
     except Exception as e:
-        logger.error(f"Error reordering objectives: {e}")
+        logger.error("Error reordering objectives: {}", str(e))
         logger.exception(e)
         return False
