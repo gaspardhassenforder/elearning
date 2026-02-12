@@ -11,8 +11,10 @@
  * - Details toggle for transparency
  */
 
-import { useState } from 'react'
-import { MessageSquare } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { MessageSquare, Pencil, Check, X } from 'lucide-react'
 import { ErrorBoundary } from '@/components/common/ErrorBoundary'
 import { DocumentSnippetCard } from './DocumentSnippetCard'
 import { ModuleSuggestionCard } from './ModuleSuggestionCard'
@@ -22,6 +24,7 @@ import { ChatErrorMessage } from './ChatErrorMessage'
 import { DetailsToggle } from './DetailsToggle'
 import { ToolCallDetails } from './ToolCallDetails'
 import { useLearnerStore } from '@/lib/stores/learner-store'
+import { convertReferencesToCompactMarkdown, createCompactReferenceLinkComponent } from '@/lib/utils/source-references'
 import type { LearnerChatMessage } from '@/lib/api/learner-chat'
 import type { SuggestedModule } from '@/lib/types/api'
 
@@ -31,6 +34,8 @@ interface ChatMessageProps {
   isLastAssistant: boolean
   isStreaming: boolean
   t: Record<string, unknown>
+  isEditable?: boolean
+  onEdit?: (newContent: string) => void
 }
 
 function QuizErrorFallback() {
@@ -49,23 +54,126 @@ function PodcastErrorFallback() {
   )
 }
 
-export function ChatMessage({ message, index, isLastAssistant, isStreaming, t }: ChatMessageProps) {
+export function ChatMessage({ message, index, isLastAssistant, isStreaming, t, isEditable, onEdit }: ChatMessageProps) {
   const [detailsExpanded, setDetailsExpanded] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editContent, setEditContent] = useState('')
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null)
   const openViewerSheet = useLearnerStore((state) => state.openViewerSheet)
 
   const tLearner = t.learner as Record<string, unknown>
   const tChat = tLearner?.chat as Record<string, string>
+  const tCommon = t.common as Record<string, string>
   const tLearnerErrors = t.learnerErrors as Record<string, string>
+
+  // Auto-focus and auto-resize textarea when entering edit mode
+  useEffect(() => {
+    if (isEditing && editTextareaRef.current) {
+      editTextareaRef.current.focus()
+      editTextareaRef.current.style.height = 'auto'
+      editTextareaRef.current.style.height = `${editTextareaRef.current.scrollHeight}px`
+    }
+  }, [isEditing])
+
+  const handleStartEdit = () => {
+    setEditContent(message.content)
+    setIsEditing(true)
+  }
+
+  const handleConfirmEdit = () => {
+    const trimmed = editContent.trim()
+    if (trimmed && trimmed !== message.content && onEdit) {
+      onEdit(trimmed)
+    }
+    setIsEditing(false)
+  }
+
+  const handleCancelEdit = () => {
+    setIsEditing(false)
+    setEditContent('')
+  }
+
+  const handleEditKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleConfirmEdit()
+    } else if (e.key === 'Escape') {
+      handleCancelEdit()
+    }
+  }
 
   if (message.role === 'user') {
     return (
-      <div className="flex justify-end">
-        <div className="max-w-[80%] bg-accent/30 rounded-2xl px-4 py-3">
-          <p className="text-base leading-relaxed">{message.content}</p>
+      <div className="flex justify-end group">
+        <div className="max-w-[80%]">
+          {isEditing ? (
+            <div className="bg-accent/30 rounded-2xl px-4 py-3 space-y-2">
+              <textarea
+                ref={editTextareaRef}
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                onKeyDown={handleEditKeyDown}
+                className="w-full bg-transparent text-base leading-relaxed resize-none focus:outline-none min-h-[28px]"
+                rows={1}
+                onInput={(e) => {
+                  const target = e.target as HTMLTextAreaElement
+                  target.style.height = 'auto'
+                  target.style.height = `${target.scrollHeight}px`
+                }}
+              />
+              <div className="flex justify-end gap-1">
+                <button
+                  onClick={handleCancelEdit}
+                  className="p-1 rounded hover:bg-accent/50 text-muted-foreground"
+                  type="button"
+                  aria-label="Cancel"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={handleConfirmEdit}
+                  className="p-1 rounded hover:bg-accent/50 text-primary"
+                  type="button"
+                  aria-label="Confirm"
+                >
+                  <Check className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="bg-accent/30 rounded-2xl px-4 py-3">
+                <p className="text-base leading-relaxed">{message.content}</p>
+              </div>
+              {isEditable && (
+                <div className="flex justify-end mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={handleStartEdit}
+                    className="p-1 rounded hover:bg-accent/50 text-muted-foreground"
+                    type="button"
+                    aria-label="Edit message"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
     )
   }
+
+  // Build reference link component for clickable source citations
+  const ReferenceLinkComponent = createCompactReferenceLinkComponent((type, id) => {
+    openViewerSheet({ type: 'source', id: `${type}:${id}` })
+  })
+
+  // Convert references to compact numbered format
+  const processedContent = convertReferencesToCompactMarkdown(
+    message.content,
+    tCommon?.references || 'References'
+  )
 
   // Assistant message
   return (
@@ -74,12 +182,39 @@ export function ChatMessage({ message, index, isLastAssistant, isStreaming, t }:
         <MessageSquare className="h-4 w-4 text-primary" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-base leading-relaxed text-foreground/90">
-          {message.content}
+        <div className="prose prose-sm prose-neutral dark:prose-invert max-w-none break-words prose-headings:font-semibold prose-a:text-blue-600 prose-a:break-all prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-p:mb-4 prose-p:leading-7 prose-li:mb-2 text-foreground/90">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              a: ReferenceLinkComponent,
+              p: ({ children }) => <p className="mb-4">{children}</p>,
+              h1: ({ children }) => <h1 className="mb-4 mt-6">{children}</h1>,
+              h2: ({ children }) => <h2 className="mb-3 mt-5">{children}</h2>,
+              h3: ({ children }) => <h3 className="mb-3 mt-4">{children}</h3>,
+              h4: ({ children }) => <h4 className="mb-2 mt-4">{children}</h4>,
+              h5: ({ children }) => <h5 className="mb-2 mt-3">{children}</h5>,
+              h6: ({ children }) => <h6 className="mb-2 mt-3">{children}</h6>,
+              li: ({ children }) => <li className="mb-1">{children}</li>,
+              ul: ({ children }) => <ul className="mb-4 space-y-1">{children}</ul>,
+              ol: ({ children }) => <ol className="mb-4 space-y-1">{children}</ol>,
+              table: ({ children }) => (
+                <div className="my-4 overflow-x-auto">
+                  <table className="min-w-full border-collapse border border-border">{children}</table>
+                </div>
+              ),
+              thead: ({ children }) => <thead className="bg-muted">{children}</thead>,
+              tbody: ({ children }) => <tbody>{children}</tbody>,
+              tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
+              th: ({ children }) => <th className="border border-border px-3 py-2 text-left font-semibold">{children}</th>,
+              td: ({ children }) => <td className="border border-border px-3 py-2">{children}</td>,
+            }}
+          >
+            {processedContent}
+          </ReactMarkdown>
           {isLastAssistant && isStreaming && (
             <span className="inline-block w-1.5 h-4 ml-1 bg-primary animate-pulse" />
           )}
-        </p>
+        </div>
 
         {/* Tool call artifacts */}
         {message.toolCalls && message.toolCalls.length > 0 && (

@@ -16,7 +16,7 @@
  */
 
 import { useEffect, useState, useRef } from 'react'
-import { MessageSquare, ArrowDown, Mic, MicOff, Send } from 'lucide-react'
+import { MessageSquare, ArrowDown, Mic, MicOff, Send, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { useLearnerChat, useChatHistory } from '@/lib/hooks/use-learner-chat'
@@ -66,6 +66,8 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
     error,
     sendMessage,
     messages,
+    clearMessages,
+    editLastMessage,
   } = useLearnerChat(notebookId)
 
   // Voice input
@@ -261,6 +263,23 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
               onScroll={handleScroll}
               className="flex-1 overflow-y-auto relative"
             >
+              {/* New conversation button */}
+              {allMessages.length > 0 && !isStreaming && (
+                <div className="sticky top-2 z-10 flex justify-end px-4">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-full shadow-sm text-xs gap-1.5"
+                    onClick={() => {
+                      clearMessages()
+                      setHistoryLoaded(false)
+                    }}
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    {t.learner.chat.newConversation}
+                  </Button>
+                </div>
+              )}
               <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
                 {allMessages.length === 0 && isStreaming ? (
                   // Greeting loading state
@@ -287,19 +306,34 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
                     </div>
                   </div>
                 ) : (
-                  allMessages.map((message, index) => (
-                    <ChatMessage
-                      key={index}
-                      message={message}
-                      index={index}
-                      isLastAssistant={
-                        message.role === 'assistant' &&
-                        index === allMessages.length - 1
-                      }
-                      isStreaming={isStreaming}
-                      t={t}
-                    />
-                  ))
+                  allMessages.map((message, index) => {
+                    // Determine if this is the last user message (for edit)
+                    const lastUserIndex = allMessages.reduce(
+                      (lastIdx: number, msg: { role: string }, idx: number) =>
+                        msg.role === 'user' ? idx : lastIdx,
+                      -1
+                    )
+                    const isEditableMsg =
+                      message.role === 'user' &&
+                      index === lastUserIndex &&
+                      !isStreaming
+
+                    return (
+                      <ChatMessage
+                        key={index}
+                        message={message}
+                        index={index}
+                        isLastAssistant={
+                          message.role === 'assistant' &&
+                          index === allMessages.length - 1
+                        }
+                        isStreaming={isStreaming}
+                        t={t}
+                        isEditable={isEditableMsg}
+                        onEdit={isEditableMsg ? editLastMessage : undefined}
+                      />
+                    )
+                  })
                 )}
                 <div ref={messagesEndRef} />
               </div>

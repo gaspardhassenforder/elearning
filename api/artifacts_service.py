@@ -234,7 +234,7 @@ async def get_artifact_preview_data(artifact: Artifact) -> dict:
     """
     from open_notebook.domain.quiz import Quiz
     from open_notebook.domain.notebook import Note
-    from open_notebook.domain.podcast import Podcast
+    from open_notebook.podcasts.models import PodcastEpisode
 
     artifact_type = artifact.artifact_type
     artifact_id = artifact.artifact_id
@@ -269,7 +269,7 @@ async def get_artifact_preview_data(artifact: Artifact) -> dict:
 
         elif artifact_type == "podcast":
             # Get podcast episode
-            podcast = await Podcast.get(artifact_id)
+            podcast = await PodcastEpisode.get(artifact_id)
             if not podcast:
                 return {
                     "artifact_type": "podcast",
@@ -279,9 +279,8 @@ async def get_artifact_preview_data(artifact: Artifact) -> dict:
             return {
                 "artifact_type": "podcast",
                 "id": podcast.id,
-                "title": podcast.title or artifact.title,
-                "duration": podcast.duration_minutes,
-                "audio_url": f"/api/podcasts/{podcast.id}/audio" if podcast.audio_file_path else None,
+                "title": podcast.name or artifact.title,
+                "audio_url": f"/api/podcasts/{podcast.id}/audio" if podcast.audio_file else None,
                 "transcript": podcast.transcript,
             }
 

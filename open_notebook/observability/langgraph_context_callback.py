@@ -45,7 +45,7 @@ class ContextLoggingCallback(BaseCallbackHandler):
         **kwargs: Any,
     ) -> None:
         """Log chain/graph start."""
-        chain_name = serialized.get("name", "unknown")
+        chain_name = serialized.get("name", "unknown") if serialized else "unknown"
         run_id = kwargs.get("run_id")
 
         if run_id:
@@ -110,7 +110,7 @@ class ContextLoggingCallback(BaseCallbackHandler):
         **kwargs: Any,
     ) -> None:
         """Log tool invocation start."""
-        tool_name = serialized.get("name", "unknown")
+        tool_name = serialized.get("name", "unknown") if serialized else "unknown"
         run_id = kwargs.get("run_id")
 
         log_operation(
@@ -162,7 +162,7 @@ class ContextLoggingCallback(BaseCallbackHandler):
         **kwargs: Any,
     ) -> None:
         """Log LLM call start."""
-        model_name = serialized.get("model_name", serialized.get("name", "unknown"))
+        model_name = serialized.get("model_name", serialized.get("name", "unknown")) if serialized else "unknown"
         run_id = kwargs.get("run_id")
 
         log_operation(

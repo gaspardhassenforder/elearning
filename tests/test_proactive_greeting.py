@@ -1,7 +1,7 @@
 """
 Story 4.2: Tests for Proactive Greeting Functionality
 
-Tests greeting generation, personalization, and first-visit detection.
+Tests LLM-based greeting generation, personalization, and fallback behavior.
 """
 
 import pytest
@@ -11,222 +11,237 @@ from api.learner_chat_service import generate_proactive_greeting
 
 
 @pytest.mark.asyncio
-async def test_greeting_generation_with_beginner_learner():
-    """Test greeting personalization for beginner AI familiarity."""
-    # Arrange
+async def test_greeting_calls_llm_with_learner_context():
+    """Test that greeting sends learner profile and objectives to LLM."""
     notebook_id = "notebook:test-123"
     learner_profile = {
         "role": "Data Analyst",
         "ai_familiarity": "beginner",
-        "job_description": "Analyzing sales data"
+        "job_description": "Analyzing sales data",
     }
     mock_notebook = MagicMock()
-    mock_notebook.title = "Introduction to Machine Learning"
+    mock_notebook.name = "Introduction to Machine Learning"
 
-    # Mock LearningObjective.list_by_notebook
-    with patch('api.learner_chat_service.LearningObjective.list_by_notebook') as mock_objectives:
-        mock_obj = MagicMock()
-        mock_obj.text = "Understand supervised learning"
-        mock_objectives.return_value = [mock_obj]
+    mock_obj = MagicMock()
+    mock_obj.text = "Understand supervised learning"
 
-        # Mock LLM for opening question generation
-        with patch('api.learner_chat_service.provision_langchain_model') as mock_model:
+    with patch(
+        "api.learner_chat_service.LearningObjective.get_for_notebook",
+        new_callable=AsyncMock,
+        return_value=[mock_obj],
+    ):
+        with patch("api.learner_chat_service.provision_langchain_model") as mock_provision:
             mock_llm = AsyncMock()
-            mock_llm.ainvoke = AsyncMock(return_value=MagicMock(
-                content="What patterns do you notice in your sales data analysis?"
-            ))
-            mock_model.return_value = mock_llm
+            mock_llm.ainvoke = AsyncMock(
+                return_value=MagicMock(
+                    content="Welcome Data Analyst! Let's explore Introduction to Machine Learning together."
+                )
+            )
+            mock_provision.return_value = mock_llm
 
-            # Act
             greeting = await generate_proactive_greeting(
                 notebook_id=notebook_id,
                 learner_profile=learner_profile,
-                notebook=mock_notebook
+                notebook=mock_notebook,
             )
 
-    # Assert
-    assert "Data Analyst" in greeting
-    assert "Introduction to Machine Learning" in greeting
-    assert "AI is new to you" in greeting or "beginner" in greeting.lower()
-    assert "Understand supervised learning" in greeting
-    assert "?" in greeting  # Should ask an opening question
+    # Assert LLM was called
+    mock_llm.ainvoke.assert_called_once()
+    prompt_sent = mock_llm.ainvoke.call_args[0][0]
+
+    # Assert prompt includes learner context
+    assert "Data Analyst" in prompt_sent
+    assert "beginner" in prompt_sent
+    assert "Analyzing sales data" in prompt_sent
+    assert "Introduction to Machine Learning" in prompt_sent
+    assert "Understand supervised learning" in prompt_sent
+
+    # Assert greeting is the LLM response
+    assert "Welcome Data Analyst" in greeting
 
 
 @pytest.mark.asyncio
-async def test_greeting_generation_with_expert_learner():
-    """Test greeting personalization for expert AI familiarity."""
-    # Arrange
-    notebook_id = "notebook:test-456"
+async def test_greeting_includes_language_instruction_for_french():
+    """Test that non-English language adds instruction to prompt."""
     learner_profile = {
-        "role": "Machine Learning Engineer",
-        "ai_familiarity": "expert",
-        "job_description": "Building ML models"
-    }
-    mock_notebook = MagicMock()
-    mock_notebook.title = "Advanced Neural Networks"
-
-    with patch('api.learner_chat_service.LearningObjective.list_by_notebook') as mock_objectives:
-        mock_obj = MagicMock()
-        mock_obj.text = "Understand transformers architecture"
-        mock_objectives.return_value = [mock_obj]
-
-        with patch('api.learner_chat_service.provision_langchain_model') as mock_model:
-            mock_llm = AsyncMock()
-            mock_llm.ainvoke = AsyncMock(return_value=MagicMock(
-                content="How have you applied transformer architectures in your work?"
-            ))
-            mock_model.return_value = mock_llm
-
-            # Act
-            greeting = await generate_proactive_greeting(
-                notebook_id=notebook_id,
-                learner_profile=learner_profile,
-                notebook=mock_notebook
-            )
-
-    # Assert
-    assert "Machine Learning Engineer" in greeting
-    assert "Advanced Neural Networks" in greeting
-    assert "familiar with AI" in greeting or "expertise" in greeting.lower()
-    assert "transformers architecture" in greeting
-
-
-@pytest.mark.asyncio
-async def test_greeting_generation_with_job_context():
-    """Test that job context is referenced in greeting."""
-    # Arrange
-    learner_profile = {
-        "role": "Product Manager",
+        "role": "Analyste",
         "ai_familiarity": "intermediate",
-        "job_description": "Managing AI product features"
+        "job_description": "Analyse de données",
     }
     mock_notebook = MagicMock()
-    mock_notebook.title = "AI for Product Managers"
+    mock_notebook.name = "Module IA"
 
-    with patch('api.learner_chat_service.LearningObjective.list_by_notebook') as mock_objectives:
-        mock_objectives.return_value = [MagicMock(text="Understand AI product lifecycle")]
-
-        with patch('api.learner_chat_service.provision_langchain_model') as mock_model:
+    with patch(
+        "api.learner_chat_service.LearningObjective.get_for_notebook",
+        new_callable=AsyncMock,
+        return_value=[],
+    ):
+        with patch("api.learner_chat_service.provision_langchain_model") as mock_provision:
             mock_llm = AsyncMock()
-            mock_llm.ainvoke = AsyncMock(return_value=MagicMock(
-                content="How do you currently prioritize AI features?"
-            ))
-            mock_model.return_value = mock_llm
+            mock_llm.ainvoke = AsyncMock(
+                return_value=MagicMock(content="Bonjour ! Bienvenue dans Module IA.")
+            )
+            mock_provision.return_value = mock_llm
 
-            # Act
             greeting = await generate_proactive_greeting(
                 notebook_id="notebook:test",
                 learner_profile=learner_profile,
-                notebook=mock_notebook
+                notebook=mock_notebook,
+                language="fr-FR",
             )
 
-    # Assert
-    assert "Managing AI product features" in greeting or "your work" in greeting.lower()
+    # Assert language instruction was in the prompt
+    prompt_sent = mock_llm.ainvoke.call_args[0][0]
+    assert "French" in prompt_sent
+    assert "MUST write the entire greeting" in prompt_sent
+
+    assert len(greeting) > 0
 
 
 @pytest.mark.asyncio
-async def test_greeting_generation_handles_no_objectives():
-    """Test greeting generation when no learning objectives exist."""
-    # Arrange
+async def test_greeting_no_language_instruction_for_english():
+    """Test that English (default) does not add language instruction."""
     learner_profile = {"role": "Student", "ai_familiarity": "beginner", "job_description": ""}
     mock_notebook = MagicMock()
-    mock_notebook.title = "Test Module"
+    mock_notebook.name = "Test Module"
 
-    with patch('api.learner_chat_service.LearningObjective.list_by_notebook') as mock_objectives:
-        mock_objectives.return_value = []  # No objectives
-
-        with patch('api.learner_chat_service.provision_langchain_model') as mock_model:
+    with patch(
+        "api.learner_chat_service.LearningObjective.get_for_notebook",
+        new_callable=AsyncMock,
+        return_value=[],
+    ):
+        with patch("api.learner_chat_service.provision_langchain_model") as mock_provision:
             mock_llm = AsyncMock()
-            mock_llm.ainvoke = AsyncMock(return_value=MagicMock(
-                content="What would you like to learn?"
-            ))
-            mock_model.return_value = mock_llm
+            mock_llm.ainvoke = AsyncMock(
+                return_value=MagicMock(content="Hello! Welcome to Test Module.")
+            )
+            mock_provision.return_value = mock_llm
 
-            # Act
-            greeting = await generate_proactive_greeting(
+            await generate_proactive_greeting(
                 notebook_id="notebook:test",
                 learner_profile=learner_profile,
-                notebook=mock_notebook
+                notebook=mock_notebook,
+                language="en-US",
             )
 
-    # Assert
-    assert "Student" in greeting
-    assert "Test Module" in greeting
-    assert "exploring this module's content" in greeting  # Fallback objective text
+    prompt_sent = mock_llm.ainvoke.call_args[0][0]
+    assert "MUST write the entire greeting" not in prompt_sent
 
 
 @pytest.mark.asyncio
-async def test_greeting_generation_fallback_on_llm_failure():
+async def test_greeting_handles_no_objectives():
+    """Test greeting generation when no learning objectives exist."""
+    learner_profile = {"role": "Student", "ai_familiarity": "beginner", "job_description": ""}
+    mock_notebook = MagicMock()
+    mock_notebook.name = "Test Module"
+
+    with patch(
+        "api.learner_chat_service.LearningObjective.get_for_notebook",
+        new_callable=AsyncMock,
+        return_value=[],
+    ):
+        with patch("api.learner_chat_service.provision_langchain_model") as mock_provision:
+            mock_llm = AsyncMock()
+            mock_llm.ainvoke = AsyncMock(
+                return_value=MagicMock(content="Welcome! Let's explore this module.")
+            )
+            mock_provision.return_value = mock_llm
+
+            greeting = await generate_proactive_greeting(
+                notebook_id="notebook:test",
+                learner_profile=learner_profile,
+                notebook=mock_notebook,
+            )
+
+    # Prompt should contain fallback text for no objectives
+    prompt_sent = mock_llm.ainvoke.call_args[0][0]
+    assert "No specific objectives defined yet" in prompt_sent
+    assert len(greeting) > 0
+
+
+@pytest.mark.asyncio
+async def test_greeting_fallback_on_llm_failure():
     """Test that greeting generation falls back gracefully if LLM fails."""
-    # Arrange
     learner_profile = {"role": "Engineer", "ai_familiarity": "intermediate", "job_description": ""}
     mock_notebook = MagicMock()
-    mock_notebook.title = "Test Module"
+    mock_notebook.name = "Test Module"
 
-    with patch('api.learner_chat_service.LearningObjective.list_by_notebook') as mock_objectives:
-        mock_objectives.return_value = [MagicMock(text="Test Objective")]
+    with patch(
+        "api.learner_chat_service.LearningObjective.get_for_notebook",
+        new_callable=AsyncMock,
+        return_value=[MagicMock(text="Test Objective")],
+    ):
+        with patch("api.learner_chat_service.provision_langchain_model") as mock_provision:
+            mock_provision.side_effect = Exception("LLM unavailable")
 
-        with patch('api.learner_chat_service.provision_langchain_model') as mock_model:
-            # Simulate LLM failure
-            mock_model.side_effect = Exception("LLM unavailable")
-
-            # Act
             greeting = await generate_proactive_greeting(
                 notebook_id="notebook:test",
                 learner_profile=learner_profile,
-                notebook=mock_notebook
+                notebook=mock_notebook,
             )
 
-    # Assert - Should still generate greeting using fallback
-    assert "Engineer" in greeting
+    # Should return fallback greeting
     assert "Test Module" in greeting
-    assert len(greeting) > 0  # Not empty
+    assert len(greeting) > 0
 
 
 @pytest.mark.asyncio
-async def test_greeting_template_file_exists():
-    """Test that greeting_template.j2 file exists and is readable."""
-    from pathlib import Path
+async def test_greeting_fallback_on_llm_failure_french():
+    """Test French fallback when LLM fails."""
+    learner_profile = {"role": "Ingénieur", "ai_familiarity": "intermediate", "job_description": ""}
+    mock_notebook = MagicMock()
+    mock_notebook.name = "Module Test"
 
-    template_path = Path("prompts/greeting_template.j2")
-    assert template_path.exists(), f"Greeting template not found at {template_path}"
-    assert template_path.is_file(), f"Greeting template path is not a file: {template_path}"
+    with patch(
+        "api.learner_chat_service.LearningObjective.get_for_notebook",
+        new_callable=AsyncMock,
+        return_value=[],
+    ):
+        with patch("api.learner_chat_service.provision_langchain_model") as mock_provision:
+            mock_provision.side_effect = Exception("LLM unavailable")
 
-    # Verify file is readable
-    with open(template_path, 'r') as f:
-        content = f.read()
-        assert len(content) > 0, "Greeting template is empty"
-        assert "learner_profile" in content, "Template missing learner_profile variable"
+            greeting = await generate_proactive_greeting(
+                notebook_id="notebook:test",
+                learner_profile=learner_profile,
+                notebook=mock_notebook,
+                language="fr-FR",
+            )
+
+    # Should return French fallback
+    assert "Bonjour" in greeting
+    assert "Module Test" in greeting
 
 
 @pytest.mark.asyncio
 async def test_greeting_handles_missing_profile_fields():
     """Test greeting generation with minimal learner profile."""
-    # Arrange - minimal profile (missing job_description)
     learner_profile = {
         "role": "Student",
-        "ai_familiarity": "beginner"
+        "ai_familiarity": "beginner",
         # job_description intentionally missing
     }
     mock_notebook = MagicMock()
-    mock_notebook.title = "Intro Course"
+    mock_notebook.name = "Intro Course"
 
-    with patch('api.learner_chat_service.LearningObjective.list_by_notebook') as mock_objectives:
-        mock_objectives.return_value = [MagicMock(text="Learn basics")]
-
-        with patch('api.learner_chat_service.provision_langchain_model') as mock_model:
+    with patch(
+        "api.learner_chat_service.LearningObjective.get_for_notebook",
+        new_callable=AsyncMock,
+        return_value=[MagicMock(text="Learn basics")],
+    ):
+        with patch("api.learner_chat_service.provision_langchain_model") as mock_provision:
             mock_llm = AsyncMock()
-            mock_llm.ainvoke = AsyncMock(return_value=MagicMock(content="What interests you?"))
-            mock_model.return_value = mock_llm
+            mock_llm.ainvoke = AsyncMock(
+                return_value=MagicMock(content="Hello Student! Welcome to Intro Course.")
+            )
+            mock_provision.return_value = mock_llm
 
-            # Act
             greeting = await generate_proactive_greeting(
                 notebook_id="notebook:test",
                 learner_profile=learner_profile,
-                notebook=mock_notebook
+                notebook=mock_notebook,
             )
 
-    # Assert - Should not crash, should still personalize
-    assert "Student" in greeting
-    assert "Intro Course" in greeting
+    # Should not crash, should use N/A for missing job_description
+    prompt_sent = mock_llm.ainvoke.call_args[0][0]
+    assert "N/A" in prompt_sent
     assert len(greeting) > 0

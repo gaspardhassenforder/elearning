@@ -84,7 +84,7 @@ def navigation_node(state: NavigationState, config: RunnableConfig) -> dict:
                 provision_langchain_model(
                     str(payload),
                     model_id=None,  # Use default chat model
-                    model_type="chat",
+                    default_type="chat",
                     max_tokens=4096  # Navigation responses should be short
                 )
             )
@@ -107,7 +107,7 @@ def navigation_node(state: NavigationState, config: RunnableConfig) -> dict:
             provision_langchain_model(
                 str(payload),
                 model_id=None,
-                model_type="chat",
+                default_type="chat",
                 max_tokens=4096,
             )
         )

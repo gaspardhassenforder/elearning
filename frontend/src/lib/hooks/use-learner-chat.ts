@@ -24,7 +24,8 @@ interface UseLearnerChatResult {
   isStreaming: boolean
   error: Error | null
   sendMessage: (content: string) => Promise<void>
-  clearMessages: () => void
+  clearMessages: () => Promise<void>
+  editLastMessage: (newContent: string) => Promise<void>
   greetingRequested: boolean  // Story 4.2: Track if greeting was requested
   lastObjectiveChecked: ObjectiveCheckedData | null  // Story 4.4: Last checked objective for inline confirmation
 }
@@ -247,9 +248,36 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
     [sendMessageMutation, isStreaming]
   )
 
-  const clearMessages = useCallback(() => {
+  const clearMessages = useCallback(async () => {
     setMessages([])
-  }, [])
+    greetingRequestedRef.current = false  // Allow greeting to fire again
+    setGreetingRequested(false)
+    try {
+      const { resetLearnerChat } = await import('../api/learner-chat')
+      await resetLearnerChat(notebookId)
+      // Invalidate history cache so next load sees empty state
+      queryClient.invalidateQueries({ queryKey: ['learner-chat-history', notebookId] })
+    } catch (err) {
+      console.error('Failed to reset chat:', err)
+    }
+  }, [notebookId, queryClient])
+
+  const editLastMessage = useCallback(
+    async (newContent: string) => {
+      if (!newContent.trim() || isStreaming) return
+      // Find the last user message index
+      const lastUserIndex = messages.reduce(
+        (lastIdx, msg, idx) => (msg.role === 'user' ? idx : lastIdx),
+        -1
+      )
+      if (lastUserIndex === -1) return
+      // Truncate messages up to (but not including) the last user message
+      setMessages((prev) => prev.slice(0, lastUserIndex))
+      // Send the edited content as a new message
+      await sendMessageMutation.mutateAsync(newContent)
+    },
+    [sendMessageMutation, isStreaming, messages]
+  )
 
   // Story 4.2: Request proactive greeting on first load
   const [greetingRequested, setGreetingRequested] = useState(false)
@@ -324,6 +352,7 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
     error: error as Error | null,
     sendMessage,
     clearMessages,
+    editLastMessage,
     greetingRequested,
     lastObjectiveChecked,  // Story 4.4: Expose for inline confirmation
   }

@@ -8,7 +8,6 @@ Story: 4.2 - Two-Layer Prompt System & Proactive AI Teacher
 
 from typing import Optional, Tuple
 
-from ai_prompter import Prompter
 from fastapi import HTTPException
 from loguru import logger
 
@@ -115,6 +114,86 @@ async def get_learner_objectives_with_status(
         except Exception as e2:
             logger.error(f"Fallback objectives load also failed: {e2}")
             return []
+
+
+async def build_source_context_for_learner(notebook_id: str) -> Optional[str]:
+    """Build source context string for the learner system prompt.
+
+    Loads sources for the notebook and formats their insights into a context
+    string that populates the {{ context }} variable in the system prompt template.
+
+    Args:
+        notebook_id: Notebook/module record ID
+
+    Returns:
+        Formatted context string with source titles and insights, or None on failure
+    """
+    try:
+        notebook = await Notebook.get(notebook_id)
+        if not notebook:
+            logger.warning("Notebook {} not found for source context", notebook_id)
+            return None
+
+        sources = await notebook.get_sources()
+        if not sources:
+            logger.debug("No sources found for notebook {}", notebook_id)
+            return None
+
+        context_parts = []
+        total_chars = 0
+        max_total_chars = 50_000
+        max_insight_chars = 500
+
+        for source in sources:
+            if total_chars >= max_total_chars:
+                break
+
+            try:
+                source_context = await source.get_context("short")
+                source_id = source_context.get("id", "unknown")
+                # Strip table prefix (e.g. "source:m02eadg..." → "m02eadg...")
+                # because the format string already adds "source:" prefix
+                if isinstance(source_id, str) and ":" in source_id:
+                    source_id = source_id.split(":", 1)[1]
+                source_title = source_context.get("title", "Untitled")
+                insights = source_context.get("insights", [])
+
+                section = f'## [source:{source_id}] - "{source_title}"\n'
+
+                if insights:
+                    section += "Insights:\n"
+                    for insight in insights:
+                        insight_type = insight.get("insight_type", "summary")
+                        content = insight.get("content", "")
+                        if len(content) > max_insight_chars:
+                            content = content[:max_insight_chars] + "..."
+                        section += f"  - {insight_type}: {content}\n"
+                else:
+                    section += "  (No insights available)\n"
+
+                if total_chars + len(section) > max_total_chars:
+                    break
+
+                context_parts.append(section)
+                total_chars += len(section)
+
+            except Exception as e:
+                logger.warning("Failed to get context for source {}: {}", source.id, str(e))
+                continue
+
+        if not context_parts:
+            return None
+
+        result = "\n".join(context_parts)
+        logger.info(
+            "Built source context for notebook {}: {} sources, {} chars",
+            notebook_id, len(context_parts), len(result)
+        )
+        return result
+
+    except Exception as e:
+        logger.error("Failed to build source context for notebook {}: {}", notebook_id, str(e))
+        return None
 
 
 async def validate_learner_access_to_notebook(
@@ -259,13 +338,20 @@ async def prepare_chat_context(
         logger.warning("Failed to load learning objectives for notebook {}: {}", notebook_id, str(e))
         objectives_with_status = []
 
-    # 3. Assemble system prompt (global + per-module from Story 3.4)
+    # 3. Build source context for grounded AI responses
+    try:
+        source_context = await build_source_context_for_learner(notebook_id)
+    except Exception as e:
+        logger.warning("Failed to build source context for notebook {}: {}", notebook_id, str(e))
+        source_context = None
+
+    # 4. Assemble system prompt (global + per-module from Story 3.4)
     try:
         system_prompt = await assemble_system_prompt(
             notebook_id=notebook_id,
             learner_profile=learner_profile,
             objectives_with_status=objectives_with_status,
-            context=None,  # Context built by LangGraph chat workflow
+            context=source_context,
             language=language,
         )
         logger.info(
@@ -285,13 +371,16 @@ async def prepare_chat_context(
 async def generate_proactive_greeting(
     notebook_id: str, learner_profile: dict, notebook: Notebook, language: str = "en-US"
 ) -> str:
-    """Generate personalized proactive greeting for first visit.
+    """Generate personalized proactive greeting for first visit via LLM.
 
-    Uses greeting_template.j2 to create a personalized message that:
+    Uses a single LLM call to generate a natural, personalized greeting that:
     1. References learner's role and AI familiarity
     2. Mentions their job context
     3. Introduces the first learning objective
-    4. Asks an opening question to engage them
+    4. Asks an engaging opening question
+    5. Handles language naturally (no rigid template)
+
+    Follows the same pattern as generate_re_engagement_greeting() in prompt.py.
 
     Args:
         notebook_id: Notebook/module record ID
@@ -301,13 +390,10 @@ async def generate_proactive_greeting(
 
     Returns:
         Personalized greeting string
-
-    Raises:
-        Exception: If greeting generation fails
     """
     logger.info(f"Generating proactive greeting for notebook {notebook_id}")
 
-    # 1. Load learning objectives for this notebook
+    # 1. Load learning objectives
     try:
         objectives = await LearningObjective.get_for_notebook(notebook_id)
         logger.debug(f"Found {len(objectives)} learning objectives for notebook {notebook_id}")
@@ -315,13 +401,11 @@ async def generate_proactive_greeting(
         logger.warning("Failed to load learning objectives for notebook {}: {}", notebook_id, str(e))
         objectives = []
 
-    # 2. Determine first objective to introduce
-    first_objective_text = objectives[0].text if objectives else "exploring this module's content"
-    logger.debug(f"First objective: {first_objective_text}")
+    objectives_text = "\n".join(
+        f"- {obj.text}" for obj in objectives
+    ) if objectives else "No specific objectives defined yet."
 
-    # 3. Generate opening question based on first objective
-    # Use LLM to create contextual opening question
-    # Map language codes to display names for LLM instruction
+    # 2. Language instruction
     language_names = {
         "fr-FR": "French (Français)",
         "en-US": "English",
@@ -330,57 +414,45 @@ async def generate_proactive_greeting(
         "zh-TW": "Traditional Chinese (繁體中文)",
     }
     language_display = language_names.get(language, "English")
-    language_instruction = f"\nIMPORTANT: You MUST respond in {language_display}." if language != "en-US" else ""
+    language_instruction = (
+        f"\n6. IMPORTANT: You MUST write the entire greeting in {language_display}."
+        if language != "en-US" else ""
+    )
 
-    opening_question_prompt = f"""Generate a thought-provoking opening question to engage a learner starting to explore this learning objective:
+    # 3. Build prompt (same pattern as generate_re_engagement_greeting)
+    prompt = f"""Generate a warm, personalized first greeting for a learner starting a new learning module.
 
-"{first_objective_text}"
+**Learner Context:**
+- Role: {learner_profile.get('role', 'learner')}
+- AI Familiarity: {learner_profile.get('ai_familiarity', 'intermediate')}
+- Job: {learner_profile.get('job_description', 'N/A')}
 
-The learner's role is: {learner_profile.get('role', 'Unknown')}
-The learner's job: {learner_profile.get('job_description', 'N/A')}
+**Module:** {notebook.name}
 
-Create a question that:
-- Connects to their work context
-- Encourages them to think about what they already know
-- Sets up exploration of the objective
-- Is open-ended (not yes/no)
-{language_instruction}
-Return ONLY the question, nothing else."""
+**Learning Objectives:**
+{objectives_text}
 
+**Guidelines:**
+1. Welcome them warmly and reference their role/background
+2. Briefly acknowledge their AI familiarity level (adjust tone accordingly)
+3. Introduce the first learning objective naturally
+4. End with an engaging, open-ended question that connects to their work
+5. Keep it concise (3-5 sentences), conversational tone{language_instruction}
+
+Generate the greeting now:"""
+
+    # 4. Call LLM
     try:
         model = await provision_langchain_model(
-            opening_question_prompt,
-            model_id=None,  # Use default chat model
-            default_type="chat",
-            max_tokens=150,  # Short response
+            prompt, model_id=None, default_type="chat", max_tokens=1024
         )
-        opening_question = await model.ainvoke(opening_question_prompt)
-        # Extract text from AIMessage (handles structured content blocks)
-        if hasattr(opening_question, "content"):
-            opening_question = extract_text_from_response(opening_question.content)
-        opening_question = str(opening_question).strip()
-        logger.debug(f"Generated opening question: {opening_question}")
+        response = await model.ainvoke(prompt)
+        greeting = extract_text_from_response(response.content).strip()
+        logger.info(f"Proactive greeting generated: {len(greeting)} chars")
+        return greeting
     except Exception as e:
-        logger.warning("Failed to generate opening question, using fallback: {}", str(e))
-        opening_question = f"What comes to mind when you think about {first_objective_text.lower()}?"
-
-    # 4. Render greeting template
-    try:
-        greeting_text = Prompter(prompt_template="greeting_template").render(
-            data={
-                "learner_profile": learner_profile,
-                "module_title": notebook.name,
-                "first_objective_text": first_objective_text,
-                "opening_question": opening_question,
-                "language": language,
-                "language_display": language_display,
-            }
-        )
-        logger.info(f"Proactive greeting generated: {len(greeting_text)} chars")
-        return greeting_text
-    except Exception as e:
-        logger.error("Failed to render greeting template: {}", str(e))
+        logger.error("Failed to generate proactive greeting: {}", str(e))
         # Fallback to simple greeting
         if language == "fr-FR":
-            return f"Bonjour {learner_profile.get('role', 'apprenant')} ! Bienvenue dans {notebook.name}. Commençons !"
-        return f"Hello {learner_profile.get('role', 'learner')}! Welcome to {notebook.name}. Let's get started!"
+            return f"Bonjour ! Bienvenue dans {notebook.name}. Commençons !"
+        return f"Hello! Welcome to {notebook.name}. Let's get started!"

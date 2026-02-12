@@ -30,7 +30,8 @@ class ContentAnalysisOutput(BaseModel):
 
     summary: str = Field(description="2-3 sentence summary of the content")
     objectives: list[str] = Field(
-        description="2-4 specific learning objectives from this content"
+        default_factory=list,
+        description="2-4 specific learning objectives from this content",
     )
 
 
@@ -226,13 +227,19 @@ async def analyze_all_content(state: ObjectiveGenerationState) -> dict:
                 logger.warning(f"Source {source.id} has no text, skipping")
                 continue
 
-            analysis = await _analyze_single_content(
-                content_id=source.id,
-                content_type="source",
-                title=source.title or "Untitled Source",
-                text=text,
-            )
-            analyses.append(analysis)
+            try:
+                analysis = await _analyze_single_content(
+                    content_id=source.id,
+                    content_type="source",
+                    title=source.title or "Untitled Source",
+                    text=text,
+                )
+                analyses.append(analysis)
+            except Exception as e:
+                logger.warning(
+                    "Failed to analyze source {}: {}", source.id, str(e)
+                )
+                continue
 
         # Load artifacts for this notebook
         from open_notebook.database.repository import ensure_record_id

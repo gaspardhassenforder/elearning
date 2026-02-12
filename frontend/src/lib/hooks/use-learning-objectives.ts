@@ -23,6 +23,7 @@ import {
   reorderLearningObjectives,
   getLearnerObjectivesProgress,
 } from '@/lib/api/learning-objectives'
+import { QUERY_KEYS } from '@/lib/api/query-client'
 
 /**
  * Query key factory for learning objectives
@@ -65,6 +66,9 @@ export function useGenerateLearningObjectives(notebookId: string) {
         queryClient.invalidateQueries({
           queryKey: learningObjectivesKeys.list(notebookId),
         })
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.notebook(notebookId),
+        })
       } else if (data.status === 'error') {
         toast.error(data.error || 'Failed to generate objectives')
       }
@@ -88,6 +92,9 @@ export function useCreateLearningObjective(notebookId: string) {
       toast.success('Objective added')
       queryClient.invalidateQueries({
         queryKey: learningObjectivesKeys.list(notebookId),
+      })
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.notebook(notebookId),
       })
     },
     onError: (error: Error) => {
@@ -135,6 +142,9 @@ export function useDeleteLearningObjective(notebookId: string) {
       toast.success('Objective deleted')
       queryClient.invalidateQueries({
         queryKey: learningObjectivesKeys.list(notebookId),
+      })
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.notebook(notebookId),
       })
     },
     onError: (error: Error) => {

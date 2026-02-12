@@ -239,6 +239,18 @@ export async function* parseLearnerChatStream(
 }
 
 /**
+ * Reset learner chat conversation (clear thread checkpoint)
+ *
+ * Calls the backend DELETE endpoint to clear the thread checkpoint,
+ * allowing the learner to start a fresh conversation.
+ *
+ * @param notebookId - Notebook/module ID
+ */
+export async function resetLearnerChat(notebookId: string): Promise<void> {
+  await apiClient.delete(`/chat/learner/${notebookId}`)
+}
+
+/**
  * Get chat history for a notebook
  *
  * Story 4.8: Load previous conversation history for persistent chat.

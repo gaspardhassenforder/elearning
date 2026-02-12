@@ -481,9 +481,9 @@ Now generate the welcome-back message:
         # Use fast small model for cost optimization (re-engagement greeting doesn't need premium model)
         model = await provision_langchain_model(
             rendered_prompt,
-            model_name="gpt-4o-mini",  # Fast, cheap for greetings
-            model_type="chat",
-            max_tokens=150,  # Keep it short
+            model_id=None,
+            default_type="chat",
+            max_tokens=150,
         )
 
         response = await model.ainvoke([SystemMessage(content=rendered_prompt)])
@@ -553,8 +553,8 @@ Topic summary (1-2 sentences):"""
     try:
         model = await provision_langchain_model(
             extraction_prompt,
-            model_name="gpt-4o-mini",
-            model_type="chat",
+            model_id=None,
+            default_type="chat",
             max_tokens=100,
         )
 

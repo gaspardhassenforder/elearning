@@ -20,6 +20,7 @@ import { useNotebook } from '@/lib/hooks/use-notebooks'
 import { usePublishModule } from '@/lib/hooks/use-notebooks'
 import { ModuleSummaryCard } from './ModuleSummaryCard'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
 interface ModulePublishFlowProps {
@@ -109,33 +110,37 @@ export function ModulePublishFlow({ notebookId, isEditMode = false, onSuccess, o
       )}
 
       {/* Actions */}
-      <div className="flex justify-between">
-        <Button variant="outline" onClick={onBack} disabled={publishMutation.isPending}>
-          {t.common.back}
-        </Button>
+      <Card>
+        <CardContent className="py-4">
+          <div className="flex justify-between">
+            <Button variant="outline" onClick={onBack} disabled={publishMutation.isPending}>
+              {t.common.back}
+            </Button>
 
-        {!publishSuccess ? (
-          <Button onClick={handlePublish} disabled={!canPublish}>
-            {publishMutation.isPending && (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            {!publishSuccess ? (
+              <Button onClick={handlePublish} disabled={!canPublish}>
+                {publishMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                {isEditMode
+                  ? t.modules.publish.publishChanges || 'Publish Changes'
+                  : t.modules.publish.publishModule}
+              </Button>
+            ) : (
+              <Button onClick={handleContinue}>
+                {t.common.continue}
+              </Button>
             )}
-            {isEditMode
-              ? t.modules.publish.publishChanges || 'Publish Changes'
-              : t.modules.publish.publishModule}
-          </Button>
-        ) : (
-          <Button onClick={handleContinue}>
-            {t.common.continue}
-          </Button>
-        )}
-      </div>
+          </div>
 
-      {/* Validation Hint */}
-      {!validation.isValid && !publishSuccess && (
-        <p className="text-sm text-muted-foreground text-center">
-          {t.modules.publish.fixErrorsHint}
-        </p>
-      )}
+          {/* Validation Hint */}
+          {!validation.isValid && !publishSuccess && (
+            <p className="text-sm text-muted-foreground text-center mt-3">
+              {t.modules.publish.fixErrorsHint}
+            </p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

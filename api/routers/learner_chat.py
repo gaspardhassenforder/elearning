@@ -11,7 +11,7 @@ from typing import AsyncIterator
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from loguru import logger
 from pydantic import BaseModel, Field
 
@@ -23,6 +23,7 @@ from api.learner_chat_service import (
 )
 from open_notebook.graphs.prompt import generate_re_engagement_greeting
 from open_notebook.graphs.chat import get_async_graph, get_async_memory
+from open_notebook.utils import extract_text_from_response
 from open_notebook.observability.langsmith_handler import get_langsmith_callback
 from open_notebook.observability.langgraph_context_callback import ContextLoggingCallback
 from open_notebook.observability.token_tracking_callback import TokenTrackingCallback
@@ -104,6 +105,59 @@ class SSEObjectiveCheckedEvent(BaseModel):
     total_completed: int
     total_objectives: int
     all_complete: bool
+
+
+# ============================================================================
+# Chat Reset Endpoint
+# ============================================================================
+
+
+@router.delete("/chat/learner/{notebook_id}")
+async def reset_learner_chat(
+    notebook_id: str,
+    learner: LearnerContext = Depends(get_current_learner),
+):
+    """Reset learner chat conversation (clear thread checkpoint).
+
+    Clears the thread checkpoint so the learner starts a fresh conversation.
+    The frontend uses this when the user clicks "New conversation".
+
+    Args:
+        notebook_id: Notebook/module record ID
+        learner: Authenticated learner context (auto-injected)
+
+    Returns:
+        JSON with status and thread_id
+
+    Raises:
+        HTTPException 403: Learner does not have access to notebook
+        HTTPException 500: Failed to reset chat
+    """
+    await validate_learner_access_to_notebook(
+        notebook_id=notebook_id, learner_context=learner
+    )
+
+    thread_id = f"{learner.user.id}:{notebook_id}"
+    logger.info(f"Resetting chat for thread {thread_id}")
+
+    try:
+        async_memory = await get_async_memory()
+        # Delete checkpoint rows directly from SQLite for this thread
+        async with async_memory.lock:
+            await async_memory.conn.execute(
+                "DELETE FROM checkpoints WHERE thread_id = ?",
+                (thread_id,),
+            )
+            await async_memory.conn.execute(
+                "DELETE FROM writes WHERE thread_id = ?",
+                (thread_id,),
+            )
+            await async_memory.conn.commit()
+        logger.info(f"Chat reset successfully for thread {thread_id}")
+        return {"status": "ok", "thread_id": thread_id}
+    except Exception as e:
+        logger.error("Failed to reset chat for thread {}: {}", thread_id, str(e))
+        raise HTTPException(status_code=500, detail="Failed to reset chat")
 
 
 # ============================================================================
@@ -396,35 +450,13 @@ async def stream_learner_chat(
                 logger.warning("Could not check thread state, assuming first visit: {}", str(e))
                 is_first_visit = True
 
-            # Story 4.2 + 4.8: Generate and stream greeting (proactive or re-engagement)
-            # Greeting is sent BEFORE processing user's first message
-            if is_first_visit or is_returning_user:
-                greeting_type = "re-engagement" if is_returning_user else "proactive"
-                logger.info(f"Generating {greeting_type} greeting...")
-                try:
-                    if is_returning_user:
-                        # Story 4.8: Re-engagement greeting for returning users
-                        # Get learning objectives with status for progress context
-                        from open_notebook.domain.learning_objective import LearningObjective
-                        objectives = await LearningObjective.get_for_notebook(notebook_id)
-                        objectives_with_status = [
-                            {
-                                "id": str(obj.id),
-                                "text": obj.text,
-                                "status": obj.status if hasattr(obj, "status") else "not_started"
-                            }
-                            for obj in objectives
-                        ]
-
-                        greeting = await generate_re_engagement_greeting(
-                            thread_id=thread_id,
-                            learner_profile=learner_profile_dict,
-                            objectives_with_status=objectives_with_status,
-                            notebook_id=notebook_id,
-                            language=request.language,
-                        )
-                    else:
-                        # Story 4.2: Proactive greeting for first-time visitors
+            # Story 4.2: Generate and stream proactive greeting for FIRST visit only.
+            # Returning users already see their history loaded via /history endpoint,
+            # so a re-engagement greeting on top of that is redundant and confusing.
+            if request.request_greeting_only:
+                if is_first_visit:
+                    logger.info("Generating proactive greeting for first visit...")
+                    try:
                         greeting = await generate_proactive_greeting(
                             notebook_id=notebook_id,
                             learner_profile=learner_profile_dict,
@@ -432,33 +464,53 @@ async def stream_learner_chat(
                             language=request.language,
                         )
 
-                    # Stream greeting token-by-token for smooth UX
-                    # Split into words for token-like streaming effect
-                    words = greeting.split()
-                    for word in words:
-                        text_event = SSETextEvent(delta=word + " ")
-                        yield f"event: text\ndata: {text_event.model_dump_json()}\n\n"
+                        # Stream greeting token-by-token for smooth UX
+                        words = greeting.split()
+                        for word in words:
+                            text_event = SSETextEvent(delta=word + " ")
+                            yield f"event: text\ndata: {text_event.model_dump_json()}\n\n"
 
-                    # Send message complete for greeting
-                    greeting_complete_event = SSEMessageCompleteEvent(
-                        messageId=f"greeting_{thread_id}",
-                        metadata={
-                            "thread_id": thread_id,
-                            "notebook_id": notebook_id,
-                            "type": greeting_type + "_greeting",  # "proactive_greeting" or "re-engagement_greeting"
-                            "is_returning_user": is_returning_user,
-                        },
-                    )
-                    yield f"event: message_complete\ndata: {greeting_complete_event.model_dump_json()}\n\n"
+                        # Send message complete for greeting
+                        greeting_complete_event = SSEMessageCompleteEvent(
+                            messageId=f"greeting_{thread_id}",
+                            metadata={
+                                "thread_id": thread_id,
+                                "notebook_id": notebook_id,
+                                "type": "proactive_greeting",
+                                "is_returning_user": False,
+                            },
+                        )
+                        yield f"event: message_complete\ndata: {greeting_complete_event.model_dump_json()}\n\n"
 
-                    logger.info(f"{greeting_type.capitalize()} greeting sent successfully")
+                        logger.info("Proactive greeting sent successfully")
 
-                except Exception as e:
-                    logger.error("Failed to generate {} greeting: {}", greeting_type, str(e))
-                    # Continue with normal chat flow if greeting fails
+                        # Persist greeting to checkpoint so AI sees it in history
+                        # and doesn't re-introduce itself on the first real message
+                        try:
+                            async_graph = await get_async_graph()
+                            await async_graph.aupdate_state(
+                                {"configurable": {"thread_id": thread_id}},
+                                {"messages": [AIMessage(content=greeting)]},
+                                as_node="agent",
+                            )
+                            logger.info("Greeting persisted to checkpoint for thread {}", thread_id)
+                        except Exception as persist_err:
+                            # Non-fatal: greeting was already streamed to user
+                            logger.warning(
+                                "Failed to persist greeting to checkpoint for thread {}: {}",
+                                thread_id, str(persist_err)
+                            )
 
-            # Story 4.2 + 4.8: If greeting-only request, return after sending greeting
-            if request.request_greeting_only or ((is_first_visit or is_returning_user) and not request.message.strip()):
+                    except Exception as e:
+                        logger.error("Failed to generate proactive greeting: {}", str(e))
+                        # Continue — frontend will show fallback empty state
+
+                elif is_returning_user:
+                    # Returning user: skip greeting generation.
+                    # History is loaded separately via /history endpoint.
+                    logger.info(f"Returning user on thread {thread_id} — skipping greeting (history loaded via /history)")
+
+                # Always return after a greeting-only request
                 logger.info("Greeting-only request completed")
                 return
 
@@ -525,8 +577,10 @@ async def stream_learner_chat(
                     chunk_data = event.get("data", {})
                     chunk = chunk_data.get("chunk")
                     if chunk and hasattr(chunk, "content") and chunk.content:
-                        text_event = SSETextEvent(delta=chunk.content)
-                        yield f"event: text\ndata: {text_event.model_dump_json()}\n\n"
+                        text_content = extract_text_from_response(chunk.content)
+                        if text_content:
+                            text_event = SSETextEvent(delta=text_content)
+                            yield f"event: text\ndata: {text_event.model_dump_json()}\n\n"
 
                 # Tool call start
                 elif event_type == "on_tool_start":
