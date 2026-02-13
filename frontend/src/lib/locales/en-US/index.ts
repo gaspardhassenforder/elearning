@@ -1497,8 +1497,9 @@ export const enUS = {
       pause: "Pause",
       speed: "Speed",
       minutes: "minutes",
-      viewTranscript: "View Transcript",
+      viewTranscript: "Transcript",
       generating: "Podcast is currently being generated. Please check back later.",
+      playbackError: "Unable to play audio. Click retry.",
     },
     // Sidebar & Sheet viewer
     sidebar: {

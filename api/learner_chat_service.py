@@ -117,10 +117,12 @@ async def get_learner_objectives_with_status(
 
 
 async def build_source_context_for_learner(notebook_id: str) -> Optional[str]:
-    """Build source context string for the learner system prompt.
+    """Build FULL source context string for the learner system prompt (legacy).
 
     Loads sources for the notebook and formats their insights into a context
     string that populates the {{ context }} variable in the system prompt template.
+    ~50K chars. Kept for backward compatibility but superseded by
+    build_lightweight_context for learner ReAct chat.
 
     Args:
         notebook_id: Notebook/module record ID
@@ -193,6 +195,101 @@ async def build_source_context_for_learner(notebook_id: str) -> Optional[str]:
 
     except Exception as e:
         logger.error("Failed to build source context for notebook {}: {}", notebook_id, str(e))
+        return None
+
+
+async def build_lightweight_context(notebook_id: str) -> Optional[str]:
+    """Build lightweight source context (~5K tokens) for learner ReAct chat.
+
+    Instead of stuffing ~50K chars of full insights, includes only summaries,
+    key_concepts, and topics. The LLM uses search_knowledge_base tool for
+    detailed content retrieval on demand.
+
+    Args:
+        notebook_id: Notebook/module record ID
+
+    Returns:
+        Formatted lightweight context string, or None on failure
+    """
+    LIGHTWEIGHT_INSIGHT_TYPES = {"summary", "key_concepts", "topics"}
+    MAX_TOTAL_CHARS = 8_000  # ~5K tokens
+    MAX_INSIGHT_CHARS = 200
+
+    try:
+        notebook = await Notebook.get(notebook_id)
+        if not notebook:
+            logger.warning("Notebook {} not found for lightweight context", notebook_id)
+            return None
+
+        sources = await notebook.get_sources()
+        if not sources:
+            logger.debug("No sources found for notebook {}", notebook_id)
+            return None
+
+        context_parts = []
+        total_chars = 0
+
+        for source in sources:
+            if total_chars >= MAX_TOTAL_CHARS:
+                break
+
+            try:
+                source_context = await source.get_context("short")
+                source_id = source_context.get("id", "unknown")
+                if isinstance(source_id, str) and ":" in source_id:
+                    source_id = source_id.split(":", 1)[1]
+                source_title = source_context.get("title", "Untitled")
+                insights = source_context.get("insights", [])
+
+                section = f'## [source:{source_id}] - "{source_title}"\n'
+
+                # Only include lightweight insight types
+                relevant_insights = [
+                    i for i in insights
+                    if i.get("insight_type", "") in LIGHTWEIGHT_INSIGHT_TYPES
+                ]
+
+                if relevant_insights:
+                    for insight in relevant_insights:
+                        insight_type = insight.get("insight_type", "summary")
+                        content = insight.get("content", "")
+                        if len(content) > MAX_INSIGHT_CHARS:
+                            content = content[:MAX_INSIGHT_CHARS] + "..."
+                        section += f"  - {insight_type}: {content}\n"
+                else:
+                    section += "  (Use search_knowledge_base to explore this source)\n"
+
+                if total_chars + len(section) > MAX_TOTAL_CHARS:
+                    break
+
+                context_parts.append(section)
+                total_chars += len(section)
+
+            except Exception as e:
+                logger.warning(
+                    "Failed to get context for source {}: {}", source.id, str(e)
+                )
+                continue
+
+        if not context_parts:
+            return None
+
+        result = "\n".join(context_parts)
+        result += (
+            "\n\n**For detailed content, use the search_knowledge_base tool.**"
+        )
+
+        logger.info(
+            "Built lightweight context for notebook {}: {} sources, {} chars",
+            notebook_id, len(context_parts), len(result),
+        )
+        return result
+
+    except Exception as e:
+        logger.error(
+            "Failed to build lightweight context for notebook {}: {}",
+            notebook_id, str(e),
+        )
         return None
 
 
@@ -288,20 +385,22 @@ async def validate_learner_access_to_notebook(
 
 async def prepare_chat_context(
     notebook_id: str, learner: LearnerContext, language: Optional[str] = None
-) -> Tuple[str, dict]:
+) -> Tuple[str, dict, list]:
     """Prepare context for learner chat.
 
     Assembles:
     1. Learner profile (role, AI familiarity, job description)
-    2. Learning objectives with completion status (Story 4.4 - empty for now)
-    3. System prompt (global + per-module via Story 3.4 assemble_system_prompt)
+    2. Learning objectives with completion status
+    3. Lightweight source context (~5K tokens instead of 50K)
+    4. System prompt (global + per-module via Story 3.4 assemble_system_prompt)
 
     Args:
         notebook_id: Notebook/module record ID
         learner: Authenticated learner context
+        language: UI language code
 
     Returns:
-        Tuple of (system_prompt, learner_profile_dict)
+        Tuple of (system_prompt, learner_profile_dict, objectives_with_status)
 
     Raises:
         Exception: If prompt assembly fails
@@ -338,9 +437,9 @@ async def prepare_chat_context(
         logger.warning("Failed to load learning objectives for notebook {}: {}", notebook_id, str(e))
         objectives_with_status = []
 
-    # 3. Build source context for grounded AI responses
+    # 3. Build lightweight source context (~5K tokens) for ReAct chat
     try:
-        source_context = await build_source_context_for_learner(notebook_id)
+        source_context = await build_lightweight_context(notebook_id)
     except Exception as e:
         logger.warning("Failed to build source context for notebook {}: {}", notebook_id, str(e))
         source_context = None
@@ -365,7 +464,7 @@ async def prepare_chat_context(
             detail="Internal server error. Please try again later."
         )
 
-    return system_prompt, learner_profile
+    return system_prompt, learner_profile, objectives_with_status
 
 
 async def generate_proactive_greeting(

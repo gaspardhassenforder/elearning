@@ -175,7 +175,7 @@ export function ObjectiveProgressList({ notebookId }: ObjectiveProgressListProps
     )
   }
 
-  if (!data || data.objectives.length === 0) {
+  if (!data || !data.objectives || data.objectives.length === 0) {
     return (
       <EmptyState
         icon={Target}

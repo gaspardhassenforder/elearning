@@ -1497,8 +1497,9 @@ export const frFR = {
       pause: "Pause",
       speed: "Vitesse",
       minutes: "minutes",
-      viewTranscript: "Voir la transcription",
+      viewTranscript: "Transcription",
       generating: "Le podcast est en cours de génération. Veuillez revenir plus tard.",
+      playbackError: "Impossible de lire l'audio. Cliquez pour réessayer.",
     },
     // Barre latérale et visionneuse
     sidebar: {

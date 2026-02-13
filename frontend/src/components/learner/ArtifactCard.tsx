@@ -182,7 +182,7 @@ export function ArtifactCard({ artifact, isExpanded, onToggleExpand }: ArtifactC
         title={podcast.title}
         audioUrl={podcast.audio_url || ''}
         durationMinutes={Math.round(durationMinutes)}
-        transcriptUrl={podcast.transcript ? `/podcasts/${podcast.id}/transcript` : undefined}
+        transcriptUrl={`/api/podcasts/${podcast.id}/transcript`}
         status={podcast.audio_url ? 'completed' : 'generating'}
       />
     )

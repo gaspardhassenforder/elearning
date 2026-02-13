@@ -276,11 +276,22 @@ async def get_artifact_preview_data(artifact: Artifact) -> dict:
                     "error": "Podcast not found",
                 }
 
+            # Route to the correct audio endpoint based on ID prefix:
+            # - episode:xxx → /api/podcasts/episodes/{id}/audio
+            # - podcast:xxx → /api/podcasts/{id}/audio
+            audio_url = None
+            if podcast.audio_file:
+                pid = str(podcast.id)
+                if pid.startswith("episode:"):
+                    audio_url = f"/api/podcasts/episodes/{pid}/audio"
+                else:
+                    audio_url = f"/api/podcasts/{pid}/audio"
+
             return {
                 "artifact_type": "podcast",
                 "id": podcast.id,
                 "title": podcast.name or artifact.title,
-                "audio_url": f"/api/podcasts/{podcast.id}/audio" if podcast.audio_file else None,
+                "audio_url": audio_url,
                 "transcript": podcast.transcript,
             }
 

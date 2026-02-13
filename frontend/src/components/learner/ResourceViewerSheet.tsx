@@ -322,7 +322,7 @@ function ArtifactViewer({
               title={preview.title}
               audioUrl={preview.audio_url || ''}
               durationMinutes={0}
-              transcriptUrl=""
+              transcriptUrl={`/api/podcasts/${preview.id}/transcript`}
               status={preview.audio_url ? 'completed' : 'generating'}
             />
           )}

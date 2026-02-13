@@ -11,7 +11,7 @@
  * - Details toggle for transparency
  */
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { MessageSquare, Pencil, Check, X } from 'lucide-react'
@@ -36,6 +36,7 @@ interface ChatMessageProps {
   t: Record<string, unknown>
   isEditable?: boolean
   onEdit?: (newContent: string) => void
+  sourceTitleMap?: Map<string, string>
 }
 
 function QuizErrorFallback() {
@@ -54,7 +55,7 @@ function PodcastErrorFallback() {
   )
 }
 
-export function ChatMessage({ message, index, isLastAssistant, isStreaming, t, isEditable, onEdit }: ChatMessageProps) {
+export function ChatMessage({ message, index, isLastAssistant, isStreaming, t, isEditable, onEdit, sourceTitleMap }: ChatMessageProps) {
   const [detailsExpanded, setDetailsExpanded] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editContent, setEditContent] = useState('')
@@ -107,7 +108,7 @@ export function ChatMessage({ message, index, isLastAssistant, isStreaming, t, i
       <div className="flex justify-end group">
         <div className="max-w-[80%]">
           {isEditing ? (
-            <div className="bg-accent/30 rounded-2xl px-4 py-3 space-y-2">
+            <div className="bg-muted rounded-2xl px-4 py-3 space-y-2">
               <textarea
                 ref={editTextareaRef}
                 value={editContent}
@@ -142,7 +143,7 @@ export function ChatMessage({ message, index, isLastAssistant, isStreaming, t, i
             </div>
           ) : (
             <>
-              <div className="bg-accent/30 rounded-2xl px-4 py-3">
+              <div className="bg-muted rounded-2xl px-4 py-3">
                 <p className="text-base leading-relaxed">{message.content}</p>
               </div>
               {isEditable && (
@@ -164,15 +165,51 @@ export function ChatMessage({ message, index, isLastAssistant, isStreaming, t, i
     )
   }
 
+  // Build combined title map: merge sourceTitleMap with surface_document titles from tool calls
+  const combinedTitleMap = useMemo(() => {
+    const map = new Map<string, string>(sourceTitleMap)
+    // Add titles from surface_document tool calls (may override with more specific titles)
+    if (message.toolCalls) {
+      for (const tc of message.toolCalls) {
+        if (tc.toolName === 'surface_document' && tc.result?.source_id && tc.result?.title) {
+          map.set(tc.result.source_id as string, tc.result.title as string)
+        }
+      }
+    }
+    return map
+  }, [sourceTitleMap, message.toolCalls])
+
   // Build reference link component for clickable source citations
   const ReferenceLinkComponent = createCompactReferenceLinkComponent((type, id) => {
-    openViewerSheet({ type: 'source', id: `${type}:${id}` })
-  })
+    const fullId = `${type}:${id}`
+    // Find matching surface_document tool call to get excerpt for PDF highlighting
+    let matchingToolCall = message.toolCalls?.find(
+      (tc) => tc.toolName === 'surface_document' && tc.result?.source_id === fullId
+    )
+    let searchText = matchingToolCall?.result?.excerpt as string | undefined
+
+    // Fallback: extract excerpt from search_knowledge_base results if no surface_document match
+    if (!searchText && message.toolCalls) {
+      for (const tc of message.toolCalls) {
+        if (tc.toolName === 'search_knowledge_base' && tc.result?.results) {
+          const results = tc.result.results as Array<{ source_id?: string; excerpt?: string }>
+          const match = results.find((r) => r.source_id === fullId)
+          if (match?.excerpt) {
+            searchText = match.excerpt
+            break
+          }
+        }
+      }
+    }
+
+    openViewerSheet({ type: 'source', id: fullId, searchText })
+  }, combinedTitleMap)
 
   // Convert references to compact numbered format
   const processedContent = convertReferencesToCompactMarkdown(
     message.content,
-    tCommon?.references || 'References'
+    tCommon?.references || 'References',
+    combinedTitleMap
   )
 
   // Assistant message

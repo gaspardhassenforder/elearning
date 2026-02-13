@@ -336,7 +336,7 @@ export function createReferenceLinkComponent(
  * Input: "See [source:abc] and [note:xyz]. Also [source:abc] again."
  * Output: "See [1] and [2]. Also [1] again.\n\nReferences:\n[1] - [source:abc]\n[2] - [note:xyz]"
  */
-export function convertReferencesToCompactMarkdown(text: string, referencesLabel: string = 'References'): string {
+export function convertReferencesToCompactMarkdown(text: string, referencesLabel: string = 'References', titleMap?: Map<string, string>): string {
   // Step 1: Parse all references using existing function
   const references = parseSourceReferences(text)
 
@@ -400,8 +400,9 @@ export function convertReferencesToCompactMarkdown(text: string, referencesLabel
   const refListLines: string[] = [`\n\n${referencesLabel}:`]
 
   // Iterate through reference map in insertion order (Map preserves order)
-  for (const [, refData] of referenceMap) {
-    const refListItem = `[${refData.number}] - [${refData.type}:${refData.id}](#ref-${refData.type}-${refData.id})`
+  for (const [refKey, refData] of referenceMap) {
+    const displayName = titleMap?.get(refKey) || `${refData.type}:${refData.id}`
+    const refListItem = `[${refData.number}] - [${displayName}](#ref-${refData.type}-${refData.id})`
     refListLines.push(refListItem)
   }
 
@@ -429,7 +430,8 @@ export function convertReferencesToCompactMarkdown(text: string, referencesLabel
  * <ReactMarkdown components={{ a: LinkComponent }}>...</ReactMarkdown>
  */
 export function createCompactReferenceLinkComponent(
-  onReferenceClick: (type: ReferenceType, id: string) => void
+  onReferenceClick: (type: ReferenceType, id: string) => void,
+  titleMap?: Map<string, string>
 ) {
   const CompactReferenceLinkComponent = ({
     href,
@@ -445,6 +447,8 @@ export function createCompactReferenceLinkComponent(
       const parts = href.substring(5).split('-') // Remove '#ref-'
       const type = parts[0] as ReferenceType
       const id = parts.slice(1).join('-') // Rejoin in case ID has dashes
+      const refKey = `${type}:${id}`
+      const tooltipTitle = titleMap?.get(refKey)
 
       return (
         <button
@@ -455,6 +459,7 @@ export function createCompactReferenceLinkComponent(
           }}
           className="text-primary hover:underline cursor-pointer inline font-medium"
           type="button"
+          title={tooltipTitle}
         >
           {children}
         </button>

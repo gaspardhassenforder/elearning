@@ -1,7 +1,8 @@
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Tuple
 
 from langchain.tools import tool
+from langchain_core.runnables import RunnableConfig
 from loguru import logger
 
 
@@ -68,8 +69,8 @@ async def _fetch_suggested_modules(user_id: str, current_notebook_id: str) -> Li
 @tool
 async def search_available_modules(
     query: str,
-    config: Optional[dict] = None,
-    limit: int = 5
+    config: RunnableConfig,
+    limit: int = 5,
 ) -> list:
     """Search across modules assigned to learner's company.
 
@@ -176,8 +177,12 @@ def get_current_timestamp() -> str:
     return datetime.now().strftime("%Y%m%d%H%M%S")
 
 
-@tool
-async def surface_document(source_id: str, excerpt_text: str, relevance_reason: str) -> dict:
+@tool(response_format="content_and_artifact")
+async def surface_document(
+    source_id: str,
+    excerpt_text: str,
+    relevance_reason: str,
+) -> Tuple[str, dict]:
     """Surface a document snippet in the chat conversation.
 
     Use this tool when you want to reference a specific source document in your response.
@@ -190,16 +195,9 @@ async def surface_document(source_id: str, excerpt_text: str, relevance_reason: 
         relevance_reason: Brief explanation of why this document is relevant to the conversation
 
     Returns:
-        dict: Structured document snippet data with source metadata
-
-    Security Note:
-        Currently relies on API-layer access control to ensure learners only access
-        sources from their assigned notebooks. The learner chat endpoint validates
-        notebook assignment before invoking this tool.
-
-        TODO (Story 7.5): Add defense-in-depth validation to verify source belongs to
-        the notebook in the current chat session. Requires passing notebook_id via
-        RunnableConfig or adding graph edge validation query.
+        Tuple of (llm_content, ui_artifact):
+        - llm_content: String summary for the LLM to reason over
+        - ui_artifact: Dict for frontend rendering (extracted by SSE handler via ToolMessage.artifact)
     """
     from open_notebook.domain.notebook import Source
 
@@ -211,11 +209,10 @@ async def surface_document(source_id: str, excerpt_text: str, relevance_reason: 
 
         if not source:
             logger.warning(f"Source not found: {source_id}")
-            return {
-                "error": "I couldn't find that document",
-                "error_type": "not_found",
-                "recoverable": True,
-            }
+            return (
+                f"Document {source_id} not found.",
+                {"error": "not_found", "source_id": source_id},
+            )
 
         # Truncate excerpt to 200 characters if needed
         truncated_excerpt = excerpt_text
@@ -226,15 +223,33 @@ async def surface_document(source_id: str, excerpt_text: str, relevance_reason: 
         # Determine file type from asset (file_path or URL)
         file_type = "document"
         if source.asset and source.asset.file_path:
-            # Extract extension from file path
             import os
             _, ext = os.path.splitext(source.asset.file_path)
             file_type = ext.lstrip('.') if ext else "file"
         elif source.asset and source.asset.url:
             file_type = "url"
 
-        # Return structured data for frontend rendering
-        result = {
+        # Load actual content for LLM reasoning
+        try:
+            source_context = await source.get_context("short")
+            insights = source_context.get("insights", [])
+            content_parts = []
+            for insight in insights[:3]:
+                content_parts.append(
+                    f"{insight.get('insight_type', '')}: {insight.get('content', '')[:300]}"
+                )
+            content_summary = "\n".join(content_parts) if content_parts else truncated_excerpt
+        except Exception:
+            content_summary = truncated_excerpt
+
+        # String for LLM (content) — LLM sees this in the next agent turn
+        llm_content = (
+            f'Displayed document "{source.title}" [source:{source_id}].\n'
+            f"Content:\n{content_summary}"
+        )
+
+        # Dict for frontend (artifact) — extracted by SSE handler
+        ui_artifact = {
             "source_id": source_id,
             "title": source.title or "Untitled Document",
             "source_type": file_type,
@@ -243,26 +258,28 @@ async def surface_document(source_id: str, excerpt_text: str, relevance_reason: 
             "metadata": {
                 "created": source.created.isoformat() if source.created else None,
                 "file_type": file_type,
-            }
+            },
         }
 
         logger.info(f"Successfully surfaced document: {source.title}")
-        return result
+        return llm_content, ui_artifact
 
     except Exception as e:
-        logger.error("Error in surface_document tool for source {}: {}", source_id, str(e), exc_info=True)
-        return {
-            "error": "I had trouble accessing that document",
-            "error_type": "service_error",
-            "recoverable": False,
-        }
+        logger.error(
+            "Error in surface_document tool for source {}: {}",
+            source_id, str(e), exc_info=True,
+        )
+        return (
+            "I had trouble accessing that document.",
+            {"error": "service_error", "source_id": source_id},
+        )
 
 
 @tool
 async def check_off_objective(
     objective_id: str,
     evidence_text: str,
-    config: Optional[dict] = None,
+    config: RunnableConfig,
 ) -> dict:
     """Check off a learning objective when learner demonstrates understanding.
 
@@ -372,7 +389,7 @@ async def check_off_objective(
 
 
 @tool
-async def surface_quiz(quiz_id: str, config: Optional[dict] = None) -> dict:
+async def surface_quiz(quiz_id: str, config: RunnableConfig) -> dict:
     """Surface a quiz in the chat conversation.
 
     Use this tool when you want to validate learner understanding through an interactive quiz.
@@ -482,7 +499,7 @@ async def surface_quiz(quiz_id: str, config: Optional[dict] = None) -> dict:
 
 
 @tool
-async def surface_podcast(podcast_id: str, config: Optional[dict] = None) -> dict:
+async def surface_podcast(podcast_id: str, config: RunnableConfig) -> dict:
     """Surface a podcast in the chat conversation.
 
     Use this tool when you want to offer an audio learning experience.
@@ -592,64 +609,58 @@ async def surface_podcast(podcast_id: str, config: Optional[dict] = None) -> dic
 
 
 @tool
-async def search_documents(
+async def search_knowledge_base(
     query: str,
-    config: Optional[dict] = None,
+    config: RunnableConfig,
 ) -> list:
-    """Search across all documents in the current module using semantic search.
-
-    Use this to find relevant document passages when the learner asks about a topic.
-    Returns relevant chunks with source_id, title, and excerpt that you can then
-    surface using the surface_document tool.
+    """Search the module's knowledge base for relevant information.
+    Use this to find content related to the learner's question.
+    Returns text passages from source documents and insights.
 
     Args:
-        query: The search query (e.g., "machine learning basics", "neural networks")
-        config: RunnableConfig containing notebook_id (injected by chat graph)
-
-    Returns:
-        List of dicts with source_id, title, excerpt, relevance_score
+        query: Natural language search query
     """
     from open_notebook.domain.notebook import vector_search_for_notebook
 
-    logger.info(f"search_documents tool called with query: '{query}'")
+    logger.info(f"search_knowledge_base tool called with query: '{query}'")
 
-    # Extract notebook_id from config
-    notebook_id = None
-    if config:
-        configurable = config.get("configurable", {})
-        notebook_id = configurable.get("notebook_id")
+    # Extract notebook_id from config (auto-injected by LangChain)
+    notebook_id = config.get("configurable", {}).get("notebook_id")
 
     if not notebook_id:
-        logger.warning("search_documents called without notebook_id in config")
-        return []
+        logger.warning("search_knowledge_base called without notebook_id in config")
+        return [{"error": "Search temporarily unavailable"}]
 
     try:
         results = await vector_search_for_notebook(
             notebook_id=notebook_id,
             keyword=query,
-            results=5,
+            results=8,
         )
 
-        # Format results for the AI to use
+        # Format results with actual content (up to 1000 chars) for LLM reasoning
         formatted = []
         for r in results:
-            # Extract content snippet (first 200 chars)
             content = r.get("content", "")
-            excerpt = content[:200] + "..." if len(content) > 200 else content
+            truncated = content[:1000] + "..." if len(content) > 1000 else content
 
             formatted.append({
                 "source_id": str(r.get("parent_id") or r.get("id", "")),
                 "title": r.get("title", "Untitled"),
-                "excerpt": excerpt,
-                "relevance_score": r.get("similarity", 0),
+                "content": truncated,
+                "similarity": r.get("similarity", 0),
             })
 
-        logger.info(f"search_documents found {len(formatted)} results for '{query}'")
+        logger.info(
+            f"search_knowledge_base found {len(formatted)} results for '{query}'"
+        )
         return formatted
 
     except Exception as e:
-        logger.error("Error in search_documents: {}", str(e), exc_info=True)
-        return []
+        logger.error(
+            "Error in search_knowledge_base: {}", str(e), exc_info=True
+        )
+        return [{"error": "Search temporarily unavailable"}]
 
 
 @tool
@@ -659,7 +670,7 @@ async def generate_artifact(
     notebook_id: Optional[str] = None,
     num_questions: Optional[int] = 5,
     speaker_profile: Optional[str] = "default",
-    config: Optional[dict] = None,
+    config: RunnableConfig = None,
 ) -> dict:
     """Generate an artifact (podcast or quiz) asynchronously.
 

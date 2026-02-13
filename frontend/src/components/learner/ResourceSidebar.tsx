@@ -15,17 +15,14 @@ import {
   TrendingUp,
   ChevronDown,
   ChevronRight,
-  Headphones,
-  CheckCircle2,
-  Circle,
 } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { useNotebookSources } from '@/lib/hooks/use-sources'
 import { useNotebookArtifacts } from '@/lib/hooks/use-artifacts'
-import { useLearnerObjectivesProgress } from '@/lib/hooks/use-learning-objectives'
 import { useLearnerStore } from '@/lib/stores/learner-store'
+import { ObjectiveProgressList } from './ObjectiveProgressList'
 
 interface ResourceSidebarProps {
   notebookId: string
@@ -65,11 +62,6 @@ export function ResourceSidebar({ notebookId }: ResourceSidebarProps) {
 
   const { sources, isLoading: sourcesLoading } = useNotebookSources(notebookId)
   const { data: artifacts, isLoading: artifactsLoading } = useNotebookArtifacts(notebookId)
-  const { data: progressData, isLoading: progressLoading } = useLearnerObjectivesProgress(notebookId)
-
-  const completedCount = progressData?.completed_count ?? 0
-  const totalCount = progressData?.total_count ?? 0
-  const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
 
   return (
     <ScrollArea className="h-full">
@@ -164,59 +156,8 @@ export function ResourceSidebar({ notebookId }: ResourceSidebarProps) {
           className="mt-4"
         />
         {progressOpen && (
-          <div className="mt-1 px-4">
-            {progressLoading ? (
-              <div className="flex items-center justify-center py-4">
-                <LoadingSpinner />
-              </div>
-            ) : !progressData || totalCount === 0 ? (
-              <p className="text-xs text-muted-foreground py-2">
-                {t.learner.progress.noObjectives}
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {/* Progress bar */}
-                <div>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                    <span>{completedCount}/{totalCount} {t.learner.progress.complete}</span>
-                    <span>{progressPercent}%</span>
-                  </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary rounded-full transition-all duration-500"
-                      style={{ width: `${progressPercent}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Objective list */}
-                <div className="space-y-1.5">
-                  {progressData.objectives.map((obj) => (
-                    <div key={obj.id} className="flex items-start gap-2">
-                      {obj.progress_status === 'completed' ? (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-                      ) : (
-                        <Circle className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                      )}
-                      <span className={`text-xs leading-relaxed ${
-                        obj.progress_status === 'completed'
-                          ? 'text-muted-foreground line-through'
-                          : 'text-foreground'
-                      }`}>
-                        {obj.text}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* All complete message */}
-                {completedCount === totalCount && totalCount > 0 && (
-                  <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                    {t.learner.progress.allComplete}
-                  </p>
-                )}
-              </div>
-            )}
+          <div className="mt-1 overflow-hidden px-2">
+            <ObjectiveProgressList notebookId={notebookId} />
           </div>
         )}
       </div>

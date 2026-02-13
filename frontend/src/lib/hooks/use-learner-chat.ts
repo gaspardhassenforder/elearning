@@ -127,18 +127,22 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
             // Merge result into tool call
             const toolCall = toolCallsMap.get(event.toolResult.id)
             if (toolCall) {
-              toolCall.result = event.toolResult.result
+              // Unwrap 'output' wrapper if present (backward compatibility)
+              const rawResult = event.toolResult.result
+              toolCall.result = rawResult?.output && typeof rawResult.output === 'object' && !Array.isArray(rawResult.output)
+                ? rawResult.output
+                : rawResult
 
               // Story 4.7: Detect async artifact generation (tool result with job_id)
               if (
                 toolCall.toolName === 'generate_artifact' &&
-                event.toolResult.result?.job_id &&
-                event.toolResult.result?.artifact_type
+                toolCall.result?.job_id &&
+                toolCall.result?.artifact_type
               ) {
                 // Store active job in learner store to trigger AsyncStatusBar
                 setActiveJob({
-                  jobId: event.toolResult.result.job_id,
-                  artifactType: event.toolResult.result.artifact_type,
+                  jobId: toolCall.result.job_id,
+                  artifactType: toolCall.result.artifact_type,
                   notebookId,
                 })
               }

@@ -15,11 +15,16 @@ from typing_extensions import TypedDict
 from open_notebook.ai.provision import provision_langchain_model
 from open_notebook.config import LANGGRAPH_CHECKPOINT_FILE
 from open_notebook.domain.notebook import Notebook
+from langchain_core.messages import ToolMessage
+from langgraph.prebuilt import ToolNode
+
 from open_notebook.graphs.tools import (
     surface_document,
     check_off_objective,
     surface_quiz,
     surface_podcast,
+    search_knowledge_base,
+    generate_artifact,
 )
 from open_notebook.utils import clean_thinking_content
 
@@ -71,17 +76,13 @@ def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict
             asyncio.set_event_loop(None)
 
     # Determine which tools to bind based on context
-    # Story 4.3: surface_document for document references
-    # Story 4.4: check_off_objective for progress tracking (learner chat only)
-    # Story 4.6: surface_quiz and surface_podcast for artifact surfacing
-    # Surface tools put structured data INTO tool call args for frontend extraction.
-    # They don't need server-side ToolNode execution.
-    # TODO: Re-add search_documents, generate_artifact, search_available_modules
-    # when a proper ToolNode + tool execution loop is added to the graph.
+    # Admin chat: surface tools only (no ToolNode execution, single-pass graph)
+    # Learner chat: surface tools + search_knowledge_base + generate_artifact
+    #   (executed via ToolNode in ReAct loop)
     tools = [surface_document, surface_quiz, surface_podcast]
     if user_id:
-        # Learner chat gets objective tracking
-        tools.append(check_off_objective)
+        # Learner chat gets retrieval and artifact generation tools
+        tools.extend([search_knowledge_base, generate_artifact])
 
     try:
         # Try to get the current event loop
@@ -145,8 +146,65 @@ agent_state.add_edge(START, "agent")
 agent_state.add_edge("agent", END)
 graph = agent_state.compile(checkpointer=memory)
 
+
+# ---------------------------------------------------------------------------
+# Learner ReAct graph: agent -> tools -> agent loop with safety limit
+# ---------------------------------------------------------------------------
+
+MAX_TOOL_ITERATIONS = 5
+
+LEARNER_TOOLS = [
+    surface_document,
+    surface_quiz,
+    surface_podcast,
+    search_knowledge_base,
+    generate_artifact,
+]
+# NOTE: check_off_objective removed from learner tools — handled by background examiner
+
+tool_executor = ToolNode(tools=LEARNER_TOOLS, handle_tool_errors=True, name="tools")
+
+
+def should_continue(state: ThreadState) -> str:
+    """Route to tools node or end based on last message tool_calls."""
+    messages = state.get("messages", [])
+    if not messages:
+        return "__end__"
+
+    last_message = messages[-1]
+    if not hasattr(last_message, "tool_calls") or not last_message.tool_calls:
+        return "__end__"
+
+    # Count consecutive tool rounds to enforce safety limit
+    tool_rounds = 0
+    for msg in reversed(messages):
+        if isinstance(msg, ToolMessage):
+            continue
+        elif isinstance(msg, AIMessage) and getattr(msg, "tool_calls", None):
+            tool_rounds += 1
+        else:
+            break
+
+    if tool_rounds >= MAX_TOOL_ITERATIONS:
+        return "__end__"
+
+    return "tools"
+
+
+learner_state = StateGraph(ThreadState)
+learner_state.add_node("agent", call_model_with_messages)
+learner_state.add_node("tools", tool_executor)
+learner_state.add_edge(START, "agent")
+learner_state.add_conditional_edges(
+    "agent", should_continue, {"tools": "tools", "__end__": END}
+)
+learner_state.add_edge("tools", "agent")
+
+
+# ---------------------------------------------------------------------------
 # Async checkpointer for learner chat (graph.astream_events)
 # Must be initialized lazily because AsyncSqliteSaver requires a running event loop
+# ---------------------------------------------------------------------------
 _async_memory: Optional[AsyncSqliteSaver] = None
 _async_graph = None
 
@@ -165,9 +223,13 @@ async def get_async_memory() -> AsyncSqliteSaver:
 
 
 async def get_async_graph():
-    """Get or create the async-compatible chat graph (lazy singleton)."""
+    """Get or create the async-compatible learner chat graph (lazy singleton).
+
+    Uses the learner_state ReAct graph (agent <-> tools loop) instead of the
+    single-pass admin agent_state graph.
+    """
     global _async_graph
     if _async_graph is None:
         amemory = await get_async_memory()
-        _async_graph = agent_state.compile(checkpointer=amemory)
+        _async_graph = learner_state.compile(checkpointer=amemory)
     return _async_graph

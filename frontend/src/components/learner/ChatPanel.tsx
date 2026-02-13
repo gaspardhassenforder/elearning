@@ -15,7 +15,7 @@
  * - Async job tracking
  */
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { MessageSquare, ArrowDown, Mic, MicOff, Send, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTranslation } from '@/lib/hooks/use-translation'
@@ -29,6 +29,7 @@ import { useToast } from '@/lib/hooks/use-toast'
 import { learnerToast } from '@/lib/utils/learner-toast'
 import { useVoiceInput } from '@/lib/hooks/use-voice-input'
 import { VoiceRecordingOverlay } from './VoiceRecordingOverlay'
+import { useNotebookSources } from '@/lib/hooks/use-sources'
 
 interface ChatPanelProps {
   notebookId: string
@@ -69,6 +70,20 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
     clearMessages,
     editLastMessage,
   } = useLearnerChat(notebookId)
+
+  // Build source title map for reference display (source:id -> title)
+  const { sources: notebookSources } = useNotebookSources(notebookId)
+  const sourceTitleMap = useMemo(() => {
+    const map = new Map<string, string>()
+    if (notebookSources) {
+      for (const source of notebookSources) {
+        if (source.id && source.title) {
+          map.set(source.id, source.title)
+        }
+      }
+    }
+    return map
+  }, [notebookSources])
 
   // Voice input
   const {
@@ -331,6 +346,7 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
                         t={t}
                         isEditable={isEditableMsg}
                         onEdit={isEditableMsg ? editLastMessage : undefined}
+                        sourceTitleMap={sourceTitleMap}
                       />
                     )
                   })

@@ -6,12 +6,13 @@ Implements company-scoped access control and thread isolation per user/notebook.
 Story: 4.1 - Learner Chat Interface & SSE Streaming
 """
 
+import asyncio
 import json
 from typing import AsyncIterator
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from loguru import logger
 from pydantic import BaseModel, Field
 
@@ -87,6 +88,13 @@ class SSEToolResultEvent(BaseModel):
 
     id: str
     result: dict
+
+
+class SSEToolStatusEvent(BaseModel):
+    """SSE tool status event for user-facing progress indicators."""
+
+    status: str
+    tool_name: str
 
 
 class SSEMessageCompleteEvent(BaseModel):
@@ -270,15 +278,23 @@ async def get_chat_history(
         )
 
         # 4. Transform messages to frontend format (assistant-ui compatible)
+        # Filter out ToolMessage from display (internal ReAct loop messages).
+        # The AsyncSqliteSaver checkpoint still stores them for LLM context.
         import uuid
         from datetime import datetime
 
         formatted_messages = []
         for msg in paginated_messages:
+            # Skip internal ToolMessage objects from ReAct loop
+            if isinstance(msg, ToolMessage):
+                continue
+
+            # Skip AIMessages that only contain tool_calls (no user-facing text)
+            if isinstance(msg, AIMessage) and getattr(msg, "tool_calls", None) and not msg.content:
+                continue
+
             try:
                 # Determine role
-                from langchain_core.messages import AIMessage
-
                 role = "assistant" if isinstance(msg, AIMessage) else "user"
 
                 # Extract content (handle structured content)
@@ -394,7 +410,7 @@ async def stream_learner_chat(
 
     # 2. Prepare chat context (system prompt, learner profile, objectives)
     try:
-        system_prompt, learner_profile_dict = await prepare_chat_context(
+        system_prompt, learner_profile_dict, objectives_with_status = await prepare_chat_context(
             notebook_id=notebook_id, learner=learner, language=request.language
         )
         logger.debug(
@@ -546,8 +562,20 @@ async def stream_learner_chat(
             if langsmith_callback:
                 callbacks.append(langsmith_callback)
 
+            # Human-readable status messages for tool_status SSE events
+            _TOOL_STATUS_MAP = {
+                "search_knowledge_base": "Searching knowledge base...",
+                "surface_document": "Loading document...",
+                "surface_quiz": "Loading quiz...",
+                "surface_podcast": "Loading podcast...",
+                "generate_artifact": "Generating content...",
+            }
+
+            # Collect AI response text for background examiner
+            collected_ai_text: list[str] = []
+
             # Stream events from chat graph with assembled system prompt
-            # Story 4.4: Pass user_id for objective progress tracking
+            # ReAct loop: agent -> tools -> agent -> ... (up to MAX_TOOL_ITERATIONS)
             async_graph = await get_async_graph()
             async for event in async_graph.astream_events(
                 {
@@ -557,13 +585,13 @@ async def stream_learner_chat(
                     "context_config": None,
                     "model_override": None,  # Use default model
                     "system_prompt_override": system_prompt,  # Story 4.1: Use assembled prompt
-                    "user_id": learner.user.id,  # Story 4.4: For check_off_objective tool
+                    "user_id": learner.user.id,  # For tools via config
                 },
                 config={
                     "configurable": {
                         "thread_id": thread_id,
-                        "user_id": learner.user.id,  # Story 4.4: Pass to tools
-                        "notebook_id": notebook_id,  # For search_documents + generate_artifact tools
+                        "user_id": learner.user.id,  # Pass to tools
+                        "notebook_id": notebook_id,  # For search_knowledge_base + generate_artifact
                         "company_id": learner.company_id,  # For search_available_modules tool
                     },
                     "callbacks": callbacks,  # Story 7.4: LangSmith tracing
@@ -572,17 +600,18 @@ async def stream_learner_chat(
             ):
                 event_type = event.get("event")
 
-                # Text chunk from LLM
+                # Text chunk from LLM (fires multiple times in ReAct loop)
                 if event_type == "on_chat_model_stream":
                     chunk_data = event.get("data", {})
                     chunk = chunk_data.get("chunk")
                     if chunk and hasattr(chunk, "content") and chunk.content:
                         text_content = extract_text_from_response(chunk.content)
                         if text_content:
+                            collected_ai_text.append(text_content)
                             text_event = SSETextEvent(delta=text_content)
                             yield f"event: text\ndata: {text_event.model_dump_json()}\n\n"
 
-                # Tool call start
+                # Tool call start — emit tool_call + tool_status events
                 elif event_type == "on_tool_start":
                     tool_data = event.get("data", {})
                     tool_name = tool_data.get("name", "unknown")
@@ -594,40 +623,79 @@ async def stream_learner_chat(
                     )
                     yield f"event: tool_call\ndata: {tool_call_event.model_dump_json()}\n\n"
 
-                # Tool call end (result)
+                    # Emit human-readable status for frontend progress indicator
+                    status_text = _TOOL_STATUS_MAP.get(tool_name)
+                    if status_text:
+                        status_event = SSEToolStatusEvent(
+                            status=status_text, tool_name=tool_name
+                        )
+                        yield f"event: tool_status\ndata: {status_event.model_dump_json()}\n\n"
+
+                # Tool call end (result) — handle content_and_artifact tools
                 elif event_type == "on_tool_end":
-                    tool_result = event.get("data", {}).get("output", {})
+                    tool_output = event.get("data", {}).get("output")
                     tool_run_id = event.get("run_id", "call_result")
                     tool_name = event.get("name", "")
 
+                    # For content_and_artifact tools (surface_document), extract
+                    # artifact for frontend. ToolMessage.artifact holds the UI dict.
+                    if hasattr(tool_output, "artifact") and tool_output.artifact:
+                        result_for_frontend = tool_output.artifact
+                    elif hasattr(tool_output, "content"):
+                        # ToolMessage from ToolNode (quiz, podcast, generate_artifact):
+                        # parse JSON content back to dict for frontend
+                        try:
+                            result_for_frontend = json.loads(tool_output.content) if isinstance(tool_output.content, str) else tool_output.content
+                        except (json.JSONDecodeError, TypeError):
+                            result_for_frontend = {"content": str(tool_output.content) if tool_output.content else ""}
+                    elif isinstance(tool_output, dict):
+                        result_for_frontend = tool_output
+                    else:
+                        result_for_frontend = {"content": str(tool_output) if tool_output else ""}
+
                     tool_result_event = SSEToolResultEvent(
-                        id=tool_run_id, result={"output": tool_result}
+                        id=tool_run_id, result=result_for_frontend
                     )
                     yield f"event: tool_result\ndata: {tool_result_event.model_dump_json()}\n\n"
 
-                    # Story 4.4: Emit objective_checked event when check_off_objective completes
-                    if tool_name == "check_off_objective" and isinstance(tool_result, dict):
-                        # Only emit if successful (no error key)
-                        if "error" not in tool_result and "objective_id" in tool_result:
-                            objective_event = SSEObjectiveCheckedEvent(
-                                objective_id=tool_result.get("objective_id", ""),
-                                objective_text=tool_result.get("objective_text", ""),
-                                evidence=tool_result.get("evidence", ""),
-                                total_completed=tool_result.get("total_completed", 0),
-                                total_objectives=tool_result.get("total_objectives", 0),
-                                all_complete=tool_result.get("all_complete", False),
-                            )
-                            yield f"event: objective_checked\ndata: {objective_event.model_dump_json()}\n\n"
-                            logger.info(
-                                f"Emitted objective_checked event: {tool_result.get('total_completed')}/{tool_result.get('total_objectives')}"
-                            )
-
-            # Message complete event
+            # Emit message_complete IMMEDIATELY (not blocked by examiner)
             message_complete_event = SSEMessageCompleteEvent(
                 messageId=f"msg_{thread_id}_{len(request.message)}",
                 metadata={"thread_id": thread_id, "notebook_id": notebook_id},
             )
             yield f"event: message_complete\ndata: {message_complete_event.model_dump_json()}\n\n"
+
+            # Launch background examiner and relay results while SSE connection is open
+            from open_notebook.graphs.nodes.examiner import evaluate_exchange
+
+            examiner_queue: asyncio.Queue = asyncio.Queue()
+            asyncio.create_task(
+                evaluate_exchange(
+                    user_message=request.message,
+                    ai_response="".join(collected_ai_text),
+                    objectives_with_status=objectives_with_status,
+                    user_id=learner.user.id,
+                    notebook_id=notebook_id,
+                    result_queue=examiner_queue,
+                )
+            )
+
+            # Wait for examiner results (with 15s timeout) — SSE stays alive
+            try:
+                while True:
+                    result = await asyncio.wait_for(
+                        examiner_queue.get(), timeout=15.0
+                    )
+                    if result is None:
+                        break  # Sentinel: examiner done
+                    objective_event = SSEObjectiveCheckedEvent(**result)
+                    yield f"event: objective_checked\ndata: {objective_event.model_dump_json()}\n\n"
+                    logger.info(
+                        "Emitted objective_checked event: {}/{}",
+                        result.get("total_completed"), result.get("total_objectives"),
+                    )
+            except asyncio.TimeoutError:
+                logger.warning("Examiner timed out for thread {}", thread_id)
 
         except Exception as e:
             # Story 7.1: Stream error event to frontend
