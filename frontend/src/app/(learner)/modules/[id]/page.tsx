@@ -90,7 +90,7 @@ export default function ModuleConversationPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col h-full">
       {/* Minimal Header (48px) */}
       <header className="flex-shrink-0 h-12 border-b bg-background flex items-center px-4 gap-3">
         {/* Mobile: hamburger toggle */}

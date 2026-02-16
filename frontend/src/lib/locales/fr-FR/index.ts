@@ -1371,6 +1371,12 @@ export const frFR = {
       suggestedModules: "Modules suggérés",
       startModule: "Commencer le module",
       noMoreModules: "Aucun module disponible",
+      // Suggestions de démarrage de conversation
+      suggestions: {
+        whatAbout: "De quoi parle ce module ?",
+        summarize: "Peux-tu résumer les concepts clés ?",
+        focusFirst: "Par quoi devrais-je commencer ?",
+      },
       // Story 6.2: Saisie vocale
       voiceInput: {
         startRecording: "Démarrer la saisie vocale",

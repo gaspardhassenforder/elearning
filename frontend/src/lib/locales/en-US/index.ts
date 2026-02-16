@@ -1371,6 +1371,12 @@ export const enUS = {
       suggestedModules: "Suggested Modules",
       startModule: "Start Module",
       noMoreModules: "No more modules available",
+      // Conversation starter suggestions
+      suggestions: {
+        whatAbout: "What is this module about?",
+        summarize: "Can you summarize the key concepts?",
+        focusFirst: "What should I focus on first?",
+      },
       // Story 6.2: Voice Input
       voiceInput: {
         startRecording: "Start voice input",

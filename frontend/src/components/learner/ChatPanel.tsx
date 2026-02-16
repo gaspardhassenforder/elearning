@@ -373,6 +373,25 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
             {/* Input Area - ChatGPT style */}
             <div className="flex-shrink-0 border-t bg-background">
               <div className="max-w-3xl mx-auto px-4 py-3 relative">
+                {/* Conversation starter suggestions - show when no user message sent yet */}
+                {!isStreaming && !messages.some(m => m.role === 'user') && !historyData?.messages?.some((m: { role: string }) => m.role === 'user') && (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {[
+                      t.learner.chat.suggestions.whatAbout,
+                      t.learner.chat.suggestions.summarize,
+                      t.learner.chat.suggestions.focusFirst,
+                    ].map((suggestion: string) => (
+                      <button
+                        key={suggestion}
+                        type="button"
+                        onClick={() => sendMessage(suggestion)}
+                        className="text-sm px-3 py-1.5 rounded-full border bg-background hover:bg-accent hover:text-accent-foreground transition-colors text-muted-foreground"
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {/* Voice recording overlay */}
                 {isListening && (
                   <VoiceRecordingOverlay
