@@ -94,24 +94,9 @@ export function useCreateSource() {
   return useMutation({
     mutationFn: (data: CreateSourceRequest) => sourcesApi.create(data),
     onSuccess: (result: SourceResponse, variables) => {
-      // Invalidate queries for all relevant notebooks with immediate refetch
-      if (variables.notebooks) {
-        variables.notebooks.forEach(notebookId => {
-          queryClient.invalidateQueries({
-            queryKey: QUERY_KEYS.sources(notebookId),
-            refetchType: 'active' // Refetch active queries immediately
-          })
-        })
-      } else if (variables.notebook_id) {
-        queryClient.invalidateQueries({
-          queryKey: QUERY_KEYS.sources(variables.notebook_id),
-          refetchType: 'active'
-        })
-      }
-
-      // Invalidate general sources query too with immediate refetch
+      // Invalidate ALL sources queries (including infinite scroll) with immediate refetch
       queryClient.invalidateQueries({
-        queryKey: QUERY_KEYS.sources(),
+        queryKey: ['sources'],
         refetchType: 'active'
       })
 
@@ -201,9 +186,8 @@ export function useFileUpload() {
     mutationFn: ({ file, notebookId }: { file: File; notebookId: string }) =>
       sourcesApi.upload(file, notebookId),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ 
-        queryKey: QUERY_KEYS.sources(variables.notebookId) 
-      })
+      // Invalidate ALL sources queries (including infinite scroll)
+      queryClient.invalidateQueries({ queryKey: ['sources'] })
       toast({
         title: t.common.success,
         description: t.sources.fileUploadedSuccess,
@@ -298,14 +282,8 @@ export function useAddSourcesToNotebook() {
       return { successes, failures, total: sourceIds.length }
     },
     onSuccess: (result, { notebookId, sourceIds }) => {
-      // Invalidate ALL sources queries to refresh all lists
+      // Invalidate ALL sources queries (including infinite scroll)
       queryClient.invalidateQueries({ queryKey: ['sources'] })
-      // Specifically invalidate the notebook's sources
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.sources(notebookId) })
-      // Invalidate each affected source
-      sourceIds.forEach(sourceId => {
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.source(sourceId) })
-      })
 
       // Show appropriate toast based on results
       if (result.failures === 0) {
@@ -351,12 +329,8 @@ export function useRemoveSourceFromNotebook() {
       return notebooksApi.removeSource(notebookId, sourceId)
     },
     onSuccess: (_, { notebookId, sourceId }) => {
-      // Invalidate ALL sources queries to refresh all lists
+      // Invalidate ALL sources queries (including infinite scroll)
       queryClient.invalidateQueries({ queryKey: ['sources'] })
-      // Specifically invalidate the notebook's sources
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.sources(notebookId) })
-      // Also invalidate the specific source
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.source(sourceId) })
 
       toast({
         title: t.common.success,
