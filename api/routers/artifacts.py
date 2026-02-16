@@ -216,6 +216,7 @@ async def get_learner_notebook_artifacts(
                 artifact_type=a.artifact_type,
                 title=a.title or "Untitled",
                 created=str(a.created),
+                created_by=getattr(a, "created_by", None),
             )
             for a in artifacts
         ]

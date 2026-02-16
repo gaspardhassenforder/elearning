@@ -16,6 +16,7 @@ class Artifact(ObjectModel):
     artifact_type: Literal["quiz", "podcast", "note", "summary", "transformation"]
     artifact_id: str  # ID of the actual artifact (quiz:xxx, podcast:xxx, etc.)
     title: str
+    created_by: Optional[str] = None  # None = admin-created, user ID string = learner-created
 
     def _is_job_id(self) -> bool:
         """Check if artifact_id is a job ID (command:xxx) rather than a real artifact ID."""
@@ -83,6 +84,7 @@ class Artifact(ObjectModel):
         artifact_type: Literal["quiz", "podcast", "note", "summary", "transformation"],
         artifact_id: str,
         title: str,
+        created_by: Optional[str] = None,
     ) -> "Artifact":
         """Create and save a new artifact tracker."""
         artifact = cls(
@@ -90,6 +92,7 @@ class Artifact(ObjectModel):
             artifact_type=artifact_type,
             artifact_id=artifact_id,
             title=title,
+            created_by=created_by,
         )
         await artifact.save()
         return artifact

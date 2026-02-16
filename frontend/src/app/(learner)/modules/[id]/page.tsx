@@ -25,6 +25,7 @@ import { useLearnerStore } from '@/lib/stores/learner-store'
 import { ResourceSidebar } from '@/components/learner/ResourceSidebar'
 import { ResourceViewerSheet } from '@/components/learner/ResourceViewerSheet'
 import { ChatPanel } from '@/components/learner/ChatPanel'
+import { LearnerActionButtons } from '@/components/learner/LearnerActionButtons'
 
 export default function ModuleConversationPage() {
   const { t } = useTranslation()
@@ -146,8 +147,9 @@ export default function ModuleConversationPage() {
         )}
 
         {/* Chat Area - fills remaining space */}
-        <main className="flex-1 min-w-0">
+        <main className="flex-1 min-w-0 relative">
           <ChatPanel notebookId={moduleId} />
+          <LearnerActionButtons notebookId={moduleId} />
         </main>
       </div>
 

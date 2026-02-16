@@ -8,7 +8,7 @@
  * Click on any item opens the ResourceViewerSheet.
  */
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   FileText,
   GraduationCap,
@@ -61,6 +61,15 @@ export function ResourceSidebar({ notebookId }: ResourceSidebarProps) {
 
   const { sources, isLoading: sourcesLoading } = useNotebookSources(notebookId)
   const { data: artifacts, isLoading: artifactsLoading } = useNotebookArtifacts(notebookId)
+
+  // Split artifacts into module (admin-created) vs. learner-created
+  const { moduleArtifacts, myArtifacts } = useMemo(() => {
+    if (!artifacts) return { moduleArtifacts: [], myArtifacts: [] }
+    return {
+      moduleArtifacts: artifacts.filter((a) => !a.created_by),
+      myArtifacts: artifacts.filter((a) => !!a.created_by),
+    }
+  }, [artifacts])
 
   return (
     <div className="h-full overflow-y-auto overflow-x-hidden">
@@ -116,7 +125,7 @@ export function ResourceSidebar({ notebookId }: ResourceSidebarProps) {
           className="mt-4"
         />
         {artifactsOpen && (
-          <div className="mt-1 space-y-0.5 px-2">
+          <div className="mt-1 px-2">
             {artifactsLoading ? (
               <div className="flex items-center justify-center py-4">
                 <LoadingSpinner />
@@ -126,22 +135,65 @@ export function ResourceSidebar({ notebookId }: ResourceSidebarProps) {
                 {t.learner.artifacts.noArtifacts}
               </p>
             ) : (
-              artifacts.map((artifact) => (
-                <button
-                  key={artifact.id}
-                  onClick={() => openViewerSheet({ type: 'artifact', id: artifact.id })}
-                  className={`w-full text-left flex items-center gap-2 py-2 px-3 rounded-lg text-sm transition-colors hover:bg-accent/50 ${
-                    viewerSheet?.type === 'artifact' && viewerSheet?.id === artifact.id
-                      ? 'bg-accent border-l-2 border-primary'
-                      : ''
-                  }`}
-                >
-                  <span className="flex-shrink-0 text-sm">
-                    {getArtifactIcon(artifact.artifact_type)}
-                  </span>
-                  <span className="truncate">{artifact.title}</span>
-                </button>
-              ))
+              <>
+                {/* Module Artifacts (admin-created) */}
+                {moduleArtifacts.length > 0 && (
+                  <div className="mb-2">
+                    <p className="text-[10px] font-medium uppercase text-muted-foreground tracking-wider px-3 py-1">
+                      {t.learner?.artifacts?.moduleArtifacts || 'Module Artifacts'}
+                    </p>
+                    <div className="space-y-0.5">
+                      {moduleArtifacts.map((artifact) => (
+                        <button
+                          key={artifact.id}
+                          onClick={() => openViewerSheet({ type: 'artifact', id: artifact.id })}
+                          className={`w-full text-left flex items-center gap-2 py-2 px-3 rounded-lg text-sm transition-colors hover:bg-accent/50 ${
+                            viewerSheet?.type === 'artifact' && viewerSheet?.id === artifact.id
+                              ? 'bg-accent border-l-2 border-primary'
+                              : ''
+                          }`}
+                        >
+                          <span className="flex-shrink-0 text-sm">
+                            {getArtifactIcon(artifact.artifact_type)}
+                          </span>
+                          <span className="truncate">{artifact.title}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* My Artifacts (learner-created) */}
+                <div>
+                  <p className="text-[10px] font-medium uppercase text-muted-foreground tracking-wider px-3 py-1">
+                    {t.learner?.artifacts?.myArtifacts || 'My Artifacts'}
+                  </p>
+                  {myArtifacts.length === 0 ? (
+                    <p className="text-xs text-muted-foreground px-3 py-2">
+                      {t.learner?.artifacts?.noMyArtifacts || 'No artifacts created yet'}
+                    </p>
+                  ) : (
+                    <div className="space-y-0.5">
+                      {myArtifacts.map((artifact) => (
+                        <button
+                          key={artifact.id}
+                          onClick={() => openViewerSheet({ type: 'artifact', id: artifact.id })}
+                          className={`w-full text-left flex items-center gap-2 py-2 px-3 rounded-lg text-sm transition-colors hover:bg-accent/50 ${
+                            viewerSheet?.type === 'artifact' && viewerSheet?.id === artifact.id
+                              ? 'bg-accent border-l-2 border-primary'
+                              : ''
+                          }`}
+                        >
+                          <span className="flex-shrink-0 text-sm">
+                            {getArtifactIcon(artifact.artifact_type)}
+                          </span>
+                          <span className="truncate">{artifact.title}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
             )}
           </div>
         )}

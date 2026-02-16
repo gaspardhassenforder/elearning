@@ -950,6 +950,7 @@ class ArtifactListResponse(BaseModel):
     artifact_type: Literal["quiz", "podcast", "summary", "transformation"]
     title: str
     created: str  # ISO timestamp
+    created_by: Optional[str] = None  # None = admin-created, user ID = learner-created
 
 
 # ==============================================================================

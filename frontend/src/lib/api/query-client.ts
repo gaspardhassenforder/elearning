@@ -49,4 +49,5 @@ export const QUERY_KEYS = {
   // Story 5.2: Learner artifacts browsing
   learnerArtifacts: (notebookId: string) => ['learner-artifacts', notebookId] as const,
   learnerArtifactPreview: (artifactId: string) => ['learner-artifacts', 'preview', artifactId] as const,
+  transformations: ['transformations'] as const,
 }

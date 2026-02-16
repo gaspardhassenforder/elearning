@@ -82,6 +82,7 @@ export interface LearnerArtifactListItem {
   artifact_type: 'quiz' | 'podcast' | 'summary' | 'transformation'
   title: string
   created: string  // ISO timestamp
+  created_by?: string | null  // null = admin-created, user ID = learner-created
 }
 
 // Regeneration types (Story 3.2)

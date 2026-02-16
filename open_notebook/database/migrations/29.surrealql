@@ -1,0 +1,2 @@
+-- Migration 29: Add created_by field to artifact table for learner artifact creation
+DEFINE FIELD created_by ON TABLE artifact TYPE option<string>;
