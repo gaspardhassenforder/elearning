@@ -653,6 +653,10 @@ async def stream_learner_chat(
                     else:
                         result_for_frontend = {"content": str(tool_output) if tool_output else ""}
 
+                    # Ensure result is always a dict (search tools return lists)
+                    if isinstance(result_for_frontend, list):
+                        result_for_frontend = {"items": result_for_frontend}
+
                     tool_result_event = SSEToolResultEvent(
                         id=tool_run_id, result=result_for_frontend
                     )
