@@ -16,7 +16,6 @@ import {
   ChevronDown,
   ChevronRight,
 } from 'lucide-react'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { useNotebookSources } from '@/lib/hooks/use-sources'
@@ -64,7 +63,7 @@ export function ResourceSidebar({ notebookId }: ResourceSidebarProps) {
   const { data: artifacts, isLoading: artifactsLoading } = useNotebookArtifacts(notebookId)
 
   return (
-    <ScrollArea className="h-full">
+    <div className="h-full overflow-y-auto overflow-x-hidden">
       <div className="py-4">
         {/* Sources Section */}
         <SectionHeader
@@ -161,7 +160,7 @@ export function ResourceSidebar({ notebookId }: ResourceSidebarProps) {
           </div>
         )}
       </div>
-    </ScrollArea>
+    </div>
   )
 }
 

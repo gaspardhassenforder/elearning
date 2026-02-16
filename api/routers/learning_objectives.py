@@ -16,6 +16,7 @@ from api import learning_objectives_service
 from api.auth import LearnerContext, get_current_learner, require_admin
 from api.learner_chat_service import get_learner_objectives_with_status, validate_learner_access_to_notebook
 from api.models import (
+    LearnerObjectivesProgressResponse,
     LearningObjectiveCreate,
     LearningObjectiveReorder,
     LearningObjectiveResponse,
@@ -243,7 +244,7 @@ async def reorder_objectives(
 
 @learner_router.get(
     "/notebooks/{notebook_id}/learning-objectives/progress",
-    response_model=List[ObjectiveWithProgress],
+    response_model=LearnerObjectivesProgressResponse,
 )
 async def get_objectives_with_progress(
     notebook_id: str,
@@ -264,7 +265,7 @@ async def get_objectives_with_progress(
         learner: Authenticated learner context (auto-injected)
 
     Returns:
-        List of ObjectiveWithProgress with completion status
+        LearnerObjectivesProgressResponse with objectives, completed_count, total_count
 
     Raises:
         HTTPException 403: Learner does not have access to notebook
@@ -292,20 +293,26 @@ async def get_objectives_with_progress(
             notebook_id=notebook_id, user_id=learner.user.id
         )
 
-        # Convert to response model
-        return [
+        # Convert to response model, ensuring datetime values are serialized to strings
+        objectives = [
             ObjectiveWithProgress(
-                id=obj.get("id", ""),
+                id=str(obj.get("id", "")),
                 notebook_id=notebook_id,
                 text=obj.get("text", ""),
                 order=obj.get("order", 0),
                 auto_generated=obj.get("auto_generated", False),
                 progress_status=obj.get("status"),
-                progress_completed_at=obj.get("completed_at"),
+                progress_completed_at=str(obj["completed_at"]) if obj.get("completed_at") else None,
                 progress_evidence=obj.get("evidence"),
             )
             for obj in objectives_data
         ]
+        completed_count = sum(1 for o in objectives if o.progress_status == "completed")
+        return LearnerObjectivesProgressResponse(
+            objectives=objectives,
+            completed_count=completed_count,
+            total_count=len(objectives),
+        )
 
     except Exception as e:
         logger.error("Error fetching objectives with progress for notebook {}: {}", notebook_id, str(e))

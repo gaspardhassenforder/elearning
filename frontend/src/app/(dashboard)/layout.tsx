@@ -1,7 +1,6 @@
 'use client'
 
 import { useAuthStore } from '@/lib/stores/auth-store'
-import { useVersionCheck } from '@/lib/hooks/use-version-check'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -28,9 +27,6 @@ export default function DashboardLayout({
   const { isAuthenticated, user, hasHydrated } = useAuthStore()
   const router = useRouter()
   const [hasCheckedRole, setHasCheckedRole] = useState(false)
-
-  // Check for version updates once per session
-  useVersionCheck()
 
   useEffect(() => {
     // Wait for store to hydrate

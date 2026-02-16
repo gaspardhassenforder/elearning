@@ -891,6 +891,14 @@ class ObjectiveWithProgress(BaseModel):
     progress_evidence: Optional[str] = None
 
 
+class LearnerObjectivesProgressResponse(BaseModel):
+    """Wrapped response for learner objectives with progress."""
+
+    objectives: List[ObjectiveWithProgress]
+    completed_count: int
+    total_count: int
+
+
 class SuggestedModule(BaseModel):
     """Suggested module for learner continuation (Story 4.5)."""
 

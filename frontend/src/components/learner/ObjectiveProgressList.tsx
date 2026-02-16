@@ -17,7 +17,6 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { CheckCircle2, Circle, Target, Loader2 } from 'lucide-react'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { EmptyState } from '@/components/common/EmptyState'
 import { Progress } from '@/components/ui/progress'
@@ -54,7 +53,7 @@ function ObjectiveItem({ objective, t, hasWarmGlow = false }: ObjectiveItemProps
     <div
       data-testid={`objective-item-${objective.id}`}
       className={cn(
-        'flex items-start gap-3 p-3 rounded-lg transition-all duration-150',
+        'flex items-start gap-2 py-1.5 px-2 rounded-md transition-all duration-150',
         isCompleted
           ? 'bg-green-50 dark:bg-green-950/30'
           : 'bg-muted/50 hover:bg-muted',
@@ -64,9 +63,9 @@ function ObjectiveItem({ objective, t, hasWarmGlow = false }: ObjectiveItemProps
       {/* Checkbox icon */}
       <div className="flex-shrink-0 mt-0.5">
         {isCompleted ? (
-          <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+          <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
         ) : (
-          <Circle className="h-5 w-5 text-muted-foreground" />
+          <Circle className="h-3.5 w-3.5 text-muted-foreground" />
         )}
       </div>
 
@@ -74,7 +73,7 @@ function ObjectiveItem({ objective, t, hasWarmGlow = false }: ObjectiveItemProps
       <div className="flex-1 min-w-0">
         <p
           className={cn(
-            'text-sm leading-relaxed',
+            'text-xs leading-normal',
             isCompleted
               ? 'text-green-900 dark:text-green-100'
               : 'text-foreground'
@@ -83,7 +82,7 @@ function ObjectiveItem({ objective, t, hasWarmGlow = false }: ObjectiveItemProps
           {objective.text}
         </p>
         {isCompleted && objective.progress_completed_at && (
-          <p className="text-xs text-green-600/80 dark:text-green-400/80 mt-1">
+          <p className="text-[10px] text-green-600/80 dark:text-green-400/80 mt-0.5">
             {t.learner.progress.completedAt.replace(
               '{date}',
               new Date(objective.progress_completed_at).toLocaleDateString()
@@ -191,39 +190,37 @@ export function ObjectiveProgressList({ notebookId }: ObjectiveProgressListProps
 
   return (
     <TooltipProvider>
-      <div className="h-full flex flex-col">
+      <div>
         {/* Progress Summary Header */}
-        <div className="px-4 py-3 border-b space-y-2">
+        <div className="px-1 py-2 space-y-1.5">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium">{t.learner.progress.title}</h3>
-            <span className="text-sm text-muted-foreground">
+            <span className="text-xs font-medium">{t.learner.progress.title}</span>
+            <span className="text-[10px] text-muted-foreground tabular-nums">
               {data.completed_count}/{data.total_count}
             </span>
           </div>
-          <Progress value={progressPercentage} className="h-2" />
-          <p className="text-xs text-muted-foreground">
+          <Progress value={progressPercentage} className="h-1.5" />
+          <p className="text-[10px] text-muted-foreground">
             {progressPercentage}% {t.learner.progress.complete}
           </p>
         </div>
 
         {/* Objectives List */}
-        <ScrollArea className="flex-1 px-4 py-3">
-          <div className="space-y-2">
-            {data.objectives.map((objective) => (
-              <ObjectiveItem
-                key={objective.id}
-                objective={objective}
-                t={t}
-                hasWarmGlow={recentlyCheckedObjectiveIds.has(objective.id)}  // Story 5.3: Pass glow state
-              />
-            ))}
-          </div>
-        </ScrollArea>
+        <div className="space-y-1 px-1 pb-2">
+          {data.objectives.map((objective) => (
+            <ObjectiveItem
+              key={objective.id}
+              objective={objective}
+              t={t}
+              hasWarmGlow={recentlyCheckedObjectiveIds.has(objective.id)}  // Story 5.3: Pass glow state
+            />
+          ))}
+        </div>
 
         {/* All Complete Message */}
         {data.completed_count === data.total_count && data.total_count > 0 && (
-          <div className="px-4 py-3 border-t bg-green-50 dark:bg-green-950/30">
-            <p className="text-sm text-green-700 dark:text-green-300 font-medium text-center">
+          <div className="px-1 py-2 bg-green-50 dark:bg-green-950/30 rounded-md">
+            <p className="text-xs text-green-700 dark:text-green-300 font-medium text-center">
               {t.learner.progress.allComplete}
             </p>
           </div>
