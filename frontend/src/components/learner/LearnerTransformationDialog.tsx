@@ -95,7 +95,7 @@ export function LearnerTransformationDialog({
                 <LoadingSpinner />
               </div>
             ) : !transformations || transformations.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-2">No transformations available</p>
+              <p className="text-sm text-muted-foreground py-2">{t.learner?.createArtifact?.noTransformationsAvailable || 'No transformations available'}</p>
             ) : (
               <div className="grid grid-cols-2 gap-2">
                 {transformations.map((tx) => (

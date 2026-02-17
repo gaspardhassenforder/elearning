@@ -195,9 +195,9 @@ export function ArtifactCard({ artifact, isExpanded, onToggleExpand }: ArtifactC
       <div className="space-y-3">
         {/* Metadata row */}
         <div className="flex items-center gap-4 text-xs text-muted-foreground">
-          <span>{content.word_count.toLocaleString()} words</span>
+          <span>{content.word_count.toLocaleString()} {t.learner?.artifacts?.words || 'words'}</span>
           {'transformation_name' in content && content.transformation_name && (
-            <span>Type: {content.transformation_name}</span>
+            <span>{(t.learner?.artifacts?.type || 'Type: {name}').replace('{name}', content.transformation_name)}</span>
           )}
         </div>
 

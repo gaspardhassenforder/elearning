@@ -104,7 +104,7 @@ export function LearnerPodcastDialog({
             <Label>{t.learner?.createArtifact?.episodeProfile || 'Episode Profile'}</Label>
             {profilesLoading ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <LoadingSpinner /> Loading profiles...
+                <LoadingSpinner /> {t.learner?.createArtifact?.loadingProfiles || 'Loading profiles...'}
               </div>
             ) : (
               <Select value={selectedProfile} onValueChange={setSelectedProfile}>
@@ -125,11 +125,11 @@ export function LearnerPodcastDialog({
             {selectedEpisodeProfile && (
               <div className="flex gap-2 flex-wrap">
                 <span className="inline-flex items-center rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium">
-                  {selectedEpisodeProfile.num_segments} segments
+                  {(t.learner?.createArtifact?.segments || '{count} segments').replace('{count}', String(selectedEpisodeProfile.num_segments))}
                 </span>
                 {linkedSpeakerProfile && (
                   <span className="inline-flex items-center rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium">
-                    {linkedSpeakerProfile.speakers.length} speaker{linkedSpeakerProfile.speakers.length !== 1 ? 's' : ''}
+                    {(t.learner?.createArtifact?.speakers || '{count} speaker(s)').replace('{count}', String(linkedSpeakerProfile.speakers.length))}
                   </span>
                 )}
               </div>
