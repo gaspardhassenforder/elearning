@@ -39,6 +39,7 @@ class QuizGenerationState(TypedDict):
     # Story 7.7: Token tracking context
     user_id: Optional[str]
     company_id: Optional[str]
+    created_by: Optional[str]
 
 
 class QuizSearch(BaseModel):
@@ -471,6 +472,7 @@ async def save_quiz(state: QuizGenerationState) -> dict:
             artifact_type="quiz",
             artifact_id=quiz.id,
             title=quiz.title,
+            created_by=state.get("created_by"),
         )
 
         logger.info(f"Quiz saved with ID: {quiz.id}")
@@ -497,6 +499,7 @@ async def generate_quiz(
     instructions: Optional[str] = None,
     user_id: Optional[str] = None,  # Story 7.7: Token tracking context
     company_id: Optional[str] = None,  # Story 7.7: Token tracking context
+    created_by: Optional[str] = None,
 ) -> dict:
     """
     Main entry point for quiz generation.
@@ -531,6 +534,7 @@ async def generate_quiz(
         "status": "pending",
         "user_id": user_id,  # Story 7.7: Token tracking context
         "company_id": company_id,  # Story 7.7: Token tracking context
+        "created_by": created_by,
     }
 
     # Run workflow steps sequentially

@@ -45,6 +45,7 @@ class PodcastService:
         notebook_ids: Optional[list[str]] = None,
         content: Optional[str] = None,
         briefing_suffix: Optional[str] = None,
+        created_by: Optional[str] = None,
     ) -> Tuple[str, list[str]]:
         """Submit a podcast generation job for background processing.
         
@@ -138,6 +139,7 @@ class PodcastService:
                         artifact_type="podcast",
                         artifact_id=job_id_str,  # Use job_id as placeholder
                         title=episode_name,
+                        created_by=created_by,
                     )
                     artifact_ids.append(str(artifact.id))
                     logger.info(

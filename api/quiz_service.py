@@ -16,6 +16,7 @@ async def generate_quiz(
     instructions: Optional[str] = None,
     user_id: Optional[str] = None,  # Story 7.7: Token tracking context
     company_id: Optional[str] = None,  # Story 7.7: Token tracking context
+    created_by: Optional[str] = None,
 ) -> dict:
     """
     Generate a quiz for a notebook.
@@ -42,6 +43,7 @@ async def generate_quiz(
         instructions=instructions,
         user_id=user_id,  # Story 7.7: Pass token tracking context
         company_id=company_id,  # Story 7.7: Pass token tracking context
+        created_by=created_by,
     )
 
     return result

@@ -167,17 +167,8 @@ async def learner_generate_podcast(
             notebook_id=notebook_id,
             content=content,
             briefing_suffix=briefing_suffix,
+            created_by=str(learner.user.id),
         )
-
-        # Update artifact(s) with created_by
-        for art_id in artifact_ids:
-            try:
-                await repo_query(
-                    "UPDATE $art_id SET created_by = $user_id",
-                    {"art_id": ensure_record_id(art_id), "user_id": str(learner.user.id)},
-                )
-            except Exception as e:
-                logger.warning(f"Failed to set created_by on artifact {art_id}: {e}")
 
         logger.info(
             f"Learner {learner.user.id} started podcast generation in notebook {notebook_id}, job_id={job_id}"
@@ -241,28 +232,11 @@ async def learner_generate_quiz(
             source_ids=request.source_ids,
             user_id=str(learner.user.id),
             company_id=str(learner.company_id),
+            created_by=str(learner.user.id),
         )
 
         if result.get("error"):
             raise HTTPException(status_code=400, detail=result["error"])
-
-        # Update artifact created_by for the quiz
-        quiz_id = result.get("quiz_id")
-        if quiz_id:
-            try:
-                await repo_query(
-                    """
-                    UPDATE artifact SET created_by = $user_id
-                    WHERE artifact_id = $quiz_id AND notebook_id = $notebook_id
-                    """,
-                    {
-                        "user_id": str(learner.user.id),
-                        "quiz_id": quiz_id,
-                        "notebook_id": ensure_record_id(notebook_id),
-                    },
-                )
-            except Exception as e:
-                logger.warning(f"Failed to set created_by on quiz artifact: {e}")
 
         logger.info(
             f"Learner {learner.user.id} generated quiz in notebook {notebook_id}"
@@ -335,8 +309,8 @@ async def learner_execute_transformation(
         )
         await note.save()
 
-        # Link note to notebook
-        await note.add_to_notebook(notebook_id)
+        # Link note to notebook (relate only, artifact tracker created below)
+        await note.relate("refers_to", notebook_id)
 
         # Create Artifact tracker
         artifact = await Artifact.create_for_artifact(
