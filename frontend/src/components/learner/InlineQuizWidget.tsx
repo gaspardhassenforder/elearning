@@ -128,10 +128,17 @@ export function InlineQuizWidget({
     if (quizUrl) router.push(quizUrl)
   }
 
+  const handleRetake = useCallback(() => {
+    setQuizResults(null)
+    setSelectedAnswers({})
+    setCurrentIndex(0)
+    setSubmitError(null)
+  }, [])
+
   // Results view
   if (quizResults) {
     return (
-      <Card className="my-2 p-4 bg-warm-neutral-50 dark:bg-warm-neutral-900 border-warm-neutral-200 dark:border-warm-neutral-700">
+      <Card className="my-2 p-4 bg-warm-neutral-50 dark:bg-warm-neutral-900 border-warm-neutral-200 dark:border-warm-neutral-700 max-h-[70vh] overflow-y-auto">
         <div className="flex items-start gap-3">
           <div className="flex-shrink-0 w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center">
             <FileQuestion className="h-4 w-4 text-primary" />
@@ -153,30 +160,29 @@ export function InlineQuizWidget({
                 <div
                   key={i}
                   className={cn(
-                    'p-2 rounded-md text-sm',
+                    'p-2 rounded-md text-sm border',
                     result.is_correct
-                      ? 'bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800'
-                      : 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800'
+                      ? 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800'
+                      : 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800'
                   )}
                 >
                   <div className="flex items-start gap-2">
                     {result.is_correct ? (
                       <CheckCircle2 className="h-4 w-4 flex-shrink-0 mt-0.5 text-green-600 dark:text-green-400" />
                     ) : (
-                      <XCircle className="h-4 w-4 flex-shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                      <XCircle className="h-4 w-4 flex-shrink-0 mt-0.5 text-red-500 dark:text-red-400" />
                     )}
                     <div className="flex-1">
-                      <p className={cn(
-                        'font-medium',
-                        result.is_correct ? 'text-green-700 dark:text-green-300' : 'text-amber-700 dark:text-amber-300'
-                      )}>
+                      <p className="font-medium text-foreground">
                         Q{i + 1}: {questions[i]?.text}
                       </p>
+                      {!result.is_correct && (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {t.learner.quiz.correct}: {questions[i]?.options[result.correct_answer]}
+                        </p>
+                      )}
                       {result.explanation && (
-                        <p className={cn(
-                          'mt-1',
-                          result.is_correct ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'
-                        )}>
+                        <p className="mt-1 text-sm text-muted-foreground">
                           {result.explanation}
                         </p>
                       )}
@@ -186,16 +192,24 @@ export function InlineQuizWidget({
               ))}
             </div>
 
-            {quizUrl && (
-              <div className="pt-2">
+            {/* Actions: Retake + View Full Quiz */}
+            <div className="flex items-center gap-3 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRetake}
+              >
+                {t.learner.quiz.tryAgain}
+              </Button>
+              {quizUrl && (
                 <button
                   onClick={handleViewFullQuiz}
                   className="text-xs text-primary hover:underline font-medium"
                 >
                   {t.learner.quiz.viewFullQuiz} →
                 </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </Card>
