@@ -739,7 +739,7 @@ class TransformationPreviewResponse(BaseModel):
 class ArtifactPreviewResponse(BaseModel):
     """Generic artifact preview response (union type)."""
 
-    artifact_type: Literal["quiz", "podcast", "summary", "transformation"]
+    artifact_type: Literal["quiz", "podcast", "note", "summary", "transformation"]
     data: Dict[str, Any] = Field(..., description="Type-specific preview data")
 
 
@@ -947,7 +947,7 @@ class ArtifactListResponse(BaseModel):
     """Artifact item for learner artifact list (Story 5.2)."""
 
     id: str
-    artifact_type: Literal["quiz", "podcast", "summary", "transformation"]
+    artifact_type: Literal["quiz", "podcast", "note", "summary", "transformation"]
     title: str
     created: str  # ISO timestamp
     created_by: Optional[str] = None  # None = admin-created, user ID = learner-created

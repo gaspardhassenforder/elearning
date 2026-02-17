@@ -28,6 +28,7 @@ import { InlineQuizWidget } from './InlineQuizWidget'
 import { InlineAudioPlayer } from './InlineAudioPlayer'
 import { cn } from '@/lib/utils'
 import { formatDistanceToNow } from 'date-fns'
+import ReactMarkdown from 'react-markdown'
 
 interface ArtifactCardProps {
   artifact: LearnerArtifactListItem
@@ -202,8 +203,10 @@ export function ArtifactCard({ artifact, isExpanded, onToggleExpand }: ArtifactC
 
         {/* Content scroll area */}
         <ScrollArea className="max-h-[calc(100vh-300px)]">
-          <div className="text-sm whitespace-pre-wrap leading-relaxed pr-4">
-            {content.content || (t.learner?.artifacts?.noContent || 'No content available')}
+          <div className="prose prose-sm dark:prose-invert max-w-none pr-4">
+            <ReactMarkdown>
+              {content.content || (t.learner?.artifacts?.noContent || 'No content available')}
+            </ReactMarkdown>
           </div>
         </ScrollArea>
       </div>

@@ -32,6 +32,7 @@ import { sourcesApi } from '@/lib/api/sources'
 import { InlineQuizWidget } from './InlineQuizWidget'
 import { InlineAudioPlayer } from './InlineAudioPlayer'
 import { AlertCircle } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
 
 function ArtifactErrorFallback() {
   return (
@@ -329,9 +330,9 @@ function ArtifactViewer({
 
           {(preview.artifact_type === 'summary' || preview.artifact_type === 'transformation') && (
             <div className="prose prose-sm dark:prose-invert max-w-none">
-              <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
+              <ReactMarkdown>
                 {preview.content || tArtifacts?.noContent || 'No content available'}
-              </pre>
+              </ReactMarkdown>
             </div>
           )}
         </ErrorBoundary>

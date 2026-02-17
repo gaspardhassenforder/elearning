@@ -4,10 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
 from pydantic import BaseModel, Field
 
-from api.auth import require_admin
+from api.auth import get_current_user, require_admin
 from open_notebook.podcasts.models import SpeakerProfile
 
-router = APIRouter(dependencies=[Depends(require_admin)])
+router = APIRouter()
 
 
 class SpeakerProfileResponse(BaseModel):
@@ -20,7 +20,7 @@ class SpeakerProfileResponse(BaseModel):
 
 
 @router.get("/speaker-profiles", response_model=List[SpeakerProfileResponse])
-async def list_speaker_profiles():
+async def list_speaker_profiles(_user=Depends(get_current_user)):
     """List all available speaker profiles"""
     try:
         profiles = await SpeakerProfile.get_all(order_by="name asc")
@@ -45,7 +45,7 @@ async def list_speaker_profiles():
 
 
 @router.get("/speaker-profiles/{profile_name}", response_model=SpeakerProfileResponse)
-async def get_speaker_profile(profile_name: str):
+async def get_speaker_profile(profile_name: str, _user=Depends(get_current_user)):
     """Get a specific speaker profile by name"""
     try:
         profile = await SpeakerProfile.get_by_name(profile_name)
@@ -84,7 +84,7 @@ class SpeakerProfileCreate(BaseModel):
 
 
 @router.post("/speaker-profiles", response_model=SpeakerProfileResponse)
-async def create_speaker_profile(profile_data: SpeakerProfileCreate):
+async def create_speaker_profile(profile_data: SpeakerProfileCreate, _admin=Depends(require_admin)):
     """Create a new speaker profile"""
     try:
         profile = SpeakerProfile(
@@ -114,7 +114,7 @@ async def create_speaker_profile(profile_data: SpeakerProfileCreate):
 
 
 @router.put("/speaker-profiles/{profile_id}", response_model=SpeakerProfileResponse)
-async def update_speaker_profile(profile_id: str, profile_data: SpeakerProfileCreate):
+async def update_speaker_profile(profile_id: str, profile_data: SpeakerProfileCreate, _admin=Depends(require_admin)):
     """Update an existing speaker profile"""
     try:
         profile = await SpeakerProfile.get(profile_id)
@@ -152,7 +152,7 @@ async def update_speaker_profile(profile_id: str, profile_data: SpeakerProfileCr
 
 
 @router.delete("/speaker-profiles/{profile_id}")
-async def delete_speaker_profile(profile_id: str):
+async def delete_speaker_profile(profile_id: str, _admin=Depends(require_admin)):
     """Delete a speaker profile"""
     try:
         profile = await SpeakerProfile.get(profile_id)
@@ -178,7 +178,7 @@ async def delete_speaker_profile(profile_id: str):
 @router.post(
     "/speaker-profiles/{profile_id}/duplicate", response_model=SpeakerProfileResponse
 )
-async def duplicate_speaker_profile(profile_id: str):
+async def duplicate_speaker_profile(profile_id: str, _admin=Depends(require_admin)):
     """Duplicate a speaker profile"""
     try:
         original = await SpeakerProfile.get(profile_id)

@@ -4,10 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
 from pydantic import BaseModel, Field
 
-from api.auth import require_admin
+from api.auth import get_current_user, require_admin
 from open_notebook.podcasts.models import EpisodeProfile
 
-router = APIRouter(dependencies=[Depends(require_admin)])
+router = APIRouter()
 
 
 class EpisodeProfileResponse(BaseModel):
@@ -24,7 +24,7 @@ class EpisodeProfileResponse(BaseModel):
 
 
 @router.get("/episode-profiles", response_model=List[EpisodeProfileResponse])
-async def list_episode_profiles():
+async def list_episode_profiles(_user=Depends(get_current_user)):
     """List all available episode profiles"""
     try:
         profiles = await EpisodeProfile.get_all(order_by="name asc")
@@ -53,7 +53,7 @@ async def list_episode_profiles():
 
 
 @router.get("/episode-profiles/{profile_name}", response_model=EpisodeProfileResponse)
-async def get_episode_profile(profile_name: str):
+async def get_episode_profile(profile_name: str, _user=Depends(get_current_user)):
     """Get a specific episode profile by name"""
     try:
         profile = await EpisodeProfile.get_by_name(profile_name)
@@ -100,7 +100,7 @@ class EpisodeProfileCreate(BaseModel):
 
 
 @router.post("/episode-profiles", response_model=EpisodeProfileResponse)
-async def create_episode_profile(profile_data: EpisodeProfileCreate):
+async def create_episode_profile(profile_data: EpisodeProfileCreate, _admin=Depends(require_admin)):
     """Create a new episode profile"""
     try:
         profile = EpisodeProfile(
@@ -138,7 +138,7 @@ async def create_episode_profile(profile_data: EpisodeProfileCreate):
 
 
 @router.put("/episode-profiles/{profile_id}", response_model=EpisodeProfileResponse)
-async def update_episode_profile(profile_id: str, profile_data: EpisodeProfileCreate):
+async def update_episode_profile(profile_id: str, profile_data: EpisodeProfileCreate, _admin=Depends(require_admin)):
     """Update an existing episode profile"""
     try:
         profile = await EpisodeProfile.get(profile_id)
@@ -184,7 +184,7 @@ async def update_episode_profile(profile_id: str, profile_data: EpisodeProfileCr
 
 
 @router.delete("/episode-profiles/{profile_id}")
-async def delete_episode_profile(profile_id: str):
+async def delete_episode_profile(profile_id: str, _admin=Depends(require_admin)):
     """Delete an episode profile"""
     try:
         profile = await EpisodeProfile.get(profile_id)
@@ -210,7 +210,7 @@ async def delete_episode_profile(profile_id: str):
 @router.post(
     "/episode-profiles/{profile_id}/duplicate", response_model=EpisodeProfileResponse
 )
-async def duplicate_episode_profile(profile_id: str):
+async def duplicate_episode_profile(profile_id: str, _admin=Depends(require_admin)):
     """Duplicate an episode profile"""
     try:
         original = await EpisodeProfile.get(profile_id)
