@@ -81,7 +81,7 @@ export default function LearnerLayout({
     <LearnerErrorBoundaryWithRouter>
       <div className="h-screen bg-background flex flex-col overflow-hidden">
         <LearnerHeader />
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 flex flex-col">
           {children}
         </div>
       </div>

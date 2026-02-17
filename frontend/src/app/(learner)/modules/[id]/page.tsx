@@ -4,7 +4,7 @@
  * Module Conversation Page - ChatGPT-like Layout
  *
  * Clean, spacious layout:
- * - Minimal header (48px): hamburger (mobile) + module name + back button
+ * - Header is handled by LearnerHeader (via currentModule store state)
  * - Fixed 280px sidebar: sources, artifacts, progress
  * - Chat area: fills remaining space, ChatGPT-style messages
  * - Resource viewer sheet: slides from right when sidebar item clicked
@@ -14,7 +14,7 @@
 
 import { useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, BookOpen, Menu, X } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { AxiosError } from 'axios'
 import { Button } from '@/components/ui/button'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -38,10 +38,22 @@ export default function ModuleConversationPage() {
   // Sidebar state
   const sidebarOpen = useLearnerStore((state) => state.sidebarOpen)
   const setSidebarOpen = useLearnerStore((state) => state.setSidebarOpen)
-  const toggleSidebar = useLearnerStore((state) => state.toggleSidebar)
+
+  // Set current module in store for the unified header
+  const setCurrentModule = useLearnerStore((state) => state.setCurrentModule)
 
   // Validate learner access
   const { data: module, error: accessError, isLoading: accessLoading } = useLearnerModule(moduleId)
+
+  // Sync module info to store for header display
+  useEffect(() => {
+    if (module) {
+      setCurrentModule({ id: moduleId, name: module.name })
+    }
+    return () => {
+      setCurrentModule(null)
+    }
+  }, [module, moduleId, setCurrentModule])
 
   // Redirect if access denied
   useEffect(() => {
@@ -69,7 +81,7 @@ export default function ModuleConversationPage() {
   // Loading state
   if (accessLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="h-full flex items-center justify-center">
         <LoadingSpinner size="lg" />
       </div>
     )
@@ -90,68 +102,34 @@ export default function ModuleConversationPage() {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Minimal Header (48px) */}
-      <header className="flex-shrink-0 h-12 border-b bg-background flex items-center px-4 gap-3">
-        {/* Mobile: hamburger toggle */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="md:hidden h-8 w-8"
-          onClick={toggleSidebar}
-          aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
-        >
-          {sidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-        </Button>
+    <div className="flex flex-1 min-h-0 h-full relative">
+      {/* Sidebar - fixed 280px on desktop, overlay on mobile */}
+      <aside
+        className={`
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+          absolute md:relative z-30 md:z-0
+          w-[280px] flex-shrink-0
+          h-full bg-background border-r
+          transition-transform duration-200 ease-in-out
+          ${sidebarOpen ? '' : 'md:hidden'}
+        `}
+      >
+        <ResourceSidebar notebookId={moduleId} />
+      </aside>
 
-        {/* Back button */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="hidden md:flex h-8 text-muted-foreground hover:text-foreground"
-          onClick={() => router.push('/modules')}
-        >
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          {t.common.back}
-        </Button>
+      {/* Mobile sidebar overlay backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-20 bg-black/20 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
-        {/* Module name */}
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <BookOpen className="h-4 w-4 text-primary flex-shrink-0" />
-          <h1 className="text-sm font-medium truncate">{module.name}</h1>
-        </div>
-      </header>
-
-      {/* Main Content: Sidebar + Chat */}
-      <div className="flex-1 flex min-h-0 relative">
-        {/* Sidebar - fixed 280px on desktop, overlay on mobile */}
-        <aside
-          className={`
-            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-            absolute md:relative z-30 md:z-0
-            w-[280px] flex-shrink-0
-            h-full bg-background border-r
-            transition-transform duration-200 ease-in-out
-            ${sidebarOpen ? '' : 'md:hidden'}
-          `}
-        >
-          <ResourceSidebar notebookId={moduleId} />
-        </aside>
-
-        {/* Mobile sidebar overlay backdrop */}
-        {sidebarOpen && (
-          <div
-            className="fixed inset-0 z-20 bg-black/20 md:hidden"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
-
-        {/* Chat Area - fills remaining space */}
-        <main className="flex-1 min-w-0 relative">
-          <ChatPanel notebookId={moduleId} />
-          <LearnerActionButtons notebookId={moduleId} />
-        </main>
-      </div>
+      {/* Chat Area - fills remaining space */}
+      <main className="flex-1 min-w-0 h-full relative">
+        <ChatPanel notebookId={moduleId} />
+        <LearnerActionButtons notebookId={moduleId} />
+      </main>
 
       {/* Resource Viewer Sheet */}
       <ResourceViewerSheet notebookId={moduleId} />

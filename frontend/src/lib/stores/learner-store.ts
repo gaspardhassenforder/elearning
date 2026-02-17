@@ -28,6 +28,12 @@ interface ViewerSheet {
   searchText?: string  // Excerpt text for PDF search / text highlight
 }
 
+// Current module context (for unified header)
+interface CurrentModule {
+  id: string
+  name: string
+}
+
 interface LearnerState {
   // Sidebar state (for mobile toggle)
   sidebarOpen: boolean
@@ -41,6 +47,9 @@ interface LearnerState {
   // Active async job tracking
   activeJob: ActiveJob | null
 
+  // Current module (for header display)
+  currentModule: CurrentModule | null
+
   // Actions
   setSidebarOpen: (open: boolean) => void
   toggleSidebar: () => void
@@ -49,6 +58,7 @@ interface LearnerState {
   setScrollToSourceId: (id: string | null) => void
   setActiveJob: (job: ActiveJob | null) => void
   clearActiveJob: () => void
+  setCurrentModule: (module: CurrentModule | null) => void
 }
 
 export const useLearnerStore = create<LearnerState>()(
@@ -58,6 +68,7 @@ export const useLearnerStore = create<LearnerState>()(
       viewerSheet: null,
       scrollToSourceId: null,
       activeJob: null,
+      currentModule: null,
 
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
@@ -76,6 +87,7 @@ export const useLearnerStore = create<LearnerState>()(
 
       setActiveJob: (job) => set({ activeJob: job }),
       clearActiveJob: () => set({ activeJob: null }),
+      setCurrentModule: (module) => set({ currentModule: module }),
     }),
     {
       name: 'learner-ui-storage',
