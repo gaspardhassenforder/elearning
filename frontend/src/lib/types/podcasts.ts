@@ -60,6 +60,8 @@ export interface PodcastGenerationRequest {
   /** List of all notebook IDs that contributed content to this podcast */
   notebook_ids?: string[]
   briefing_suffix?: string | null
+  /** Podcast output language code (e.g., 'en', 'fr') */
+  language?: string
 }
 
 export interface PodcastGenerationResponse {

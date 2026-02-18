@@ -6,6 +6,8 @@ export interface LearnerPodcastRequest {
   episode_name: string
   source_ids: string[]
   instructions?: string
+  /** Podcast output language code (e.g., 'en', 'fr') */
+  language?: string
 }
 
 export interface LearnerQuizRequest {

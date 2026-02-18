@@ -42,6 +42,7 @@ export function LearnerPodcastDialog({
   const [selectedProfile, setSelectedProfile] = useState<string>('')
   const [episodeName, setEpisodeName] = useState('')
   const [instructions, setInstructions] = useState('')
+  const [podcastLanguage, setPodcastLanguage] = useState<string>('en')
 
   const { episodeProfiles, isLoading: profilesLoading } = useEpisodeProfiles()
   const { speakerProfiles } = useSpeakerProfiles(episodeProfiles)
@@ -67,6 +68,7 @@ export function LearnerPodcastDialog({
         episode_name: episodeName.trim(),
         source_ids: selectedSourceIds,
         instructions: instructions.trim() || undefined,
+        language: podcastLanguage,
       },
       {
         onSuccess: () => {
@@ -75,6 +77,7 @@ export function LearnerPodcastDialog({
           setSelectedProfile('')
           setEpisodeName('')
           setInstructions('')
+          setPodcastLanguage('en')
           onOpenChange(false)
         },
       }
@@ -155,6 +158,20 @@ export function LearnerPodcastDialog({
               placeholder={t.learner?.createArtifact?.instructionsPlaceholder || 'Optional: focus on specific topics, tone, etc.'}
               rows={3}
             />
+          </div>
+
+          {/* Podcast Language */}
+          <div className="space-y-2">
+            <Label>{t.learner?.createArtifact?.podcastLanguage || 'Podcast language'}</Label>
+            <Select value={podcastLanguage} onValueChange={setPodcastLanguage}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="en">{t.learner?.createArtifact?.podcastLanguageEn || 'English'}</SelectItem>
+                <SelectItem value="fr">{t.learner?.createArtifact?.podcastLanguageFr || 'Fran\u00e7ais'}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 

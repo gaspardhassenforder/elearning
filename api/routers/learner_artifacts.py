@@ -25,6 +25,7 @@ class LearnerPodcastRequest(BaseModel):
     episode_name: str = Field(..., description="Name for the podcast episode")
     source_ids: List[str] = Field(..., min_length=1, description="Source IDs to use")
     instructions: Optional[str] = Field(None, description="Additional instructions")
+    language: str = Field(default="en", description="Podcast output language (e.g., 'en', 'fr')")
 
 
 class LearnerPodcastResponse(BaseModel):
@@ -169,6 +170,7 @@ async def learner_generate_podcast(
             content=content,
             briefing_suffix=briefing_suffix,
             created_by=str(learner.user.id),
+            language=request.language,
         )
 
         logger.info(

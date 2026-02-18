@@ -1,3 +1,4 @@
+import contextvars
 import os
 import re
 import time
@@ -565,8 +566,11 @@ except Exception as e:
 # Progress tracking for podcast generation
 # ---------------------------------------------------------------------------
 
-# Module-level context so the patched transcript node can report progress
-_active_command_id = None
+# Async-task-scoped context so the patched nodes can report progress
+# without race conditions across concurrent podcast generation requests.
+_active_command_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    '_active_command_id', default=None
+)
 
 
 async def _update_command_progress(command_id, current: int, total: int, phase: str):
@@ -629,8 +633,9 @@ try:
         total_segments = len(outline.segments)
 
         # Report initial progress
-        if _active_command_id:
-            await _update_command_progress(_active_command_id, 0, total_segments, "transcript")
+        cmd_id = _active_command_id.get(None)
+        if cmd_id:
+            await _update_command_progress(cmd_id, 0, total_segments, "transcript")
 
         transcript = []
         for i, segment in enumerate(outline.segments):
@@ -663,9 +668,10 @@ try:
             transcript.extend(result.transcript)
 
             # Report per-segment progress
-            if _active_command_id:
+            cmd_id = _active_command_id.get(None)
+            if cmd_id:
                 await _update_command_progress(
-                    _active_command_id, i + 1, total_segments, "transcript"
+                    cmd_id, i + 1, total_segments, "transcript"
                 )
 
         logger.info(f"Generated transcript with {len(transcript)} dialogue segments")
@@ -676,6 +682,69 @@ try:
 
 except Exception as e:
     logger.warning("Failed to patch generate_transcript_node for progress: {}", str(e))
+
+# Patch generate_outline_node to report progress
+try:
+    _original_generate_outline_node = podcast_nodes.generate_outline_node
+
+    async def _patched_generate_outline_node(state, config):
+        """Outline node with progress reporting."""
+        cmd_id = _active_command_id.get(None)
+        if cmd_id:
+            await _update_command_progress(cmd_id, 0, 1, "outline")
+        result = await _original_generate_outline_node(state, config)
+        cmd_id = _active_command_id.get(None)
+        if cmd_id:
+            await _update_command_progress(cmd_id, 1, 1, "outline")
+        return result
+
+    podcast_nodes.generate_outline_node = _patched_generate_outline_node
+    logger.info("Applied progress tracking patch to generate_outline_node")
+
+except Exception as e:
+    logger.warning("Failed to patch generate_outline_node for progress: {}", str(e))
+
+# Patch generate_all_audio_node to report progress
+try:
+    _original_generate_all_audio_node = podcast_nodes.generate_all_audio_node
+
+    async def _patched_generate_all_audio_node(state, config):
+        """Audio generation node with progress reporting."""
+        cmd_id = _active_command_id.get(None)
+        if cmd_id:
+            await _update_command_progress(cmd_id, 0, 1, "audio")
+        result = await _original_generate_all_audio_node(state, config)
+        cmd_id = _active_command_id.get(None)
+        if cmd_id:
+            await _update_command_progress(cmd_id, 1, 1, "audio")
+        return result
+
+    podcast_nodes.generate_all_audio_node = _patched_generate_all_audio_node
+    logger.info("Applied progress tracking patch to generate_all_audio_node")
+
+except Exception as e:
+    logger.warning("Failed to patch generate_all_audio_node for progress: {}", str(e))
+
+# Patch combine_audio_node to report progress
+try:
+    _original_combine_audio_node = podcast_nodes.combine_audio_node
+
+    async def _patched_combine_audio_node(state, config):
+        """Combine audio node with progress reporting."""
+        cmd_id = _active_command_id.get(None)
+        if cmd_id:
+            await _update_command_progress(cmd_id, 0, 1, "combining")
+        result = await _original_combine_audio_node(state, config)
+        cmd_id = _active_command_id.get(None)
+        if cmd_id:
+            await _update_command_progress(cmd_id, 1, 1, "combining")
+        return result
+
+    podcast_nodes.combine_audio_node = _patched_combine_audio_node
+    logger.info("Applied progress tracking patch to combine_audio_node")
+
+except Exception as e:
+    logger.warning("Failed to patch combine_audio_node for progress: {}", str(e))
 
 # Rebuild the compiled LangGraph graph so it picks up all patched node functions.
 # The original graph was compiled at import time with the original function references.
@@ -722,6 +791,7 @@ class PodcastGenerationInput(CommandInput):
     content: str
     notebook_ids: Optional[list[str]] = None  # All notebooks that contributed content
     briefing_suffix: Optional[str] = None
+    language: Optional[str] = "en"
 
 
 class PodcastGenerationOutput(CommandOutput):
@@ -788,6 +858,16 @@ async def generate_podcast_command(
         if input_data.briefing_suffix:
             briefing += f"\n\nAdditional instructions: {input_data.briefing_suffix}"
 
+        # Inject language instruction into briefing
+        if input_data.language and input_data.language != "en":
+            lang_name = {"fr": "French"}.get(input_data.language, input_data.language)
+            briefing = (
+                f"IMPORTANT: This entire podcast MUST be in {lang_name}. "
+                f"All dialogue, introductions, transitions, and conclusions must be in {lang_name}. "
+                f"Speaker names can remain in their original form.\n\n"
+                + briefing
+            )
+
         # Create the a record for the episose and associate with the ongoing command
         episode = PodcastEpisode(
             name=input_data.episode_name,
@@ -820,16 +900,17 @@ async def generate_podcast_command(
         # 6. Generate podcast using podcast-creator
         logger.info("Starting podcast generation with podcast-creator...")
 
-        # Set active command ID for progress reporting in the patched transcript node
-        global _active_command_id
-        _active_command_id = (
+        # Set active command ID for progress reporting in the patched nodes.
+        # Uses ContextVar so concurrent async tasks each see their own value.
+        cmd_id = (
             str(input_data.execution_context.command_id)
             if input_data.execution_context
             else None
         )
+        _active_command_id.set(cmd_id)
 
-        if _active_command_id:
-            await _update_command_progress(_active_command_id, 0, 0, "starting")
+        if cmd_id:
+            await _update_command_progress(cmd_id, 0, 0, "starting")
 
         try:
             result = await create_podcast(
@@ -841,7 +922,7 @@ async def generate_podcast_command(
                 episode_profile=episode_profile.name,
             )
         finally:
-            _active_command_id = None
+            _active_command_id.set(None)
 
         episode.audio_file = (
             str(result.get("final_output_file_path")) if result else None

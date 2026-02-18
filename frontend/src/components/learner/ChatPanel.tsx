@@ -455,7 +455,7 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
       </div>
 
       {/* Async Status Bar */}
-      {activeJob && (
+      {activeJob && activeJob.artifactType !== 'podcast' && (
         <AsyncStatusBar
           jobId={activeJob.jobId}
           artifactType={activeJob.artifactType}

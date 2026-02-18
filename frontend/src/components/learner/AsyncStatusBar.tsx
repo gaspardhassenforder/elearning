@@ -32,6 +32,7 @@ interface AsyncStatusBarProps {
     current?: number
     total?: number
     percentage?: number
+    phase?: string
   }
   errorMessage?: string
   onComplete?: () => void

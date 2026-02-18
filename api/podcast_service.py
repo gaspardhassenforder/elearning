@@ -20,6 +20,7 @@ class PodcastGenerationRequest(BaseModel):
     notebook_id: Optional[str] = None
     notebook_ids: Optional[list[str]] = None  # All notebooks that contributed content
     briefing_suffix: Optional[str] = None
+    language: Optional[str] = "en"
 
 
 class PodcastGenerationResponse(BaseModel):
@@ -46,6 +47,7 @@ class PodcastService:
         content: Optional[str] = None,
         briefing_suffix: Optional[str] = None,
         created_by: Optional[str] = None,
+        language: Optional[str] = "en",
     ) -> Tuple[str, list[str]]:
         """Submit a podcast generation job for background processing.
         
@@ -108,6 +110,7 @@ class PodcastService:
                 "content": str(content),
                 "notebook_ids": all_notebook_ids if all_notebook_ids else None,
                 "briefing_suffix": briefing_suffix,
+                "language": language,
             }
 
             # Ensure command modules are imported before submitting

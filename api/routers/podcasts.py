@@ -66,6 +66,7 @@ async def generate_podcast(request: PodcastGenerationRequest, admin: User = Depe
             notebook_ids=request.notebook_ids,
             content=request.content,
             briefing_suffix=request.briefing_suffix,
+            language=request.language,
         )
 
         logger.info(f"✓ Podcast generation job submitted successfully!")

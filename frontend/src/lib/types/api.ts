@@ -461,5 +461,6 @@ export interface CommandJobStatusResponse {
     current?: number
     total?: number
     percentage?: number
+    phase?: string
   } | null
 }

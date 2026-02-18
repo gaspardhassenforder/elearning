@@ -381,6 +381,7 @@ export function GeneratePodcastDialog({ open, onOpenChange, notebookId }: Genera
   const [episodeProfileId, setEpisodeProfileId] = useState<string>('')
   const [episodeName, setEpisodeName] = useState('')
   const [instructions, setInstructions] = useState('')
+  const [podcastLanguage, setPodcastLanguage] = useState<string>('en')
 
   const [isBuildingContext, setIsBuildingContext] = useState(false)
   const [tokenCount, setTokenCount] = useState<number>(0)
@@ -523,6 +524,7 @@ export function GeneratePodcastDialog({ open, onOpenChange, notebookId }: Genera
     setEpisodeProfileId('')
     setEpisodeName('')
     setInstructions('')
+    setPodcastLanguage('en')
     setTokenCount(0)
     setCharCount(0)
   }, [])
@@ -874,6 +876,7 @@ export function GeneratePodcastDialog({ open, onOpenChange, notebookId }: Genera
         notebook_id: notebookId, // Keep for backwards compatibility
         notebook_ids: notebookIdsWithContent, // All notebooks with selected content
         briefing_suffix: instructions.trim() ? instructions.trim() : undefined,
+        language: podcastLanguage,
       }
 
       await generatePodcast.mutateAsync(payload)
@@ -1023,6 +1026,25 @@ export function GeneratePodcastDialog({ open, onOpenChange, notebookId }: Genera
                       className="min-h-[100px] text-xs"
                       autoComplete="off"
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="podcast_language">{t.podcasts.podcastLanguage}</Label>
+                    <Select
+                      value={podcastLanguage}
+                      onValueChange={setPodcastLanguage}
+                    >
+                      <SelectTrigger id="podcast_language">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="en">{t.podcasts.podcastLanguageEn}</SelectItem>
+                        <SelectItem value="fr">{t.podcasts.podcastLanguageFr}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {t.podcasts.podcastLanguageDesc}
+                    </p>
                   </div>
                 </div>
               )}

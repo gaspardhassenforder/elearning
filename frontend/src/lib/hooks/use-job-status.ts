@@ -14,6 +14,7 @@
  * ```
  */
 
+import { useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getJobStatus } from '@/lib/api/commands'
 import { QUERY_KEYS } from '@/lib/api/query-client'
@@ -46,6 +47,7 @@ export const jobStatusKeys = {
  * - Stops polling when status is "completed" or "error"
  * - Invalidates artifacts query on completion
  * - Calls onComplete/onError callbacks
+ * - Retries failed network requests up to 3 times with exponential backoff
  */
 export function useJobStatus(
   jobId: string | null,
@@ -59,6 +61,14 @@ export function useJobStatus(
   } = options
 
   const queryClient = useQueryClient()
+
+  // Store callbacks in refs to decouple effect deps from callback identity.
+  // This prevents the effect from re-running every render when callers pass
+  // inline arrow functions (standard "latest callback ref" pattern).
+  const onCompleteRef = useRef(onComplete)
+  const onErrorRef = useRef(onError)
+  useEffect(() => { onCompleteRef.current = onComplete }, [onComplete])
+  useEffect(() => { onErrorRef.current = onError }, [onError])
 
   const query = useQuery<CommandJobStatusResponse>({
     queryKey: jobStatusKeys.job(jobId || ''),
@@ -79,13 +89,15 @@ export function useJobStatus(
     refetchIntervalInBackground: true, // Keep polling even when tab is backgrounded
     staleTime: 0, // Always refetch to get latest status
     gcTime: 300000, // Keep in cache for 5 minutes after unmount
+    retry: 3, // Stop after 3 failed network requests instead of polling forever
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
   })
 
   // Handle completion and error callbacks
   const data = query.data
-  const prevStatusRef = React.useRef<string | null>(null)
+  const prevStatusRef = useRef<string | null>(null)
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!data || !data.status) return
 
     const currentStatus = data.status
@@ -99,22 +111,18 @@ export function useJobStatus(
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.learnerArtifacts(notebookId) })
       }
 
-      // Call onComplete callback
-      if (onComplete) {
-        onComplete(data.result)
-      }
+      // Call onComplete callback via ref
+      onCompleteRef.current?.(data.result)
     }
 
     // Detect status transition to error
     if (currentStatus === 'error' && prevStatus !== 'error') {
-      // Call onError callback
-      if (onError) {
-        onError(data.error_message || 'Unknown error')
-      }
+      // Call onError callback via ref
+      onErrorRef.current?.(data.error_message || 'Unknown error')
     }
 
     prevStatusRef.current = currentStatus
-  }, [data, notebookId, onComplete, onError, queryClient])
+  }, [data, notebookId, queryClient])
 
   return {
     /** Job status: "pending" | "processing" | "completed" | "error" */
@@ -136,6 +144,3 @@ export function useJobStatus(
     refetch: query.refetch,
   }
 }
-
-// Re-export React for the useEffect and useRef hooks
-import React from 'react'
