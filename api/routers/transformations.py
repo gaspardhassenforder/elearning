@@ -36,6 +36,8 @@ async def get_transformations():
                 name=transformation.name,
                 title=transformation.title,
                 description=transformation.description,
+                title_fr=transformation.title_fr,
+                description_fr=transformation.description_fr,
                 prompt=transformation.prompt,
                 apply_default=transformation.apply_default,
                 created=str(transformation.created),
@@ -58,6 +60,8 @@ async def create_transformation(transformation_data: TransformationCreate, admin
             name=transformation_data.name,
             title=transformation_data.title,
             description=transformation_data.description,
+            title_fr=transformation_data.title_fr,
+            description_fr=transformation_data.description_fr,
             prompt=transformation_data.prompt,
             apply_default=transformation_data.apply_default,
         )
@@ -68,6 +72,8 @@ async def create_transformation(transformation_data: TransformationCreate, admin
             name=new_transformation.name,
             title=new_transformation.title,
             description=new_transformation.description,
+            title_fr=new_transformation.title_fr,
+            description_fr=new_transformation.description_fr,
             prompt=new_transformation.prompt,
             apply_default=new_transformation.apply_default,
             created=str(new_transformation.created),
@@ -188,6 +194,8 @@ async def get_transformation(transformation_id: str):
             name=transformation.name,
             title=transformation.title,
             description=transformation.description,
+            title_fr=transformation.title_fr,
+            description_fr=transformation.description_fr,
             prompt=transformation.prompt,
             apply_default=transformation.apply_default,
             created=str(transformation.created),
@@ -221,6 +229,10 @@ async def update_transformation(
             transformation.title = transformation_update.title
         if transformation_update.description is not None:
             transformation.description = transformation_update.description
+        if transformation_update.title_fr is not None:
+            transformation.title_fr = transformation_update.title_fr
+        if transformation_update.description_fr is not None:
+            transformation.description_fr = transformation_update.description_fr
         if transformation_update.prompt is not None:
             transformation.prompt = transformation_update.prompt
         if transformation_update.apply_default is not None:
@@ -233,6 +245,8 @@ async def update_transformation(
             name=transformation.name,
             title=transformation.title,
             description=transformation.description,
+            title_fr=transformation.title_fr,
+            description_fr=transformation.description_fr,
             prompt=transformation.prompt,
             apply_default=transformation.apply_default,
             created=str(transformation.created),

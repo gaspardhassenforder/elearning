@@ -117,7 +117,7 @@ export function AsyncStatusBar({
     },
   }
 
-  const currentStyle = statusStyles[status]
+  const currentStyle = statusStyles[status as keyof typeof statusStyles] ?? statusStyles.pending
 
   const handleDismiss = () => {
     setDismissed(true)

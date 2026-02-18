@@ -5,10 +5,10 @@ from loguru import logger
 from pydantic import BaseModel, Field
 from surreal_commands import registry
 
-from api.auth import require_admin
+from api.auth import get_current_user, require_admin
 from api.command_service import CommandService
 
-router = APIRouter(dependencies=[Depends(require_admin)])
+router = APIRouter()
 
 
 class CommandExecutionRequest(BaseModel):
@@ -35,7 +35,7 @@ class CommandJobStatusResponse(BaseModel):
     progress: Optional[Dict[str, Any]] = None
 
 
-@router.post("/commands/jobs", response_model=CommandJobResponse)
+@router.post("/commands/jobs", response_model=CommandJobResponse, dependencies=[Depends(require_admin)])
 async def execute_command(request: CommandExecutionRequest):
     """
     Submit a command for background processing.
@@ -72,7 +72,7 @@ async def execute_command(request: CommandExecutionRequest):
         )
 
 
-@router.get("/commands/jobs/{job_id:path}", response_model=CommandJobStatusResponse)
+@router.get("/commands/jobs/{job_id:path}", response_model=CommandJobStatusResponse, dependencies=[Depends(get_current_user)])
 async def get_command_job_status(job_id: str):
     """Get the status of a specific command job
     
@@ -93,7 +93,7 @@ async def get_command_job_status(job_id: str):
         )
 
 
-@router.get("/commands/jobs", response_model=List[Dict[str, Any]])
+@router.get("/commands/jobs", response_model=List[Dict[str, Any]], dependencies=[Depends(require_admin)])
 async def list_command_jobs(
     command_filter: Optional[str] = Query(None, description="Filter by command name"),
     status_filter: Optional[str] = Query(None, description="Filter by status"),
@@ -113,7 +113,7 @@ async def list_command_jobs(
         )
 
 
-@router.delete("/commands/jobs/{job_id:path}")
+@router.delete("/commands/jobs/{job_id:path}", dependencies=[Depends(require_admin)])
 async def cancel_command_job(job_id: str):
     """Cancel a running command job
     
@@ -141,7 +141,7 @@ async def cancel_command_job(job_id: str):
         )
 
 
-@router.get("/commands/registry/debug")
+@router.get("/commands/registry/debug", dependencies=[Depends(require_admin)])
 async def debug_registry():
     """Debug endpoint to see what commands are registered"""
     try:

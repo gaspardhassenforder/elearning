@@ -55,6 +55,9 @@ export interface PodcastPreview {
   duration?: string
   audio_url?: string
   transcript?: string
+  /** Present when podcast is still generating (artifact_id is command:xxx) */
+  status?: 'generating'
+  error?: string
 }
 
 export interface SummaryPreview {

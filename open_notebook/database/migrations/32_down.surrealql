@@ -1,0 +1,2 @@
+-- Migration 32 rollback: Remove French translation from admin-created Summary transformation
+UPDATE transformation SET title_fr = NONE, description_fr = NONE WHERE title = "Summary" OR name = "Summary" OR name = "summary";

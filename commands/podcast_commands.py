@@ -68,7 +68,17 @@ def _strip_thinking_tags_and_extract_json(content: str) -> str:
         return str(content) if content is not None else ""
     
     original_content = content
-    
+
+    # Handle unclosed <think> tags (e.g. DeepSeek/Qwen output <think> without </think>)
+    if '<think>' in content.lower() and '</think>' not in content.lower():
+        stripped = re.sub(r'<think>', '', content, flags=re.IGNORECASE).strip()
+        json_match = re.search(r'(\{[\s\S]*\}|\[[\s\S]*\])', stripped)
+        if json_match:
+            logger.warning("Found JSON after removing unclosed <think> tag")
+            return json_match.group(1)
+        logger.warning("Model produced only thinking content (unclosed <think>), no JSON")
+        return stripped
+
     # First, try standard cleaning - remove <think> blocks
     thinking_matches = THINK_PATTERN.findall(content)
     cleaned_content = THINK_PATTERN.sub("", content).strip()
@@ -297,10 +307,14 @@ try:
                     cleaned = _strip_thinking_tags_and_extract_json(text)
                     data = _json.loads(cleaned)
                     fixed = _fix_speaker_names_in_transcript(data, self._valid_speakers)
-                    return _json.dumps(fixed, ensure_ascii=False)
-                except Exception:
-                    # If pre-processing fails, return original text and let
-                    # the original parser produce a clear error.
+                    result = _json.dumps(fixed, ensure_ascii=False)
+                    logger.debug("Speaker name pre-processing applied successfully")
+                    return result
+                except Exception as e:
+                    logger.warning(
+                        "Speaker name pre-processing failed ({}), passing text through: {}",
+                        type(e).__name__, str(e)[:200],
+                    )
                     return text
 
             # ----------------------------------------------------------
@@ -323,7 +337,20 @@ try:
                 return self._original.parse(self._preprocess(text))
 
             def parse_result(self, result, *, partial=False):
-                """Delegate parse_result (called by invoke internally)."""
+                """Pre-process Generation texts then delegate to original parser."""
+                from langchain_core.outputs import Generation
+
+                if result and isinstance(result, list):
+                    fixed_result = []
+                    for gen in result:
+                        if isinstance(gen, Generation) and isinstance(gen.text, str):
+                            fixed_text = self._preprocess(gen.text)
+                            fixed_result.append(
+                                Generation(text=fixed_text, generation_info=gen.generation_info)
+                            )
+                        else:
+                            fixed_result.append(gen)
+                    return self._original.parse_result(fixed_result, partial=partial)
                 return self._original.parse_result(result, partial=partial)
 
             def get_format_instructions(self):
@@ -383,13 +410,14 @@ try:
         model_name = kwargs.get('model_name', model_name)
         config = kwargs.get('config', config)
         
-        # Check if this is a Gemini model
-        is_gemini = (
-            (provider and provider.lower() in ['google', 'gemini']) or
-            (model_name and 'gemini' in model_name.lower())
+        # Check if this is a thinking model (Gemini, DeepSeek, Grok, Qwen)
+        is_thinking_model = (
+            (provider and provider.lower() in ['google', 'gemini', 'deepseek', 'xai']) or
+            (model_name and any(kw in model_name.lower()
+             for kw in ['gemini', 'deepseek', 'grok', 'qwen', 'r1']))
         )
-        
-        if is_gemini and config:
+
+        if is_thinking_model and config:
             # Disable extended thinking for Gemini models
             config = config.copy() if isinstance(config, dict) else {}
             
@@ -409,7 +437,7 @@ try:
                 config['structured'] = structured
             
             logger.debug(
-                f"Patched Gemini model config to disable thinking: "
+                f"Patched thinking model config to disable thinking: "
                 f"provider={provider}, model={model_name}, config_keys={list(config.keys())}"
             )
             
@@ -427,7 +455,7 @@ try:
     
     # Apply the patch
     AIFactory.create_language = _patched_create_language
-    logger.info("Applied AIFactory.create_language patch to disable thinking for Gemini models")
+    logger.info("Applied AIFactory.create_language patch to disable thinking for thinking models")
     
 except ImportError:
     logger.warning("Could not import esperanto.AIFactory - skipping model config patch")
@@ -531,6 +559,149 @@ except AttributeError:
     logger.warning("Could not find generate_single_audio_clip in podcast_creator.nodes - skipping TTS retry patch")
 except Exception as e:
     logger.warning("Failed to patch generate_single_audio_clip: {}", str(e))
+
+
+# ---------------------------------------------------------------------------
+# Progress tracking for podcast generation
+# ---------------------------------------------------------------------------
+
+# Module-level context so the patched transcript node can report progress
+_active_command_id = None
+
+
+async def _update_command_progress(command_id, current: int, total: int, phase: str):
+    """Update command record with progress data.
+
+    surreal-commands' CommandResult doesn't have a progress field, but SurrealDB
+    is schema-flexible — we UPDATE the command record directly with a progress object.
+    """
+    try:
+        pct = round((current / total) * 100) if total > 0 else 0
+        await repo_query(
+            "UPDATE $cmd_id SET progress = $progress",
+            {
+                "cmd_id": ensure_record_id(command_id),
+                "progress": {
+                    "current": current,
+                    "total": total,
+                    "percentage": pct,
+                    "phase": phase,
+                },
+            },
+        )
+    except Exception as e:
+        logger.debug(f"Progress update failed (non-fatal): {e}")
+
+
+# Patch generate_transcript_node for per-segment progress reporting.
+# We re-implement the ~30-line loop so we can call _update_command_progress
+# after each segment instead of only at start/end.
+try:
+    from esperanto import AIFactory as _AIFactory_for_transcript
+
+    _original_generate_transcript_node = podcast_nodes.generate_transcript_node
+
+    async def _patched_generate_transcript_node(state, config):
+        """Transcript node with per-segment progress reporting."""
+        logger.info("Starting transcript generation (patched with progress)")
+
+        assert state.get("outline") is not None, "outline must be provided"
+        assert state.get("speaker_profile") is not None, "speaker_profile must be provided"
+
+        configurable = config.get("configurable", {})
+        transcript_provider = configurable.get("transcript_provider", "openai")
+        transcript_model_name = configurable.get("transcript_model", "gpt-4o-mini")
+
+        transcript_model = _AIFactory_for_transcript.create_language(
+            transcript_provider,
+            transcript_model_name,
+            config={"max_tokens": 5000, "structured": {"type": "json"}},
+        ).to_langchain()
+
+        speaker_profile = state["speaker_profile"]
+        assert speaker_profile is not None, "speaker_profile must be provided"
+        speaker_names = speaker_profile.get_speaker_names()
+        validated_transcript_parser = podcast_nodes.create_validated_transcript_parser(speaker_names)
+
+        outline = state["outline"]
+        assert outline is not None, "outline must be provided"
+
+        total_segments = len(outline.segments)
+
+        # Report initial progress
+        if _active_command_id:
+            await _update_command_progress(_active_command_id, 0, total_segments, "transcript")
+
+        transcript = []
+        for i, segment in enumerate(outline.segments):
+            logger.info(
+                f"Generating transcript for segment {i + 1}/{total_segments}: {segment.name}"
+            )
+
+            is_final = i == total_segments - 1
+            turns = 3 if segment.size == "short" else 6 if segment.size == "medium" else 10
+
+            data = {
+                "briefing": state["briefing"],
+                "outline": outline,
+                "context": state["content"],
+                "segment": segment,
+                "is_final": is_final,
+                "turns": turns,
+                "speakers": speaker_profile.speakers,
+                "speaker_names": speaker_names,
+                "transcript": transcript,
+            }
+
+            transcript_prompt = podcast_nodes.get_transcript_prompter()
+            transcript_prompt_rendered = transcript_prompt.render(data)
+            transcript_preview = await transcript_model.ainvoke(transcript_prompt_rendered)
+            transcript_preview.content = podcast_nodes.clean_thinking_content(
+                transcript_preview.content
+            )
+            result = validated_transcript_parser.invoke(transcript_preview.content)
+            transcript.extend(result.transcript)
+
+            # Report per-segment progress
+            if _active_command_id:
+                await _update_command_progress(
+                    _active_command_id, i + 1, total_segments, "transcript"
+                )
+
+        logger.info(f"Generated transcript with {len(transcript)} dialogue segments")
+        return {"transcript": transcript}
+
+    podcast_nodes.generate_transcript_node = _patched_generate_transcript_node
+    logger.info("Applied per-segment progress tracking patch to generate_transcript_node")
+
+except Exception as e:
+    logger.warning("Failed to patch generate_transcript_node for progress: {}", str(e))
+
+# Rebuild the compiled LangGraph graph so it picks up all patched node functions.
+# The original graph was compiled at import time with the original function references.
+# We need to rebuild it with the current (patched) module attributes.
+try:
+    import podcast_creator.graph as _podcast_graph
+    from langgraph.graph import END, START, StateGraph
+    from podcast_creator.state import PodcastState as _PodcastState
+
+    _new_workflow = StateGraph(_PodcastState)
+    _new_workflow.add_node("generate_outline", podcast_nodes.generate_outline_node)
+    _new_workflow.add_node("generate_transcript", podcast_nodes.generate_transcript_node)
+    _new_workflow.add_node("generate_all_audio", podcast_nodes.generate_all_audio_node)
+    _new_workflow.add_node("combine_audio", podcast_nodes.combine_audio_node)
+    _new_workflow.add_edge(START, "generate_outline")
+    _new_workflow.add_edge("generate_outline", "generate_transcript")
+    _new_workflow.add_conditional_edges(
+        "generate_transcript", podcast_nodes.route_audio_generation, ["generate_all_audio"]
+    )
+    _new_workflow.add_edge("generate_all_audio", "combine_audio")
+    _new_workflow.add_edge("combine_audio", END)
+    _podcast_graph.graph = _new_workflow.compile()
+    logger.info("Rebuilt podcast graph with all patched node functions")
+
+except Exception as e:
+    logger.warning("Failed to rebuild podcast graph with patched nodes: {}", str(e))
 
 
 def full_model_dump(model):
@@ -649,14 +820,28 @@ async def generate_podcast_command(
         # 6. Generate podcast using podcast-creator
         logger.info("Starting podcast generation with podcast-creator...")
 
-        result = await create_podcast(
-            content=input_data.content,
-            briefing=briefing,
-            episode_name=input_data.episode_name,
-            output_dir=str(output_dir),
-            speaker_config=speaker_profile.name,
-            episode_profile=episode_profile.name,
+        # Set active command ID for progress reporting in the patched transcript node
+        global _active_command_id
+        _active_command_id = (
+            str(input_data.execution_context.command_id)
+            if input_data.execution_context
+            else None
         )
+
+        if _active_command_id:
+            await _update_command_progress(_active_command_id, 0, 0, "starting")
+
+        try:
+            result = await create_podcast(
+                content=input_data.content,
+                briefing=briefing,
+                episode_name=input_data.episode_name,
+                output_dir=str(output_dir),
+                speaker_config=speaker_profile.name,
+                episode_profile=episode_profile.name,
+            )
+        finally:
+            _active_command_id = None
 
         episode.audio_file = (
             str(result.get("final_output_file_path")) if result else None

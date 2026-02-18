@@ -270,6 +270,11 @@ async def delete_podcast_episode(episode_id: str, admin: User = Depends(require_
 # ==============================================================================
 
 
+def _is_command_placeholder(podcast_id: str) -> bool:
+    """True if ID is a job placeholder (podcast still generating)."""
+    return podcast_id.startswith("command:")
+
+
 @router.get("/podcasts/{podcast_id}")
 async def get_podcast(podcast_id: str, user: User = Depends(get_current_user)):
     """
@@ -283,6 +288,12 @@ async def get_podcast(podcast_id: str, user: User = Depends(get_current_user)):
     """
     from open_notebook.database.repository import repo_query, ensure_record_id
     from open_notebook.podcasts.models import PodcastEpisode
+
+    if _is_command_placeholder(podcast_id):
+        raise HTTPException(
+            status_code=404,
+            detail="Podcast is still being generated",
+        )
 
     try:
         # Detect model type from ID prefix
@@ -397,6 +408,12 @@ async def stream_podcast_audio(podcast_id: str, user: User = Depends(get_current
     from open_notebook.database.repository import repo_query, ensure_record_id
     from open_notebook.podcasts.models import PodcastEpisode
 
+    if _is_command_placeholder(podcast_id):
+        raise HTTPException(
+            status_code=404,
+            detail="Podcast is still being generated",
+        )
+
     try:
         # Detect model type from ID prefix
         is_episode = podcast_id.startswith("episode:")
@@ -490,6 +507,12 @@ async def get_podcast_transcript(podcast_id: str, user: User = Depends(get_curre
     """
     from open_notebook.database.repository import repo_query, ensure_record_id
     from open_notebook.podcasts.models import PodcastEpisode
+
+    if _is_command_placeholder(podcast_id):
+        raise HTTPException(
+            status_code=404,
+            detail="Podcast is still being generated",
+        )
 
     try:
         # Detect model type from ID prefix

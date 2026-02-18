@@ -1,0 +1,3 @@
+-- Migration 31 rollback: Remove French translation fields from transformation table
+REMOVE FIELD title_fr ON TABLE transformation;
+REMOVE FIELD description_fr ON TABLE transformation;

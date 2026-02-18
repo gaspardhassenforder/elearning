@@ -1,0 +1,11 @@
+-- Migration 30: Add French translations (title_fr, description_fr) to transformation table
+-- Table is SCHEMAFULL so fields must be defined before use
+DEFINE FIELD IF NOT EXISTS title_fr ON TABLE transformation TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS description_fr ON TABLE transformation TYPE option<string>;
+
+UPDATE transformation SET title_fr = "Analyse d'article", description_fr = "Analyse un article technique ou scientifique" WHERE name = "Analyze Paper";
+UPDATE transformation SET title_fr = "Points clés", description_fr = "Extrait les informations importantes et les actions à retenir" WHERE name = "Key Insights";
+UPDATE transformation SET title_fr = "Résumé dense", description_fr = "Crée un résumé riche et approfondi du contenu" WHERE name = "Dense Summary";
+UPDATE transformation SET title_fr = "Questions de réflexion", description_fr = "Génère des questions de réflexion à partir du document pour approfondir l'exploration" WHERE name = "Reflections";
+UPDATE transformation SET title_fr = "Table des matières", description_fr = "Décrit les différents sujets abordés dans le document" WHERE name = "Table of Contents";
+UPDATE transformation SET title_fr = "Résumé simple", description_fr = "Génère un court résumé du contenu" WHERE name = "Simple Summary";

@@ -1,0 +1,3 @@
+-- Migration 32: Add French translation for admin-created Summary transformation
+-- Matches any transformation with title or name containing "Summary" that doesn't already have a French translation
+UPDATE transformation SET title_fr = "Résumé", description_fr = "Génère un résumé concis du contenu" WHERE (title = "Summary" OR name = "Summary" OR name = "summary") AND title_fr IS NONE;

@@ -176,15 +176,19 @@ export function ArtifactCard({ artifact, isExpanded, onToggleExpand }: ArtifactC
         durationMinutes = parseInt(parts[0]) + parseInt(parts[1]) / 60
       }
     }
+    const isGenerating =
+      podcast.status === 'generating' || !podcast.audio_url
+    const podcastId = podcast.id || artifact.id
+    const title = podcast.title || artifact.title
 
     return (
       <InlineAudioPlayer
-        podcastId={podcast.id}
-        title={podcast.title}
+        podcastId={podcastId}
+        title={title}
         audioUrl={podcast.audio_url || ''}
         durationMinutes={Math.round(durationMinutes)}
-        transcriptUrl={`/api/podcasts/${podcast.id}/transcript`}
-        status={podcast.audio_url ? 'completed' : 'generating'}
+        transcriptUrl={podcastId && !isGenerating ? `/api/podcasts/${podcastId}/transcript` : undefined}
+        status={isGenerating ? 'generating' : 'completed'}
       />
     )
   }

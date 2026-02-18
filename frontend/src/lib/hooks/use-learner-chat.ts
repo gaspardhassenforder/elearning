@@ -77,14 +77,6 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
           content,
           timestamp: new Date().toISOString(),
         }
-        setMessages((prev) => {
-          userMessageIndex = prev.length
-          return [...prev, userMessage]
-        })
-
-        // Start streaming assistant response
-        setIsStreaming(true)
-        const response = await sendLearnerChatMessage(notebookId, { message: content, language })
 
         // Parse SSE stream and accumulate response
         // Story 4.3: Also track tool calls for reactive scroll
@@ -99,11 +91,16 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
           toolCalls: [],
         }
 
-        // Add empty assistant message that will be updated as stream arrives
+        // Add user message + empty assistant message together so dots show immediately
         setMessages((prev) => {
-          assistantMessageIndex = prev.length
-          return [...prev, assistantMessage]
+          userMessageIndex = prev.length
+          assistantMessageIndex = prev.length + 1
+          return [...prev, userMessage, assistantMessage]
         })
+
+        // Start streaming assistant response
+        setIsStreaming(true)
+        const response = await sendLearnerChatMessage(notebookId, { message: content, language })
 
         // Stream parsing with error handling
         for await (const event of parseLearnerChatStream(response)) {

@@ -18,6 +18,7 @@ export interface LearnerTransformationRequest {
   transformation_id: string
   source_ids: string[]
   instructions?: string
+  language?: string
 }
 
 // Response types

@@ -32,7 +32,7 @@ export function LearnerTransformationDialog({
   onOpenChange,
   notebookId,
 }: LearnerTransformationDialogProps) {
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([])
   const [selectedTransformationId, setSelectedTransformationId] = useState<string>('')
   const [instructions, setInstructions] = useState('')
@@ -57,6 +57,7 @@ export function LearnerTransformationDialog({
         transformation_id: selectedTransformationId,
         source_ids: selectedSourceIds,
         instructions: instructions.trim() || undefined,
+        language,
       },
       {
         onSuccess: () => {
@@ -98,25 +99,30 @@ export function LearnerTransformationDialog({
               <p className="text-sm text-muted-foreground py-2">{t.learner?.createArtifact?.noTransformationsAvailable || 'No transformations available'}</p>
             ) : (
               <div className="grid grid-cols-2 gap-2">
-                {transformations.map((tx) => (
-                  <button
-                    key={tx.id}
-                    type="button"
-                    onClick={() => setSelectedTransformationId(tx.id)}
-                    className={`rounded-xl border p-3 text-left transition-all hover:border-primary/50 ${
-                      selectedTransformationId === tx.id
-                        ? 'border-primary ring-2 ring-primary/20 bg-primary/5'
-                        : 'border-border'
-                    }`}
-                  >
-                    <div className="font-medium text-sm">{tx.title}</div>
-                    {tx.description && (
-                      <div className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                        {tx.description}
-                      </div>
-                    )}
-                  </button>
-                ))}
+                {transformations.map((tx) => {
+                  const isFrench = language === 'fr-FR'
+                  const displayTitle = (isFrench && tx.title_fr) ? tx.title_fr : tx.title
+                  const displayDesc = (isFrench && tx.description_fr) ? tx.description_fr : tx.description
+                  return (
+                    <button
+                      key={tx.id}
+                      type="button"
+                      onClick={() => setSelectedTransformationId(tx.id)}
+                      className={`rounded-xl border p-3 text-left transition-all hover:border-primary/50 ${
+                        selectedTransformationId === tx.id
+                          ? 'border-primary ring-2 ring-primary/20 bg-primary/5'
+                          : 'border-border'
+                      }`}
+                    >
+                      <div className="font-medium text-sm">{displayTitle}</div>
+                      {displayDesc && (
+                        <div className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                          {displayDesc}
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
               </div>
             )}
           </div>

@@ -337,6 +337,8 @@ class TransformationCreate(BaseModel):
     description: str = Field(
         ..., description="Description of what this transformation does"
     )
+    title_fr: Optional[str] = Field(None, description="French display title")
+    description_fr: Optional[str] = Field(None, description="French description")
     prompt: str = Field(..., description="The transformation prompt")
     apply_default: bool = Field(
         False, description="Whether to apply this transformation by default"
@@ -351,6 +353,8 @@ class TransformationUpdate(BaseModel):
     description: Optional[str] = Field(
         None, description="Description of what this transformation does"
     )
+    title_fr: Optional[str] = Field(None, description="French display title")
+    description_fr: Optional[str] = Field(None, description="French description")
     prompt: Optional[str] = Field(None, description="The transformation prompt")
     apply_default: Optional[bool] = Field(
         None, description="Whether to apply this transformation by default"
@@ -362,6 +366,8 @@ class TransformationResponse(BaseModel):
     name: str
     title: str
     description: str
+    title_fr: Optional[str] = None
+    description_fr: Optional[str] = None
     prompt: str
     apply_default: bool
     created: str

@@ -268,6 +268,15 @@ async def get_artifact_preview_data(artifact: Artifact) -> dict:
             }
 
         elif artifact_type == "podcast":
+            # If artifact_id is still a job placeholder (command:xxx), podcast isn't ready yet
+            if artifact.artifact_id.startswith("command:"):
+                return {
+                    "artifact_type": "podcast",
+                    "id": artifact.artifact_id,
+                    "title": artifact.title or "Podcast",
+                    "status": "generating",
+                    "error": "Podcast is still being generated",
+                }
             # Get podcast episode
             podcast = await PodcastEpisode.get(artifact_id)
             if not podcast:

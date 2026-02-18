@@ -86,7 +86,8 @@ async def get_artifact_preview(artifact_id: str):
     if not preview:
         raise HTTPException(status_code=404, detail="Artifact not found")
 
-    if preview.get("error"):
+    # Only treat as server error when there is an error and not a "generating" placeholder
+    if preview.get("error") and preview.get("status") != "generating":
         raise HTTPException(status_code=500, detail=preview["error"])
 
     return preview
@@ -332,7 +333,8 @@ async def get_learner_artifact_preview(
         if not preview:
             raise HTTPException(status_code=404, detail="Artifact not found")
 
-        if preview.get("error"):
+        # Only treat as server error when there is an error and not a "generating" placeholder
+        if preview.get("error") and preview.get("status") != "generating":
             raise HTTPException(status_code=500, detail=preview["error"])
 
         logger.info(

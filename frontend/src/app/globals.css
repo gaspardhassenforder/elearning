@@ -110,6 +110,21 @@
   --sidebar-ring: oklch(0.488 0.243 264.376);
 }
 
+@keyframes bounce-dot {
+  0%, 80%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  40% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+@utility animate-bounce-dot {
+  animation: bounce-dot 1.4s infinite ease-in-out both;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

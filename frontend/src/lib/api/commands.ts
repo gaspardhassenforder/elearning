@@ -21,7 +21,7 @@ export async function getJobStatus(jobId: string): Promise<CommandJobStatusRespo
   const cleanJobId = jobId.startsWith('command:') ? jobId.substring(8) : jobId
 
   const response = await apiClient.get<CommandJobStatusResponse>(
-    `/api/commands/jobs/${cleanJobId}`
+    `/commands/jobs/${cleanJobId}`
   )
   return response.data
 }
@@ -35,7 +35,7 @@ export async function cancelJob(jobId: string): Promise<{ job_id: string; cancel
   const cleanJobId = jobId.startsWith('command:') ? jobId.substring(8) : jobId
 
   const response = await apiClient.delete<{ job_id: string; cancelled: boolean }>(
-    `/api/commands/jobs/${cleanJobId}`
+    `/commands/jobs/${cleanJobId}`
   )
   return response.data
 }

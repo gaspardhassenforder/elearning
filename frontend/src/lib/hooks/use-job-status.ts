@@ -16,6 +16,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getJobStatus } from '@/lib/api/commands'
+import { QUERY_KEYS } from '@/lib/api/query-client'
 import type { CommandJobStatusResponse } from '@/lib/types/api'
 
 interface UseJobStatusOptions {
@@ -68,9 +69,10 @@ export function useJobStatus(
       return await getJobStatus(jobId)
     },
     enabled: !!jobId, // Only run if jobId exists
-    refetchInterval: (data) => {
-      // Stop polling if job is completed or errored
-      if (!data || !data.status) return false
+    refetchInterval: (query) => {
+      // TanStack Query v5: callback receives the Query object, not data directly
+      const data = query.state.data
+      if (!data?.status) return pollInterval // Keep polling until data arrives
       const isTerminal = data.status === 'completed' || data.status === 'error'
       return isTerminal ? false : pollInterval
     },
@@ -91,11 +93,10 @@ export function useJobStatus(
 
     // Detect status transition to completed
     if (currentStatus === 'completed' && prevStatus !== 'completed') {
-      // Invalidate artifacts query to refetch updated artifact list
+      // Invalidate artifacts queries so admin and learner lists refetch (e.g. podcast ready)
       if (notebookId) {
-        queryClient.invalidateQueries({
-          queryKey: ['artifacts', notebookId],
-        })
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.artifacts(notebookId) })
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.learnerArtifacts(notebookId) })
       }
 
       // Call onComplete callback

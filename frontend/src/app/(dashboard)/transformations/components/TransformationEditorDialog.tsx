@@ -21,6 +21,8 @@ const transformationSchema = z.object({
   name: z.string().min(1),
   title: z.string().min(1),
   description: z.string().optional(),
+  title_fr: z.string().optional(),
+  description_fr: z.string().optional(),
   prompt: z.string().min(1),
   apply_default: z.boolean().optional(),
 })
@@ -37,8 +39,10 @@ export function TransformationEditorDialog({ open, onOpenChange, transformation 
   const { t } = useTranslation()
   const nameId = useId()
   const titleId = useId()
+  const titleFrId = useId()
   const defaultId = useId()
   const descriptionId = useId()
+  const descriptionFrId = useId()
   const promptId = useId()
   const isEditing = Boolean(transformation)
   const { data: fetchedTransformation, isLoading } = useTransformation(transformation?.id ?? '', {
@@ -59,6 +63,8 @@ export function TransformationEditorDialog({ open, onOpenChange, transformation 
       name: '',
       title: '',
       description: '',
+      title_fr: '',
+      description_fr: '',
       prompt: '',
       apply_default: false,
     },
@@ -75,6 +81,8 @@ export function TransformationEditorDialog({ open, onOpenChange, transformation 
       name: source?.name ?? '',
       title: source?.title ?? '',
       description: source?.description ?? '',
+      title_fr: source?.title_fr ?? '',
+      description_fr: source?.description_fr ?? '',
       prompt: source?.prompt ?? '',
       apply_default: source?.apply_default ?? false,
     })
@@ -88,6 +96,8 @@ export function TransformationEditorDialog({ open, onOpenChange, transformation 
           name: data.name,
           title: data.title || undefined,
           description: data.description || undefined,
+          title_fr: data.title_fr || undefined,
+          description_fr: data.description_fr || undefined,
           prompt: data.prompt,
           apply_default: Boolean(data.apply_default),
         },
@@ -98,6 +108,8 @@ export function TransformationEditorDialog({ open, onOpenChange, transformation 
         name: data.name,
         title: data.title || data.name,
         description: data.description || '',
+        title_fr: data.title_fr || undefined,
+        description_fr: data.description_fr || undefined,
         prompt: data.prompt,
         apply_default: Boolean(data.apply_default),
       })
@@ -152,7 +164,7 @@ export function TransformationEditorDialog({ open, onOpenChange, transformation 
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor={titleId} className="text-sm font-medium">
                       {t.common.title}
@@ -167,6 +179,23 @@ export function TransformationEditorDialog({ open, onOpenChange, transformation 
                            placeholder={t.transformations.titlePlaceholder}
                            autoComplete="off"
                          />
+                      )}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor={titleFrId} className="text-sm font-medium">
+                      {t.transformations.titleFr || 'French Title (optional)'}
+                    </Label>
+                    <Controller
+                      control={control}
+                      name="title_fr"
+                      render={({ field }) => (
+                        <Input
+                          id={titleFrId}
+                          {...field}
+                          placeholder={t.transformations.titleFrPlaceholder || 'Titre en français'}
+                          autoComplete="off"
+                        />
                       )}
                     />
                   </div>
@@ -188,23 +217,43 @@ export function TransformationEditorDialog({ open, onOpenChange, transformation 
                   </div>
                 </div>
 
-                <div>
-                   <Label htmlFor={descriptionId} className="text-sm font-medium">
-                     {t.notebooks.addDescription.replace('...', '')}
-                   </Label>
-                  <Controller
-                    control={control}
-                    name="description"
-                    render={({ field }) => (
-                      <Textarea
-                         id={descriptionId}
-                         {...field}
-                         placeholder={t.transformations.descriptionPlaceholder}
-                         rows={2}
-                         autoComplete="off"
-                      />
-                    )}
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor={descriptionId} className="text-sm font-medium">
+                      {t.notebooks.addDescription.replace('...', '')}
+                    </Label>
+                    <Controller
+                      control={control}
+                      name="description"
+                      render={({ field }) => (
+                        <Textarea
+                          id={descriptionId}
+                          {...field}
+                          placeholder={t.transformations.descriptionPlaceholder}
+                          rows={2}
+                          autoComplete="off"
+                        />
+                      )}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor={descriptionFrId} className="text-sm font-medium">
+                      {t.transformations.descriptionFr || 'French Description (optional)'}
+                    </Label>
+                    <Controller
+                      control={control}
+                      name="description_fr"
+                      render={({ field }) => (
+                        <Textarea
+                          id={descriptionFrId}
+                          {...field}
+                          placeholder={t.transformations.descriptionFrPlaceholder || 'Description en français'}
+                          rows={2}
+                          autoComplete="off"
+                        />
+                      )}
+                    />
+                  </div>
                 </div>
               </div>
 

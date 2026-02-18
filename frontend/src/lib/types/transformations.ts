@@ -3,6 +3,8 @@ export interface Transformation {
   name: string
   title: string
   description: string
+  title_fr?: string
+  description_fr?: string
   prompt: string
   apply_default: boolean
   created: string
@@ -13,6 +15,8 @@ export interface CreateTransformationRequest {
   name: string
   title: string
   description: string
+  title_fr?: string
+  description_fr?: string
   prompt: string
   apply_default?: boolean
 }
@@ -21,6 +25,8 @@ export interface UpdateTransformationRequest {
   name?: string
   title?: string
   description?: string
+  title_fr?: string
+  description_fr?: string
   prompt?: string
   apply_default?: boolean
 }

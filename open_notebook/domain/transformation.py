@@ -10,6 +10,8 @@ class Transformation(ObjectModel):
     name: str
     title: str
     description: str
+    title_fr: Optional[str] = Field(None, description="French display title")
+    description_fr: Optional[str] = Field(None, description="French description")
     prompt: str
     apply_default: bool
 

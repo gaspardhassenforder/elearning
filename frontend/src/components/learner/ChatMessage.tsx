@@ -212,6 +212,17 @@ export function ChatMessage({ message, index, isLastAssistant, isStreaming, t, i
     combinedTitleMap
   )
 
+  // Hide phantom empty assistant messages: no content, no tool calls, no SSE error, and not the currently streaming message
+  // Also treat "[]" as empty (backend may serialize empty tool_calls as content)
+  const trimmedContent = message.content?.trim()
+  const hasContent = !!trimmedContent && trimmedContent !== '[]'
+  const hasToolCalls = message.toolCalls && message.toolCalls.length > 0
+  const hasSseError = !!message.sseError
+  const isCurrentlyStreaming = isLastAssistant && isStreaming
+  if (!hasContent && !hasToolCalls && !hasSseError && !isCurrentlyStreaming) {
+    return null
+  }
+
   // Assistant message
   return (
     <div className="flex items-start gap-3">
@@ -220,36 +231,42 @@ export function ChatMessage({ message, index, isLastAssistant, isStreaming, t, i
       </div>
       <div className="flex-1 min-w-0">
         <div className="prose prose-sm prose-neutral dark:prose-invert max-w-none break-words prose-headings:font-semibold prose-a:text-blue-600 prose-a:break-all prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-p:mb-4 prose-p:leading-7 prose-li:mb-2 text-foreground/90">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            components={{
-              a: ReferenceLinkComponent,
-              p: ({ children }) => <p className="mb-4">{children}</p>,
-              h1: ({ children }) => <h1 className="mb-4 mt-6">{children}</h1>,
-              h2: ({ children }) => <h2 className="mb-3 mt-5">{children}</h2>,
-              h3: ({ children }) => <h3 className="mb-3 mt-4">{children}</h3>,
-              h4: ({ children }) => <h4 className="mb-2 mt-4">{children}</h4>,
-              h5: ({ children }) => <h5 className="mb-2 mt-3">{children}</h5>,
-              h6: ({ children }) => <h6 className="mb-2 mt-3">{children}</h6>,
-              li: ({ children }) => <li className="mb-1">{children}</li>,
-              ul: ({ children }) => <ul className="mb-4 space-y-1">{children}</ul>,
-              ol: ({ children }) => <ol className="mb-4 space-y-1">{children}</ol>,
-              table: ({ children }) => (
-                <div className="my-4 overflow-x-auto">
-                  <table className="min-w-full border-collapse border border-border">{children}</table>
-                </div>
-              ),
-              thead: ({ children }) => <thead className="bg-muted">{children}</thead>,
-              tbody: ({ children }) => <tbody>{children}</tbody>,
-              tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
-              th: ({ children }) => <th className="border border-border px-3 py-2 text-left font-semibold">{children}</th>,
-              td: ({ children }) => <td className="border border-border px-3 py-2">{children}</td>,
-            }}
-          >
-            {processedContent}
-          </ReactMarkdown>
+          {hasContent && processedContent && (
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                a: ReferenceLinkComponent,
+                p: ({ children }) => <p className="mb-4">{children}</p>,
+                h1: ({ children }) => <h1 className="mb-4 mt-6">{children}</h1>,
+                h2: ({ children }) => <h2 className="mb-3 mt-5">{children}</h2>,
+                h3: ({ children }) => <h3 className="mb-3 mt-4">{children}</h3>,
+                h4: ({ children }) => <h4 className="mb-2 mt-4">{children}</h4>,
+                h5: ({ children }) => <h5 className="mb-2 mt-3">{children}</h5>,
+                h6: ({ children }) => <h6 className="mb-2 mt-3">{children}</h6>,
+                li: ({ children }) => <li className="mb-1">{children}</li>,
+                ul: ({ children }) => <ul className="mb-4 space-y-1">{children}</ul>,
+                ol: ({ children }) => <ol className="mb-4 space-y-1">{children}</ol>,
+                table: ({ children }) => (
+                  <div className="my-4 overflow-x-auto">
+                    <table className="min-w-full border-collapse border border-border">{children}</table>
+                  </div>
+                ),
+                thead: ({ children }) => <thead className="bg-muted">{children}</thead>,
+                tbody: ({ children }) => <tbody>{children}</tbody>,
+                tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
+                th: ({ children }) => <th className="border border-border px-3 py-2 text-left font-semibold">{children}</th>,
+                td: ({ children }) => <td className="border border-border px-3 py-2">{children}</td>,
+              }}
+            >
+              {processedContent}
+            </ReactMarkdown>
+          )}
           {isLastAssistant && isStreaming && (
-            <span className="inline-block w-1.5 h-4 ml-1 bg-primary animate-pulse" />
+            <span className="inline-flex items-center gap-1 ml-1 pt-4">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce-dot" style={{ animationDelay: '0ms' }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce-dot" style={{ animationDelay: '150ms' }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce-dot" style={{ animationDelay: '300ms' }} />
+            </span>
           )}
         </div>
 

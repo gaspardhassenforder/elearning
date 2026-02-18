@@ -43,6 +43,7 @@ class LearnerTransformationRequest(BaseModel):
     transformation_id: str = Field(..., description="Transformation ID to execute")
     source_ids: List[str] = Field(..., min_length=1, description="Source IDs to use")
     instructions: Optional[str] = Field(None, description="Additional instructions")
+    language: str = Field(default="en-US", description="UI language code (e.g., 'en-US', 'fr-FR') for AI response language")
 
 
 class LearnerTransformationResponse(BaseModel):
@@ -280,10 +281,29 @@ async def learner_execute_transformation(
         if not transformation:
             raise HTTPException(status_code=404, detail="Transformation not found")
 
-        # Prepend instructions if provided
+        # Build language instruction
+        language_names = {
+            "fr-FR": "French (Français)",
+            "en-US": "English",
+            "pt-BR": "Brazilian Portuguese (Português)",
+            "zh-CN": "Simplified Chinese (简体中文)",
+            "zh-TW": "Traditional Chinese (繁體中文)",
+        }
+        language_display = language_names.get(request.language, "English")
+        language_instruction = (
+            f"IMPORTANT: Write your entire response in {language_display}.\n\n"
+            if request.language != "en-US" else ""
+        )
+
+        # Prepend instructions and language directive if provided
         input_text = content
+        prefix_parts = []
+        if language_instruction:
+            prefix_parts.append(language_instruction)
         if request.instructions:
-            input_text = f"Additional instructions: {request.instructions}\n\n{content}"
+            prefix_parts.append(f"Additional instructions: {request.instructions}")
+        if prefix_parts:
+            input_text = "\n".join(prefix_parts) + "\n\n" + content
 
         # Execute transformation graph
         from open_notebook.graphs.transformation import graph as transformation_graph

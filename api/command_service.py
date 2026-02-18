@@ -60,6 +60,22 @@ class CommandService:
             status = await get_command_status(full_job_id)
             status_str = status.status if status else "unknown"
             logger.debug(f"Job {job_id} status: {status_str}")
+
+            # Fetch progress directly from the command record.
+            # CommandResult doesn't include a progress field, but we write one
+            # via _update_command_progress() during podcast generation.
+            progress = None
+            try:
+                from open_notebook.database.repository import repo_query
+                cmd_data = await repo_query(
+                    "SELECT progress FROM $cmd_id",
+                    {"cmd_id": full_job_id},
+                )
+                if cmd_data and isinstance(cmd_data, list) and len(cmd_data) > 0:
+                    progress = cmd_data[0].get("progress")
+            except Exception:
+                pass
+
             return {
                 "job_id": job_id,
                 "status": status_str,
@@ -73,7 +89,7 @@ class CommandService:
                 "updated": str(status.updated)
                 if status and hasattr(status, "updated") and status.updated
                 else None,
-                "progress": getattr(status, "progress", None) if status else None,
+                "progress": progress,
             }
         except Exception as e:
             logger.error("Failed to get command status for job {}: {}", job_id, str(e))

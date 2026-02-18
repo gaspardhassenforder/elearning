@@ -106,7 +106,9 @@ export function LearnerSourceSelector({
       </ScrollArea>
       {selectedSourceIds.length > 0 && (
         <p className="text-xs text-muted-foreground">
-          {selectedSourceIds.length} / {sources.length} selected
+          {(t.learner?.createArtifact?.selectedSources || '{selected} / {total} selected')
+            .replace('{selected}', String(selectedSourceIds.length))
+            .replace('{total}', String(sources.length))}
         </p>
       )}
     </div>
