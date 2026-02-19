@@ -1,0 +1,84 @@
+# Render.com deployment Dockerfile
+# Single container: Next.js + FastAPI + Worker + SurrealDB (managed by supervisord)
+# Based on the main Dockerfile with SurrealDB binary added.
+
+# ── Build stage ──────────────────────────────────────────────────────────────
+FROM python:3.12-slim-bookworm AS builder
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    build-essential \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV MAKEFLAGS="-j$(nproc)"
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV UV_COMPILE_BYTECODE=1
+ENV UV_LINK_MODE=copy
+
+WORKDIR /app
+
+COPY pyproject.toml uv.lock ./
+COPY open_notebook/__init__.py ./open_notebook/__init__.py
+RUN uv sync --frozen --no-dev
+
+COPY . /app
+
+WORKDIR /app/frontend
+ARG NPM_REGISTRY=https://registry.npmjs.org/
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm config set registry ${NPM_REGISTRY}
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
+WORKDIR /app
+
+# ── Runtime stage ─────────────────────────────────────────────────────────────
+FROM python:3.12-slim-bookworm AS runtime
+
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    supervisor \
+    curl \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+# Copy SurrealDB binary directly from the official image (no download needed)
+COPY --from=surrealdb/surrealdb:v2 /surreal /usr/local/bin/surreal
+
+WORKDIR /app
+
+COPY --from=builder /app/.venv /app/.venv
+
+COPY . /app
+
+ENV UV_NO_SYNC=1
+ENV VIRTUAL_ENV=/app/.venv
+
+COPY --from=builder /app/frontend/.next/standalone /app/frontend/
+COPY --from=builder /app/frontend/.next/static /app/frontend/.next/static
+COPY --from=builder /app/frontend/public /app/frontend/public
+COPY --from=builder /app/frontend/start-server.js /app/frontend/start-server.js
+
+# Expose frontend port (Render routes traffic here)
+EXPOSE 8502
+
+RUN mkdir -p /app/data /app/surreal_data
+
+COPY scripts/wait-for-api.sh /app/scripts/wait-for-api.sh
+RUN chmod +x /app/scripts/wait-for-api.sh
+
+# Use the Render-specific supervisord config that includes SurrealDB
+COPY supervisord.render.conf /etc/supervisor/conf.d/supervisord.conf
+
+RUN mkdir -p /var/log/supervisor
+
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
