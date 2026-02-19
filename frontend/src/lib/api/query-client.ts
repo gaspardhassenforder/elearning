@@ -50,4 +50,5 @@ export const QUERY_KEYS = {
   learnerArtifacts: (notebookId: string) => ['learner-artifacts', notebookId] as const,
   learnerArtifactPreview: (artifactId: string) => ['learner-artifacts', 'preview', artifactId] as const,
   transformations: ['transformations'] as const,
+  systemPrompt: () => ['system-prompt'] as const,
 }

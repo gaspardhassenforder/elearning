@@ -5,6 +5,18 @@ from surreal_commands import get_command_status, submit_command
 import surreal_commands
 
 
+# Map surreal-commands status values to the API contract expected by the frontend.
+# surreal-commands uses: new, running, completed, failed, canceled
+# Frontend expects:      pending, processing, completed, error
+_STATUS_MAP = {
+    "new": "pending",
+    "running": "processing",
+    "completed": "completed",
+    "failed": "error",
+    "canceled": "error",
+}
+
+
 class CommandService:
     """Generic service layer for command operations"""
 
@@ -58,18 +70,21 @@ class CommandService:
             # Ensure job_id has the command: prefix required by surreal_commands
             full_job_id = job_id if job_id.startswith("command:") else f"command:{job_id}"
             status = await get_command_status(full_job_id)
-            status_str = status.status if status else "unknown"
-            logger.debug(f"Job {job_id} status: {status_str}")
+            raw_status = status.status if status else "unknown"
+            status_str = _STATUS_MAP.get(raw_status, raw_status)
+            logger.debug(f"Job {job_id} status: {raw_status} -> {status_str}")
 
             # Fetch progress directly from the command record.
             # CommandResult doesn't include a progress field, but we write one
             # via _update_command_progress() during podcast generation.
+            # Must use ensure_record_id() so SurrealDB resolves $cmd_id as a
+            # record reference, not a plain string.
             progress = None
             try:
-                from open_notebook.database.repository import repo_query
+                from open_notebook.database.repository import repo_query, ensure_record_id
                 cmd_data = await repo_query(
                     "SELECT progress FROM $cmd_id",
-                    {"cmd_id": full_job_id},
+                    {"cmd_id": ensure_record_id(full_job_id)},
                 )
                 if cmd_data and isinstance(cmd_data, list) and len(cmd_data) > 0:
                     progress = cmd_data[0].get("progress")

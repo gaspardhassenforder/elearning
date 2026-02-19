@@ -49,6 +49,7 @@ from api.routers import (
     source_chat,
     sources,
     speaker_profiles,
+    system_prompt,
     token_usage,
     transformations,
     users,
@@ -214,6 +215,7 @@ app.include_router(learner_artifacts.router, prefix="/api", tags=["learner-artif
 app.include_router(debug.router, prefix="/api", tags=["debug"])
 app.include_router(logs.router, prefix="/api", tags=["logs"])
 app.include_router(token_usage.router, prefix="/api", tags=["token-usage"])
+app.include_router(system_prompt.router, prefix="/api", tags=["system-prompt"])
 
 
 @app.get("/")

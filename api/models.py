@@ -817,6 +817,15 @@ class ObjectiveGenerationResponse(BaseModel):
     error: Optional[str] = Field(None, description="Error message if failed")
 
 
+# System Prompt API models
+class SystemPromptResponse(BaseModel):
+    content: str
+
+
+class SystemPromptUpdate(BaseModel):
+    content: str
+
+
 # Module Prompt API models (Story 3.4)
 class ModulePromptUpdate(BaseModel):
     """Update or create module prompt."""

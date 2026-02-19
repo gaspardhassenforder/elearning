@@ -175,7 +175,7 @@ class PodcastService:
                 logger.debug(f"Added prefix to job_id: {job_id} -> {clean_job_id}")
 
             status = await get_command_status(clean_job_id)
-            
+
             if not status:
                 logger.warning(f"Job status not found for job_id: {clean_job_id}")
                 return {
@@ -187,10 +187,23 @@ class PodcastService:
                     "updated": None,
                     "progress": None,
                 }
-            
+
+            # Normalize surreal-commands status values to the API contract.
+            # surreal-commands: new, running, completed, failed, canceled
+            # API contract:     pending, processing, completed, error
+            _status_map = {
+                "new": "pending",
+                "running": "processing",
+                "completed": "completed",
+                "failed": "error",
+                "canceled": "error",
+            }
+            raw_status = status.status if status else "unknown"
+            normalized_status = _status_map.get(raw_status, raw_status)
+
             return {
                 "job_id": clean_job_id,
-                "status": status.status if status else "unknown",
+                "status": normalized_status,
                 "result": status.result if status else None,
                 "error_message": getattr(status, "error_message", None)
                 if status

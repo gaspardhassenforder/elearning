@@ -141,3 +141,7 @@ specs/
 
 
 **/*.local.md
+
+# btca local data
+.btca/
+btca.config.jsonc

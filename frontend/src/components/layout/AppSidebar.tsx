@@ -44,6 +44,7 @@ import {
   Users,
   Building2,
   LayoutGrid,
+  FileCode2,
 } from 'lucide-react'
 
 const getNavigation = (t: TranslationKeys) => [
@@ -74,6 +75,7 @@ const getNavigation = (t: TranslationKeys) => [
       { name: t.navigation.assignments, href: '/assignments', icon: LayoutGrid },
       { name: t.navigation.models, href: '/models', icon: Bot },
       { name: t.navigation.transformations, href: '/transformations', icon: Shuffle },
+      { name: t.navigation.systemPrompt, href: '/system-prompt', icon: FileCode2 },
       { name: t.navigation.settings, href: '/settings', icon: Settings },
       { name: t.navigation.advanced, href: '/advanced', icon: Wrench },
     ],
