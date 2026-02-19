@@ -8,6 +8,7 @@ Story: 4.1 - Learner Chat Interface & SSE Streaming
 
 import asyncio
 import json
+import time
 from typing import AsyncIterator
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -20,6 +21,7 @@ from api.auth import LearnerContext, get_current_learner
 from api.learner_chat_service import (
     generate_proactive_greeting,
     prepare_chat_context,
+    stream_proactive_greeting,
     validate_learner_access_to_notebook,
 )
 from open_notebook.graphs.prompt import generate_re_engagement_greeting
@@ -473,17 +475,16 @@ async def stream_learner_chat(
                 if is_first_visit:
                     logger.info("Generating proactive greeting for first visit...")
                     try:
-                        greeting = await generate_proactive_greeting(
+                        # Stream greeting tokens directly from LLM
+                        full_greeting = ""
+                        async for token in stream_proactive_greeting(
                             notebook_id=notebook_id,
                             learner_profile=learner_profile_dict,
                             notebook=notebook,
                             language=request.language,
-                        )
-
-                        # Stream greeting token-by-token for smooth UX
-                        words = greeting.split()
-                        for word in words:
-                            text_event = SSETextEvent(delta=word + " ")
+                        ):
+                            full_greeting += token
+                            text_event = SSETextEvent(delta=token)
                             yield f"event: text\ndata: {text_event.model_dump_json()}\n\n"
 
                         # Send message complete for greeting
@@ -498,15 +499,15 @@ async def stream_learner_chat(
                         )
                         yield f"event: message_complete\ndata: {greeting_complete_event.model_dump_json()}\n\n"
 
-                        logger.info("Proactive greeting sent successfully")
+                        logger.info("Proactive greeting streamed successfully")
 
-                        # Persist greeting to checkpoint so AI sees it in history
-                        # and doesn't re-introduce itself on the first real message
+                        # Persist complete greeting to checkpoint so AI sees it in
+                        # history and doesn't re-introduce itself on the first real message
                         try:
                             async_graph = await get_async_graph()
                             await async_graph.aupdate_state(
                                 {"configurable": {"thread_id": thread_id}},
-                                {"messages": [AIMessage(content=greeting)]},
+                                {"messages": [AIMessage(content=full_greeting)]},
                                 as_node="agent",
                             )
                             logger.info("Greeting persisted to checkpoint for thread {}", thread_id)
@@ -518,7 +519,7 @@ async def stream_learner_chat(
                             )
 
                     except Exception as e:
-                        logger.error("Failed to generate proactive greeting: {}", str(e))
+                        logger.error("Failed to stream proactive greeting: {}", str(e))
                         # Continue — frontend will show fallback empty state
 
                 elif is_returning_user:
@@ -574,6 +575,9 @@ async def stream_learner_chat(
             # Collect AI response text for background examiner
             collected_ai_text: list[str] = []
 
+            # Heartbeat: track time of last SSE event to prevent proxy timeouts
+            last_event_time = time.monotonic()
+
             # Stream events from chat graph with assembled system prompt
             # ReAct loop: agent -> tools -> agent -> ... (up to MAX_TOOL_ITERATIONS)
             async_graph = await get_async_graph()
@@ -610,6 +614,7 @@ async def stream_learner_chat(
                             collected_ai_text.append(text_content)
                             text_event = SSETextEvent(delta=text_content)
                             yield f"event: text\ndata: {text_event.model_dump_json()}\n\n"
+                            last_event_time = time.monotonic()
 
                 # Tool call start — emit tool_call + tool_status events
                 elif event_type == "on_tool_start":
@@ -630,6 +635,7 @@ async def stream_learner_chat(
                             status=status_text, tool_name=tool_name
                         )
                         yield f"event: tool_status\ndata: {status_event.model_dump_json()}\n\n"
+                    last_event_time = time.monotonic()
 
                 # Tool call end (result) — handle content_and_artifact tools
                 elif event_type == "on_tool_end":
@@ -661,6 +667,23 @@ async def stream_learner_chat(
                         id=tool_run_id, result=result_for_frontend
                     )
                     yield f"event: tool_result\ndata: {tool_result_event.model_dump_json()}\n\n"
+                    last_event_time = time.monotonic()
+
+                # Custom stream events from get_stream_writer() in tools
+                elif event_type == "on_custom_event":
+                    custom_data = event.get("data", {})
+                    if custom_data.get("type") == "tool_progress":
+                        status_event = SSEToolStatusEvent(
+                            status=custom_data.get("status", ""),
+                            tool_name=custom_data.get("tool", ""),
+                        )
+                        yield f"event: tool_status\ndata: {status_event.model_dump_json()}\n\n"
+                        last_event_time = time.monotonic()
+
+                # Heartbeat: prevent proxy/connection timeouts during long tool calls
+                if time.monotonic() - last_event_time > 10:
+                    yield ": heartbeat\n\n"
+                    last_event_time = time.monotonic()
 
             # Emit message_complete IMMEDIATELY (not blocked by examiner)
             message_complete_event = SSEMessageCompleteEvent(

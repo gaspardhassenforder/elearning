@@ -66,6 +66,7 @@ export function LearnerActionButtons({ notebookId }: LearnerActionButtonsProps) 
   // Completion flash state
   const [showComplete, setShowComplete] = useState(false)
 
+  const errorStatuses = ['error', 'failed', 'canceled']
   useEffect(() => {
     if (isPodcastActive && status === 'completed') {
       setShowComplete(true)
@@ -74,7 +75,7 @@ export function LearnerActionButtons({ notebookId }: LearnerActionButtonsProps) 
         clearActiveJob()
       }, 2000)
       return () => clearTimeout(timer)
-    } else if (isPodcastActive && status === 'error') {
+    } else if (isPodcastActive && status && errorStatuses.includes(status)) {
       clearActiveJob()
     } else {
       setShowComplete(false)
@@ -90,8 +91,10 @@ export function LearnerActionButtons({ notebookId }: LearnerActionButtonsProps) 
       : phases?.[phase] || phase
 
   // Whether to show active podcast state (in-progress or brief completion flash)
-  // status is undefined before first poll response, so treat it as in-progress
-  const isJobInProgress = status === undefined || status === 'pending' || status === 'processing'
+  // status is undefined before first poll response, so treat it as in-progress.
+  // Accept both normalized (pending/processing) and raw surreal-commands values (new/running).
+  const inProgressStatuses = ['pending', 'processing', 'new', 'running']
+  const isJobInProgress = status === undefined || inProgressStatuses.includes(status)
   const showPodcastProgress = isPodcastActive && (isJobInProgress || showComplete)
 
   return (

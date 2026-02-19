@@ -3,6 +3,7 @@ from typing import Optional, List, Tuple
 
 from langchain.tools import tool
 from langchain_core.runnables import RunnableConfig
+from langgraph.config import get_stream_writer
 from loguru import logger
 
 
@@ -182,6 +183,7 @@ async def surface_document(
     source_id: str,
     excerpt_text: str,
     relevance_reason: str,
+    page_number: Optional[int] = None,
 ) -> Tuple[str, dict]:
     """Surface a document snippet in the chat conversation.
 
@@ -193,6 +195,8 @@ async def surface_document(
         source_id: The record ID of the source document (e.g., "source:abc123")
         excerpt_text: A relevant excerpt from the document (max 200 chars recommended)
         relevance_reason: Brief explanation of why this document is relevant to the conversation
+        page_number: Optional PDF page number where the excerpt is found (1-indexed). Pass this when
+            the excerpt comes from search_knowledge_base results that include page_number.
 
     Returns:
         Tuple of (llm_content, ui_artifact):
@@ -202,6 +206,12 @@ async def surface_document(
     from open_notebook.domain.notebook import Source
 
     logger.info(f"surface_document tool called for source_id: {source_id}")
+
+    try:
+        writer = get_stream_writer()
+        writer({"type": "tool_progress", "tool": "surface_document", "status": "Loading document..."})
+    except Exception:
+        pass  # Streaming not available (e.g. sync invoke)
 
     try:
         # Load source metadata
@@ -255,6 +265,7 @@ async def surface_document(
             "source_type": file_type,
             "excerpt": truncated_excerpt,
             "relevance": relevance_reason,
+            "page_number": page_number,  # PDF page for navigation (None for non-PDF)
             "metadata": {
                 "created": source.created.isoformat() if source.created else None,
                 "file_type": file_type,
@@ -624,6 +635,12 @@ async def search_knowledge_base(
 
     logger.info(f"search_knowledge_base tool called with query: '{query}'")
 
+    try:
+        writer = get_stream_writer()
+        writer({"type": "tool_progress", "tool": "search_knowledge_base", "status": "Searching knowledge base..."})
+    except Exception:
+        pass  # Streaming not available (e.g. sync invoke)
+
     # Extract notebook_id from config (auto-injected by LangChain)
     notebook_id = config.get("configurable", {}).get("notebook_id")
 
@@ -644,16 +661,29 @@ async def search_knowledge_base(
             content = r.get("content", "")
             truncated = content[:1000] + "..." if len(content) > 1000 else content
 
-            formatted.append({
+            entry = {
                 "source_id": str(r.get("parent_id") or r.get("id", "")),
                 "title": r.get("title", "Untitled"),
                 "content": truncated,
                 "similarity": r.get("similarity", 0),
-            })
+            }
+            # Include page_number when available (from PDF source embeddings)
+            page_number = r.get("page_number")
+            if page_number is not None:
+                entry["page_number"] = page_number
+
+            formatted.append(entry)
 
         logger.info(
             f"search_knowledge_base found {len(formatted)} results for '{query}'"
         )
+
+        try:
+            writer = get_stream_writer()
+            writer({"type": "tool_progress", "tool": "search_knowledge_base", "status": f"Found {len(formatted)} results"})
+        except Exception:
+            pass
+
         return formatted
 
     except Exception as e:
@@ -700,6 +730,12 @@ async def generate_artifact(
     from open_notebook.domain.artifact import Artifact
 
     logger.info(f"generate_artifact tool called: {artifact_type} on topic '{topic}'")
+
+    try:
+        writer = get_stream_writer()
+        writer({"type": "tool_progress", "tool": "generate_artifact", "status": f"Generating {artifact_type}..."})
+    except Exception:
+        pass  # Streaming not available (e.g. sync invoke)
 
     try:
         # Extract notebook_id and user_id from config

@@ -39,6 +39,65 @@ class ThreadState(TypedDict):
     user_id: Optional[str]  # Story 4.4: For objective progress tracking
 
 
+async def _prepare_model_and_payload(
+    state: ThreadState, config: RunnableConfig
+) -> tuple:
+    """Shared logic: build system prompt, select tools, provision model.
+
+    Used by the async learner node (call_model_async). Extracted so the sync
+    admin node (call_model_with_messages) can stay untouched.
+    """
+    # System prompt selection (override vs template)
+    if state.get("system_prompt_override"):
+        system_prompt = state["system_prompt_override"]
+    else:
+        system_prompt = Prompter(prompt_template="chat/system").render(data=state)
+
+    payload = [SystemMessage(content=system_prompt)] + state.get("messages", [])
+    model_id = config.get("configurable", {}).get("model_id") or state.get("model_override")
+
+    # Propagate user_id into config for tools
+    user_id = state.get("user_id") or config.get("configurable", {}).get("user_id")
+    if user_id:
+        config.get("configurable", {})["user_id"] = user_id
+
+    # Tool selection
+    tools = [surface_document, surface_quiz, surface_podcast]
+    if user_id:
+        tools.extend([search_knowledge_base, generate_artifact])
+
+    # Provision model (async — no ThreadPoolExecutor needed)
+    model = await provision_langchain_model(str(payload), model_id, "chat", max_tokens=8192)
+    model_with_tools = model.bind_tools(tools)
+
+    return model_with_tools, payload
+
+
+async def call_model_async(state: ThreadState, config: RunnableConfig) -> dict:
+    """Async node for learner ReAct graph — enables proper token streaming.
+
+    Unlike the sync call_model_with_messages, this node:
+    - Calls provision_langchain_model() directly (no ThreadPoolExecutor hack)
+    - Passes config to ainvoke() so LangGraph can intercept callbacks/streaming
+    """
+    model_with_tools, payload = await _prepare_model_and_payload(state, config)
+
+    # KEY: pass config to enable LangGraph callback/streaming interception
+    ai_message = await model_with_tools.ainvoke(payload, config=config)
+
+    # Content extraction + thinking tag cleanup (same as sync version)
+    content = ai_message.content
+    if isinstance(content, list):
+        text_parts = [item.get('text', '') for item in content if isinstance(item, dict) and 'text' in item]
+        content = '\n'.join(text_parts) if text_parts else str(content)
+    elif not isinstance(content, str):
+        content = str(content)
+
+    cleaned_content = clean_thinking_content(content)
+    cleaned_message = ai_message.model_copy(update={"content": cleaned_content})
+    return {"messages": cleaned_message}
+
+
 def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict:
     # Story 4.1: Use system_prompt_override if provided (for learner chat)
     # Otherwise fall back to default admin chat prompt
@@ -192,7 +251,7 @@ def should_continue(state: ThreadState) -> str:
 
 
 learner_state = StateGraph(ThreadState)
-learner_state.add_node("agent", call_model_with_messages)
+learner_state.add_node("agent", call_model_async)
 learner_state.add_node("tools", tool_executor)
 learner_state.add_edge(START, "agent")
 learner_state.add_conditional_edges(

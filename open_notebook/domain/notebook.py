@@ -612,16 +612,17 @@ async def vector_search_for_notebook(
         if source_ids:
             source_ids_clean = [ensure_record_id(sid) for sid in source_ids]
             query = """
-            SELECT 
+            SELECT
                 source.id as id,
                 source.title as title,
                 content,
                 source.id as parent_id,
+                page_number,
                 vector::similarity::cosine(embedding, $embed) as similarity
-            FROM source_embedding 
+            FROM source_embedding
             WHERE source IN $source_ids
                 AND source IN (SELECT VALUE in FROM reference WHERE out=$notebook_id)
-                AND embedding != none 
+                AND embedding != none
                 AND array::len(embedding) = array::len($embed)
             ORDER BY similarity DESC
             LIMIT $results
@@ -630,15 +631,16 @@ async def vector_search_for_notebook(
             source_results = await repo_query(query, params_with_sources)
         else:
             query = """
-            SELECT 
+            SELECT
                 source.id as id,
                 source.title as title,
                 content,
                 source.id as parent_id,
+                page_number,
                 vector::similarity::cosine(embedding, $embed) as similarity
-            FROM source_embedding 
+            FROM source_embedding
             WHERE source IN (SELECT VALUE in FROM reference WHERE out=$notebook_id)
-                AND embedding != none 
+                AND embedding != none
                 AND array::len(embedding) = array::len($embed)
             ORDER BY similarity DESC
             LIMIT $results

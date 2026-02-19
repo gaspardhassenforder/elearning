@@ -1,0 +1,2 @@
+-- Rollback Migration 33: Remove page_number field from source_embedding
+REMOVE FIELD IF EXISTS page_number ON TABLE source_embedding;

@@ -6,7 +6,7 @@ Story: 4.1 - Learner Chat Interface & SSE Streaming
 Story: 4.2 - Two-Layer Prompt System & Proactive AI Teacher
 """
 
-from typing import Optional, Tuple
+from typing import AsyncGenerator, Optional, Tuple
 
 from fastapi import HTTPException
 from loguru import logger
@@ -557,3 +557,87 @@ Generate the greeting now:"""
         if language == "fr-FR":
             return f"Bonjour ! Bienvenue dans {notebook.name}. Commençons !"
         return f"Hello! Welcome to {notebook.name}. Let's get started!"
+
+
+async def stream_proactive_greeting(
+    notebook_id: str, learner_profile: dict, notebook: Notebook, language: str = "en-US"
+) -> AsyncGenerator[str, None]:
+    """Stream greeting tokens directly from LLM (not pre-generated then word-split).
+
+    Uses the same prompt as generate_proactive_greeting but streams tokens
+    as they arrive from the model, providing a smoother UX.
+
+    Args:
+        notebook_id: Notebook/module record ID
+        learner_profile: Learner profile dict
+        notebook: Notebook instance
+        language: UI language code
+
+    Yields:
+        Text chunks as they arrive from the LLM
+    """
+    logger.info(f"Streaming proactive greeting for notebook {notebook_id}")
+
+    # 1. Load learning objectives
+    try:
+        objectives = await LearningObjective.get_for_notebook(notebook_id)
+    except Exception as e:
+        logger.warning("Failed to load learning objectives for notebook {}: {}", notebook_id, str(e))
+        objectives = []
+
+    objectives_text = "\n".join(
+        f"- {obj.text}" for obj in objectives
+    ) if objectives else "No specific objectives defined yet."
+
+    # 2. Language instruction
+    language_names = {
+        "fr-FR": "French (Français)",
+        "en-US": "English",
+        "pt-BR": "Brazilian Portuguese (Português)",
+        "zh-CN": "Simplified Chinese (简体中文)",
+        "zh-TW": "Traditional Chinese (繁體中文)",
+    }
+    language_display = language_names.get(language, "English")
+    language_instruction = (
+        f"\n6. IMPORTANT: You MUST write the entire greeting in {language_display}."
+        if language != "en-US" else ""
+    )
+
+    # 3. Build prompt (same as generate_proactive_greeting)
+    prompt = f"""Generate a warm, personalized first greeting for a learner starting a new learning module.
+
+**Learner Context:**
+- Role: {learner_profile.get('role', 'learner')}
+- AI Familiarity: {learner_profile.get('ai_familiarity', 'intermediate')}
+- Job: {learner_profile.get('job_description', 'N/A')}
+
+**Module:** {notebook.name}
+
+**Learning Objectives:**
+{objectives_text}
+
+**Guidelines:**
+1. Welcome them warmly and reference their role/background
+2. Briefly acknowledge their AI familiarity level (adjust tone accordingly)
+3. Introduce the first learning objective naturally
+4. End with an engaging, open-ended question that connects to their work
+5. Keep it concise (3-5 sentences), conversational tone{language_instruction}
+
+Generate the greeting now:"""
+
+    # 4. Stream from LLM
+    try:
+        model = await provision_langchain_model(
+            prompt, model_id=None, default_type="chat", max_tokens=1024
+        )
+        async for chunk in model.astream(prompt):
+            text = extract_text_from_response(chunk.content)
+            if text:
+                yield text
+    except Exception as e:
+        logger.error("Failed to stream proactive greeting: {}", str(e))
+        # Fallback to simple greeting
+        if language == "fr-FR":
+            yield f"Bonjour ! Bienvenue dans {notebook.name}. Commençons !"
+        else:
+            yield f"Hello! Welcome to {notebook.name}. Let's get started!"

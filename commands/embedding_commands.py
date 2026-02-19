@@ -40,6 +40,7 @@ class EmbedChunkInput(CommandInput):
     source_id: str
     chunk_index: int
     chunk_text: str
+    page_number: Optional[int] = None  # PDF page number (1-indexed) for navigation
 
 
 class EmbedChunkOutput(CommandOutput):
@@ -240,7 +241,14 @@ async def embed_chunk_command(
         # Generate embedding for the chunk
         embedding = (await EMBEDDING_MODEL.aembed([input_data.chunk_text]))[0]
 
-        # Insert chunk embedding into database
+        # Insert chunk embedding into database (with optional page_number)
+        params = {
+            "source_id": ensure_record_id(input_data.source_id),
+            "order": input_data.chunk_index,
+            "content": input_data.chunk_text,
+            "embedding": embedding,
+            "page_number": input_data.page_number,
+        }
         await repo_query(
             """
             CREATE source_embedding CONTENT {
@@ -248,14 +256,10 @@ async def embed_chunk_command(
                 "order": $order,
                 "content": $content,
                 "embedding": $embedding,
+                "page_number": $page_number,
             };
             """,
-            {
-                "source_id": ensure_record_id(input_data.source_id),
-                "order": input_data.chunk_index,
-                "content": input_data.chunk_text,
-                "embedding": embedding,
-            },
+            params,
         )
 
         logger.debug(
@@ -350,12 +354,29 @@ async def vectorize_source_command(
         if total_chunks == 0:
             raise ValueError("No chunks created after splitting text")
 
+        # 3b. Extract PDF page boundaries for page_number mapping
+        page_texts = []
+        if source.asset and source.asset.file_path:
+            import os
+            _, ext = os.path.splitext(source.asset.file_path)
+            if ext.lower() == ".pdf":
+                from open_notebook.utils.pdf_utils import extract_page_texts, determine_page_number
+                page_texts = extract_page_texts(source.asset.file_path)
+                if page_texts:
+                    logger.info(f"Extracted {len(page_texts)} page boundaries for PDF page mapping")
+
         # 4. Submit each chunk as a separate job
         logger.info(f"Submitting {total_chunks} chunk jobs to worker queue")
         jobs_submitted = 0
 
         for idx, chunk_text in enumerate(chunks):
             try:
+                # Determine page number for this chunk (PDF only)
+                chunk_page_number = None
+                if page_texts:
+                    from open_notebook.utils.pdf_utils import determine_page_number
+                    chunk_page_number = determine_page_number(chunk_text, page_texts)
+
                 job_id = submit_command(
                     "open_notebook",  # app name
                     "embed_chunk",  # command name
@@ -363,6 +384,7 @@ async def vectorize_source_command(
                         "source_id": input_data.source_id,
                         "chunk_index": idx,
                         "chunk_text": chunk_text,
+                        "page_number": chunk_page_number,
                     },
                 )
                 jobs_submitted += 1

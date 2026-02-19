@@ -24,6 +24,7 @@ interface DocumentSnippetCardProps {
   excerpt: string
   sourceType?: string
   relevance?: string
+  pageNumber?: number  // PDF page number for navigation (1-indexed)
 }
 
 export function DocumentSnippetCard({
@@ -32,13 +33,14 @@ export function DocumentSnippetCard({
   excerpt,
   sourceType = 'document',
   relevance,
+  pageNumber,
 }: DocumentSnippetCardProps) {
   const { t } = useTranslation()
   const openViewerSheet = useLearnerStore((state) => state.openViewerSheet)
 
   const handleOpenInSources = (e: React.MouseEvent) => {
     e.preventDefault()
-    openViewerSheet({ type: 'source', id: sourceId, searchText: excerpt })
+    openViewerSheet({ type: 'source', id: sourceId, searchText: excerpt, pageNumber })
   }
 
   // Truncate excerpt to 200 chars if needed (should already be done by backend, but double-check)
@@ -57,10 +59,17 @@ export function DocumentSnippetCard({
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          {/* Document title */}
-          <h4 className="text-sm font-semibold text-foreground mb-1 truncate">
-            {title}
-          </h4>
+          {/* Document title with optional page badge */}
+          <div className="flex items-center gap-2 mb-1">
+            <h4 className="text-sm font-semibold text-foreground truncate">
+              {title}
+            </h4>
+            {pageNumber && (
+              <span className="flex-shrink-0 text-[10px] font-medium text-muted-foreground bg-muted rounded px-1.5 py-0.5">
+                p.{pageNumber}
+              </span>
+            )}
+          </div>
 
           {/* Excerpt */}
           <p className="text-xs text-muted-foreground mb-2 line-clamp-3">

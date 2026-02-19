@@ -1,0 +1,2 @@
+-- Migration 33: Add page_number field to source_embedding for PDF page navigation
+DEFINE FIELD IF NOT EXISTS page_number ON TABLE source_embedding TYPE option<int>;

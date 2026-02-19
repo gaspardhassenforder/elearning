@@ -183,26 +183,30 @@ export function ChatMessage({ message, index, isLastAssistant, isStreaming, t, i
   const ReferenceLinkComponent = createCompactReferenceLinkComponent((type, id) => {
     const fullId = `${type}:${id}`
     // Find matching surface_document tool call to get excerpt for PDF highlighting
-    let matchingToolCall = message.toolCalls?.find(
+    const matchingToolCall = message.toolCalls?.find(
       (tc) => tc.toolName === 'surface_document' && tc.result?.source_id === fullId
     )
     let searchText = matchingToolCall?.result?.excerpt as string | undefined
+    let pageNumber = matchingToolCall?.result?.page_number as number | undefined
 
-    // Fallback: extract excerpt from search_knowledge_base results if no surface_document match
+    // Fallback: extract content from search_knowledge_base results if no surface_document match
     if (!searchText && message.toolCalls) {
       for (const tc of message.toolCalls) {
-        if (tc.toolName === 'search_knowledge_base' && tc.result?.results) {
-          const results = tc.result.results as Array<{ source_id?: string; excerpt?: string }>
+        if (tc.toolName === 'search_knowledge_base' && tc.result?.items) {
+          const results = tc.result.items as Array<{ source_id?: string; content?: string; page_number?: number }>
           const match = results.find((r) => r.source_id === fullId)
-          if (match?.excerpt) {
-            searchText = match.excerpt
+          if (match?.content) {
+            searchText = match.content
+            if (match.page_number && !pageNumber) {
+              pageNumber = match.page_number
+            }
             break
           }
         }
       }
     }
 
-    openViewerSheet({ type: 'source', id: fullId, searchText })
+    openViewerSheet({ type: 'source', id: fullId, searchText, pageNumber })
   }, combinedTitleMap)
 
   // Convert references to compact numbered format
@@ -284,6 +288,7 @@ export function ChatMessage({ message, index, isLastAssistant, isStreaming, t, i
                   excerpt={tc.result!.excerpt as string}
                   sourceType={tc.result!.source_type as string}
                   relevance={tc.result!.relevance as string}
+                  pageNumber={tc.result!.page_number as number | undefined}
                 />
               ))}
 

@@ -11,7 +11,7 @@
  * ~50% viewport width on desktop, 100% on mobile.
  */
 
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { ErrorBoundary } from '@/components/common/ErrorBoundary'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import {
@@ -28,11 +28,11 @@ import { useSourceContent } from '@/lib/hooks/use-source-content'
 import { useNotebookSources } from '@/lib/hooks/use-sources'
 import { useLearnerArtifactPreview } from '@/lib/hooks/use-artifacts'
 import { useLearnerStore } from '@/lib/stores/learner-store'
-import { sourcesApi } from '@/lib/api/sources'
 import { InlineQuizWidget } from './InlineQuizWidget'
 import { InlineAudioPlayer } from './InlineAudioPlayer'
 import { AlertCircle } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
+import { PdfViewer } from './PdfViewer'
 
 function ArtifactErrorFallback() {
   return (
@@ -64,6 +64,7 @@ export function ResourceViewerSheet({ notebookId }: ResourceViewerSheetProps) {
             notebookId={notebookId}
             sourceId={viewerSheet.id}
             searchText={viewerSheet.searchText}
+            pageNumber={viewerSheet.pageNumber}
             t={t}
           />
         )}
@@ -83,11 +84,13 @@ function SourceViewer({
   notebookId,
   sourceId,
   searchText,
+  pageNumber,
   t,
 }: {
   notebookId: string
   sourceId: string
   searchText?: string
+  pageNumber?: number
   t: Record<string, unknown>
 }) {
   const { sources } = useNotebookSources(notebookId)
@@ -97,39 +100,6 @@ function SourceViewer({
   const tSources = (t.learner as Record<string, unknown>)?.sources as Record<string, string>
 
   const isPdf = content?.file_type === 'PDF'
-  const [blobUrl, setBlobUrl] = useState<string | null>(null)
-  const [fileLoading, setFileLoading] = useState(false)
-
-  useEffect(() => {
-    if (!isPdf || !sourceId) return
-
-    let cancelled = false
-    const loadPdf = async () => {
-      setFileLoading(true)
-      try {
-        const response = await sourcesApi.downloadLearnerFile(sourceId)
-        if (cancelled) return
-        const arrayBuffer = await response.data.arrayBuffer()
-        const typedBlob = new Blob([arrayBuffer], { type: 'application/pdf' })
-        setBlobUrl(URL.createObjectURL(typedBlob))
-      } catch {
-        // Fall back to text display
-      } finally {
-        if (!cancelled) setFileLoading(false)
-      }
-    }
-    void loadPdf()
-    return () => {
-      cancelled = true
-    }
-  }, [isPdf, sourceId])
-
-  // Cleanup blob URL on unmount or sourceId change
-  useEffect(() => {
-    return () => {
-      if (blobUrl) URL.revokeObjectURL(blobUrl)
-    }
-  }, [blobUrl])
 
   return (
     <>
@@ -144,19 +114,13 @@ function SourceViewer({
           </SheetDescription>
         )}
       </SheetHeader>
-      {isPdf && (fileLoading || blobUrl) ? (
+      {isPdf ? (
         <div className="flex-1 min-h-0">
-          {fileLoading ? (
-            <div className="flex items-center justify-center h-full">
-              <LoadingSpinner />
-            </div>
-          ) : blobUrl ? (
-            <iframe
-              src={searchText ? `${blobUrl}#search=${encodeURIComponent(searchText.slice(0, 80))}` : blobUrl}
-              title={source?.title || 'PDF'}
-              className="w-full h-full border-0"
-            />
-          ) : null}
+          <PdfViewer
+            sourceId={sourceId}
+            pageNumber={pageNumber}
+            searchText={searchText}
+          />
         </div>
       ) : (
         <ScrollArea className="flex-1 px-6 py-4">

@@ -26,6 +26,7 @@ interface ViewerSheet {
   type: 'source' | 'artifact'
   id: string
   searchText?: string  // Excerpt text for PDF search / text highlight
+  pageNumber?: number  // PDF page number for navigation (1-indexed)
 }
 
 // Current module context (for unified header)

@@ -83,7 +83,9 @@ export function useJobStatus(
       // TanStack Query v5: callback receives the Query object, not data directly
       const data = query.state.data
       if (!data?.status) return pollInterval // Keep polling until data arrives
-      const isTerminal = data.status === 'completed' || data.status === 'error'
+      // Accept both normalized (completed/error) and raw surreal-commands values (failed/canceled)
+      const terminalStatuses = ['completed', 'error', 'failed', 'canceled']
+      const isTerminal = terminalStatuses.includes(data.status)
       return isTerminal ? false : pollInterval
     },
     refetchIntervalInBackground: true, // Keep polling even when tab is backgrounded
@@ -115,8 +117,9 @@ export function useJobStatus(
       onCompleteRef.current?.(data.result)
     }
 
-    // Detect status transition to error
-    if (currentStatus === 'error' && prevStatus !== 'error') {
+    // Detect status transition to error (accept both normalized and raw values)
+    const errorStatuses = ['error', 'failed', 'canceled']
+    if (errorStatuses.includes(currentStatus) && !errorStatuses.includes(prevStatus || '')) {
       // Call onError callback via ref
       onErrorRef.current?.(data.error_message || 'Unknown error')
     }
