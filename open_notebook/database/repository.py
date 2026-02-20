@@ -72,7 +72,10 @@ async def db_connection():
     try:
         yield db
     finally:
-        await db.close()
+        try:
+            await db.close()
+        except Exception:
+            pass
 
 
 async def repo_query(

@@ -5,7 +5,7 @@ DEFINE FIELD email ON user TYPE string;
 DEFINE FIELD password_hash ON user TYPE string;
 DEFINE FIELD role ON user TYPE string DEFAULT 'learner' ASSERT $value IN ['admin', 'learner'];
 DEFINE FIELD company_id ON user TYPE option<record<company>>;
-DEFINE FIELD profile ON user FLEXIBLE TYPE option<object>;
+DEFINE FIELD profile ON user TYPE FLEXIBLE option<object>;
 DEFINE FIELD onboarding_completed ON user TYPE bool DEFAULT false;
 DEFINE FIELD created ON user TYPE datetime DEFAULT time::now();
 DEFINE FIELD updated ON user TYPE datetime DEFAULT time::now();
