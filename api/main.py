@@ -57,8 +57,11 @@ from api.routers import (
 from api.routers import commands as commands_router
 from open_notebook.database.async_migrate import AsyncMigrationManager
 
-# Import commands to register them in the API process
+# Import commands to register them in the API process.
+# This applies the surreal-commands monkey-patches (SurrealDB Cloud auth fix)
+# to the API process so job submissions via CommandService work correctly.
 try:
+    import commands  # noqa: F401
     logger.info("Commands imported in API process")
 except Exception as e:
     logger.error("Failed to import commands in API process: {}", str(e))
