@@ -1,0 +1,7 @@
+-- Migration 34: Define command table for surreal-commands job queue
+-- The surreal-commands worker uses LIVE queries on this table to pick up jobs.
+-- Without an explicit DEFINE TABLE, SurrealDB 3.0 raises "table does not exist"
+-- when the worker registers its LIVE query, crashing the worker on startup.
+-- Previously this table was only referenced as a record type in migrations 7 and 8
+-- but never explicitly defined.
+DEFINE TABLE IF NOT EXISTS command SCHEMALESS;

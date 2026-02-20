@@ -1,0 +1,3 @@
+-- Rollback Migration 34: Remove command table
+-- NOTE: Only remove if you are fully removing surreal-commands from the project.
+REMOVE TABLE IF EXISTS command;

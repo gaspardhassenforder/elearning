@@ -18,8 +18,8 @@ DEFINE FIELD IF NOT EXISTS timestamp ON TABLE token_usage TYPE datetime DEFAULT 
 DEFINE FIELD IF NOT EXISTS cost_estimate ON TABLE token_usage TYPE option<float>;
 
 -- Define indexes for efficient queries
-DEFINE INDEX IF NOT EXISTS company_timestamp_idx ON TABLE token_usage COLUMNS company_id, timestamp;
-DEFINE INDEX IF NOT EXISTS notebook_timestamp_idx ON TABLE token_usage COLUMNS notebook_id, timestamp;
-DEFINE INDEX IF NOT EXISTS user_idx ON TABLE token_usage COLUMNS user_id;
-DEFINE INDEX IF NOT EXISTS timestamp_idx ON TABLE token_usage COLUMNS timestamp;
-DEFINE INDEX IF NOT EXISTS operation_type_idx ON TABLE token_usage COLUMNS operation_type;
+DEFINE INDEX IF NOT EXISTS company_timestamp_idx ON TABLE token_usage FIELDS company_id, timestamp;
+DEFINE INDEX IF NOT EXISTS notebook_timestamp_idx ON TABLE token_usage FIELDS notebook_id, timestamp;
+DEFINE INDEX IF NOT EXISTS user_idx ON TABLE token_usage FIELDS user_id;
+DEFINE INDEX IF NOT EXISTS timestamp_idx ON TABLE token_usage FIELDS timestamp;
+DEFINE INDEX IF NOT EXISTS operation_type_idx ON TABLE token_usage FIELDS operation_type;

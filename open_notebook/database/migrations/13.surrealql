@@ -4,7 +4,7 @@
 -- This migration fixes that by removing the old RELATION table and creating the proper table.
 
 -- Remove old artifact relation table
-REMOVE TABLE artifact;
+REMOVE TABLE IF EXISTS artifact;
 
 -- Create Artifact table for unified artifact tracking
 DEFINE TABLE artifact SCHEMAFULL;
