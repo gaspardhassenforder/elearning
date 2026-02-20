@@ -2,13 +2,13 @@
 -- Creates the Gemini embedding model record and sets it as default
 
 -- Create Gemini embedding model if it doesn't exist
-IF array::len(SELECT * FROM model WHERE name = "text-embedding-004" AND provider = "google") == 0 THEN
+IF array::len(SELECT * FROM model WHERE name = "text-embedding-004" AND provider = "google") == 0 {
     CREATE model CONTENT {
         name: "text-embedding-004",
         provider: "google",
         type: "embedding"
-    }
-END;
+    };
+};
 
 -- Get the model ID
 LET $gemini_embedding_id = (SELECT VALUE id FROM model WHERE name = "text-embedding-004" AND provider = "google" LIMIT 1)[0];

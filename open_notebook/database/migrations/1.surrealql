@@ -172,7 +172,4 @@ DEFINE FUNCTION IF NOT EXISTS fn::vector_search($query: array<float>, $match_cou
     
 };
 
-IF array::len(select * from open_notebook:default_models) == 0 THEN
-    CREATE open_notebook:default_models SET
-    default_chat_model= ""
-END;
+CREATE IF NOT EXISTS open_notebook:default_models SET default_chat_model = "";

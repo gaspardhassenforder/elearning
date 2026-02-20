@@ -7,13 +7,13 @@ UPDATE model SET name = "gemini-embedding-001"
 WHERE name = "text-embedding-004" AND provider = "google";
 
 -- If no record existed, create it
-IF array::len(SELECT * FROM model WHERE name = "gemini-embedding-001" AND provider = "google") == 0 THEN
+IF array::len(SELECT * FROM model WHERE name = "gemini-embedding-001" AND provider = "google") == 0 {
     CREATE model CONTENT {
         name: "gemini-embedding-001",
         provider: "google",
         type: "embedding"
-    }
-END;
+    };
+};
 
 -- Ensure default_embedding_model points to the new model
 LET $new_embedding_id = (SELECT VALUE id FROM model WHERE name = "gemini-embedding-001" AND provider = "google" LIMIT 1)[0];
