@@ -55,15 +55,20 @@ def ensure_record_id(value: Union[str, RecordID]) -> RecordID:
 @asynccontextmanager
 async def db_connection():
     db = AsyncSurreal(get_database_url())
-    await db.signin(
-        {
-            "username": os.environ.get("SURREAL_USER"),
-            "password": get_database_password(),
-        }
-    )
-    await db.use(
-        os.environ.get("SURREAL_NAMESPACE"), os.environ.get("SURREAL_DATABASE")
-    )
+    signin_data = {
+        "username": os.environ.get("SURREAL_USER"),
+        "password": get_database_password(),
+    }
+    # Include namespace/database in signin for cloud-hosted SurrealDB where
+    # users are defined at namespace or database level (not root level).
+    namespace = os.environ.get("SURREAL_NAMESPACE")
+    database = os.environ.get("SURREAL_DATABASE")
+    if namespace:
+        signin_data["namespace"] = namespace
+    if database:
+        signin_data["database"] = database
+    await db.signin(signin_data)
+    await db.use(namespace, database)
     try:
         yield db
     finally:
