@@ -51,9 +51,6 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Copy SurrealDB binary directly from the official image (no download needed)
-COPY --from=surrealdb/surrealdb:v2 /surreal /usr/local/bin/surreal
-
 WORKDIR /app
 
 COPY --from=builder /app/.venv /app/.venv
@@ -71,7 +68,7 @@ COPY --from=builder /app/frontend/start-server.js /app/frontend/start-server.js
 # Expose frontend port (Render routes traffic here)
 EXPOSE 8502
 
-RUN mkdir -p /app/data /app/surreal_data
+RUN mkdir -p /app/data
 
 COPY scripts/wait-for-api.sh /app/scripts/wait-for-api.sh
 RUN chmod +x /app/scripts/wait-for-api.sh
