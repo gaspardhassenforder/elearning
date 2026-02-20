@@ -42,10 +42,10 @@ DEFINE FIELD IF NOT EXISTS content ON TABLE episode TYPE option<string>;
 DEFINE FIELD IF NOT EXISTS audio_file ON TABLE episode TYPE option<string>;
 
 -- Create indexes for better performance
-DEFINE INDEX IF NOT EXISTS idx_episode_profile_name ON TABLE episode_profile FIELDS name UNIQUE CONCURRENTLY;
-DEFINE INDEX IF NOT EXISTS idx_speaker_profile_name ON TABLE speaker_profile FIELDS name UNIQUE CONCURRENTLY;
-DEFINE INDEX IF NOT EXISTS idx_episode_profile ON TABLE episode FIELDS episode_profile CONCURRENTLY;
-DEFINE INDEX IF NOT EXISTS idx_episode_command ON TABLE episode FIELDS command CONCURRENTLY;
+DEFINE INDEX IF NOT EXISTS idx_episode_profile_name ON TABLE episode_profile FIELDS name UNIQUE;
+DEFINE INDEX IF NOT EXISTS idx_speaker_profile_name ON TABLE speaker_profile FIELDS name UNIQUE;
+DEFINE INDEX IF NOT EXISTS idx_episode_profile ON TABLE episode FIELDS episode_profile;
+DEFINE INDEX IF NOT EXISTS idx_episode_command ON TABLE episode FIELDS command;
 
 
 --Sample data
