@@ -172,4 +172,4 @@ DEFINE FUNCTION IF NOT EXISTS fn::vector_search($query: array<float>, $match_cou
     
 };
 
-CREATE IF NOT EXISTS open_notebook:default_models SET default_chat_model = "";
+UPSERT open_notebook:default_models SET default_chat_model = "";
