@@ -1,4 +1,4 @@
 -- Remove quiz persistence fields
-REMOVE FIELD user_answers ON quiz;
-REMOVE FIELD last_score ON quiz;
-REMOVE FIELD completed ON quiz;
+REMOVE FIELD IF EXISTS user_answers ON quiz;
+REMOVE FIELD IF EXISTS last_score ON quiz;
+REMOVE FIELD IF EXISTS completed ON quiz;

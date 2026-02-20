@@ -2,7 +2,7 @@
 -- Note: This will lose any artifact tracking data
 
 -- Remove the regular artifact table
-REMOVE TABLE artifact;
+REMOVE TABLE IF EXISTS artifact;
 
 -- Restore old artifact relation table
 DEFINE TABLE artifact

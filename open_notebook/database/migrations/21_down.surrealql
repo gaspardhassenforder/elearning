@@ -1,1 +1,1 @@
-REMOVE FIELD published ON notebook;
+REMOVE FIELD IF EXISTS published ON notebook;

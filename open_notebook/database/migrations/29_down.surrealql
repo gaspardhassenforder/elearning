@@ -1,2 +1,2 @@
 -- Rollback migration 29: Remove created_by field from artifact table
-REMOVE FIELD created_by ON TABLE artifact;
+REMOVE FIELD IF EXISTS created_by ON TABLE artifact;

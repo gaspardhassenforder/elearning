@@ -2,18 +2,18 @@
 -- Story 4.4: Learning Objectives Assessment & Progress Tracking
 
 -- Remove indexes first
-REMOVE INDEX idx_user_objective ON learner_objective_progress;
-REMOVE INDEX idx_user ON learner_objective_progress;
-REMOVE INDEX idx_objective ON learner_objective_progress;
+REMOVE INDEX IF EXISTS idx_user_objective ON learner_objective_progress;
+REMOVE INDEX IF EXISTS idx_user ON learner_objective_progress;
+REMOVE INDEX IF EXISTS idx_objective ON learner_objective_progress;
 
 -- Remove fields
-REMOVE FIELD user_id ON learner_objective_progress;
-REMOVE FIELD objective_id ON learner_objective_progress;
-REMOVE FIELD status ON learner_objective_progress;
-REMOVE FIELD completed_via ON learner_objective_progress;
-REMOVE FIELD evidence ON learner_objective_progress;
-REMOVE FIELD completed_at ON learner_objective_progress;
-REMOVE FIELD created ON learner_objective_progress;
+REMOVE FIELD IF EXISTS user_id ON learner_objective_progress;
+REMOVE FIELD IF EXISTS objective_id ON learner_objective_progress;
+REMOVE FIELD IF EXISTS status ON learner_objective_progress;
+REMOVE FIELD IF EXISTS completed_via ON learner_objective_progress;
+REMOVE FIELD IF EXISTS evidence ON learner_objective_progress;
+REMOVE FIELD IF EXISTS completed_at ON learner_objective_progress;
+REMOVE FIELD IF EXISTS created ON learner_objective_progress;
 
 -- Remove table
-REMOVE TABLE learner_objective_progress;
+REMOVE TABLE IF EXISTS learner_objective_progress;

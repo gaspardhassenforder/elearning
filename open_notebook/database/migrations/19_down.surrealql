@@ -1,1 +1,1 @@
-REMOVE TABLE company;
+REMOVE TABLE IF EXISTS company;

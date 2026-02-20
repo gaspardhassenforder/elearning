@@ -1,4 +1,4 @@
 -- Migration 23 DOWN: Remove learning_objective table
 -- Story 3.3: Learning Objectives Configuration
 
-REMOVE TABLE learning_objective;
+REMOVE TABLE IF EXISTS learning_objective;

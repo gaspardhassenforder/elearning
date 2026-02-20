@@ -1,5 +1,5 @@
 -- Migration 24 Rollback: Remove module_prompt table
 -- Story 3.4: AI Teacher Prompt Configuration
 
-REMOVE INDEX idx_module_prompt_notebook_id ON module_prompt;
-REMOVE TABLE module_prompt;
+REMOVE INDEX IF EXISTS idx_module_prompt_notebook_id ON module_prompt;
+REMOVE TABLE IF EXISTS module_prompt;

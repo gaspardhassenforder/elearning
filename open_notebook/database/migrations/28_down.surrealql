@@ -1,4 +1,4 @@
 -- Migration 28 Down: Remove content analysis table and source_refs field
 
-REMOVE TABLE content_analysis;
-REMOVE FIELD source_refs ON TABLE learning_objective;
+REMOVE TABLE IF EXISTS content_analysis;
+REMOVE FIELD IF EXISTS source_refs ON TABLE learning_objective;

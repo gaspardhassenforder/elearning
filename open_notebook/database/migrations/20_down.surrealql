@@ -1,1 +1,1 @@
-REMOVE TABLE module_assignment;
+REMOVE TABLE IF EXISTS module_assignment;
