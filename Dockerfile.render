@@ -65,8 +65,8 @@ COPY --from=builder /app/frontend/.next/static /app/frontend/.next/static
 COPY --from=builder /app/frontend/public /app/frontend/public
 COPY --from=builder /app/frontend/start-server.js /app/frontend/start-server.js
 
-# Expose frontend port (Render routes traffic here)
-EXPOSE 8502
+# Expose frontend port (Render routes traffic to 10000 by default for Docker services)
+EXPOSE 10000
 
 RUN mkdir -p /app/data
 
