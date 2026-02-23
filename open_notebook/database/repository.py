@@ -55,18 +55,21 @@ def ensure_record_id(value: Union[str, RecordID]) -> RecordID:
 @asynccontextmanager
 async def db_connection():
     db = AsyncSurreal(get_database_url())
+    username = os.environ.get("SURREAL_USER")
     signin_data = {
-        "username": os.environ.get("SURREAL_USER"),
+        "username": username,
         "password": get_database_password(),
     }
-    # Include namespace/database in signin for cloud-hosted SurrealDB where
-    # users are defined at namespace or database level (not root level).
+    # Include namespace/database in signin only for non-root users.
+    # SurrealDB v3 requires root users to sign in without namespace/database;
+    # namespace-level or database-level users still need them.
     namespace = os.environ.get("SURREAL_NAMESPACE")
     database = os.environ.get("SURREAL_DATABASE")
-    if namespace:
-        signin_data["namespace"] = namespace
-    if database:
-        signin_data["database"] = database
+    if username != "root":
+        if namespace:
+            signin_data["namespace"] = namespace
+        if database:
+            signin_data["database"] = database
     await db.signin(signin_data)
     await db.use(namespace, database)
     try:
