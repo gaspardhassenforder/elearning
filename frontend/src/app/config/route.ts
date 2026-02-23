@@ -32,20 +32,27 @@ export async function GET(request: NextRequest) {
     })
   }
 
-  // Priority 2: Auto-detect from request headers
-  try {
-    // Get the protocol (http or https)
-    // Check X-Forwarded-Proto first (for reverse proxies), then fallback to request scheme
-    const proto = request.headers.get('x-forwarded-proto') ||
-                  request.nextUrl.protocol.replace(':', '') ||
-                  'http'
+  // Priority 2: Check if behind a reverse proxy (cloud deployments like Render, Heroku, etc.)
+  // In these environments, only the frontend port is exposed externally.
+  // Port 5055 (API) is NOT accessible from the browser.
+  // Return empty string so the frontend uses Next.js rewrites to proxy API requests
+  // internally (frontend → localhost:5055).
+  const isProxied = request.headers.get('x-forwarded-proto') !== null
+  if (isProxied) {
+    console.log('[runtime-config] Behind reverse proxy, using Next.js rewrites (empty apiUrl)')
+    return NextResponse.json({
+      apiUrl: '',
+    })
+  }
 
-    // Get the host header (includes port if non-standard)
+  // Priority 3: Auto-detect from request headers (direct access, e.g. local Docker)
+  try {
     const hostHeader = request.headers.get('host')
 
     if (hostHeader) {
       // Extract just the hostname (remove port if present)
       const hostname = hostHeader.split(':')[0]
+      const proto = request.nextUrl.protocol.replace(':', '') || 'http'
 
       // Construct the API URL with port 5055
       const apiUrl = `${proto}://${hostname}:5055`
@@ -60,7 +67,7 @@ export async function GET(request: NextRequest) {
     console.error('[runtime-config] Auto-detection failed:', error)
   }
 
-  // Priority 3: Fallback to localhost
+  // Priority 4: Fallback to localhost
   console.log('[runtime-config] Using fallback: http://localhost:5055')
   return NextResponse.json({
     apiUrl: 'http://localhost:5055',
