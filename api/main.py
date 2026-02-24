@@ -103,6 +103,11 @@ async def lifespan(app: FastAPI):
     Lifespan event handler for the FastAPI application.
     Runs database migrations automatically on startup.
     """
+    # Startup: Log database URL for deploy verification
+    from open_notebook.database.repository import get_database_url
+    db_url = get_database_url()
+    logger.info(f"Database URL: {db_url}")
+
     # Startup: Run database migrations
     logger.info("Starting API initialization...")
 
@@ -228,4 +233,27 @@ async def root():
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy"}
+    from surrealdb import AsyncSurreal
+    from open_notebook.database.repository import get_database_url
+
+    db_url = get_database_url()
+    conn = AsyncSurreal(db_url)
+    conn_type = type(conn).__name__
+
+    db_ok = False
+    db_error = None
+    try:
+        from open_notebook.database.repository import db_connection, repo_query
+
+        result = await repo_query("SELECT count() FROM _sbl_migrations GROUP ALL")
+        db_ok = True
+    except Exception as e:
+        db_error = str(e)
+
+    return {
+        "status": "healthy" if db_ok else "degraded",
+        "database_url": db_url,
+        "connection_type": conn_type,
+        "database_connected": db_ok,
+        "database_error": db_error,
+    }
