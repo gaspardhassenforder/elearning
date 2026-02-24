@@ -32,6 +32,7 @@
 - **podcast_commands**: Profiles loaded from SurrealDB by name (must exist); briefing can be extended with suffix. Episode records created mid-execution.
 - **Example commands**: Accept optional `delay_seconds` for testing async behavior; not for production.
 - **Retry logging**: Uses `retry_log_level: "debug"` in decorator config + manual `logger.debug()` in exception handlers for double protection against retry log noise.
+- **DB URL**: Both patched connections import `get_database_url()` from `repository.py` (single source of truth). Do NOT duplicate URL logic here — the repository function handles HTTP→WS conversion for SurrealDB Cloud compatibility.
 
 ## Code Example
 

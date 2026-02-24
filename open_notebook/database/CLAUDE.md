@@ -19,7 +19,7 @@ Both leverage connection context manager for lifecycle management and automatic 
 ### repository.py
 
 **Connection Management**
-- `get_database_url()`: Resolves `SURREAL_URL` or constructs from `SURREAL_ADDRESS`/`SURREAL_PORT` (backward compatible)
+- `get_database_url()`: Resolves `SURREAL_URL` or constructs from `SURREAL_ADDRESS`/`SURREAL_PORT` (backward compatible). **Always converts HTTP(S) → WS(S)** via `_to_ws_url()` because the surrealdb SDK's HTTP connection returns `id=None` for table scans. This is the single source of truth for the DB URL — `commands/__init__.py` imports it too.
 - `get_database_password()`: Falls back from `SURREAL_PASSWORD` to legacy `SURREAL_PASS` env var
 - `db_connection()`: Async context manager handling sign-in, namespace/database selection, and cleanup
   - Opens AsyncSurreal, authenticates, selects namespace/database, yields connection, closes on exit

@@ -10,13 +10,10 @@ import os
 #    entire block to be skipped when the env var is absent, leaving the original
 #    broken functions in place (confirmed from Render deploy traceback).
 #
-# 2. LIVE QUERIES: surreal-commands worker uses db.live() to watch the command
-#    table. LIVE queries require a WebSocket connection. SurrealDB Cloud URLs are
-#    https:// which the surrealdb library treats as HTTP (AsyncHttpSurrealConnection),
-#    which raises NotImplementedError for live(). The worker connection must use
-#    wss:// (or ws:// for local). We auto-convert https→wss and http→ws here.
-#    The API's own repository.py uses the same https URL without issues because
-#    it never calls db.live().
+# 2. URL PROTOCOL: The surrealdb Python SDK creates AsyncHttpSurrealConnection
+#    for https:// URLs, which returns id=None for table scans and raises
+#    NotImplementedError for LIVE queries. repository.py's get_database_url()
+#    always converts to WS(S), so all connections use the correct protocol.
 
 from contextlib import asynccontextmanager
 from surrealdb import AsyncSurreal
@@ -24,29 +21,7 @@ import surreal_commands.repository as _sc_repo
 import surreal_commands.core.worker as _sc_worker
 import surreal_commands.core.service as _sc_service
 
-
-def _to_ws_url(url: str) -> str:
-    """Convert https/http URL to wss/ws for WebSocket LIVE query support."""
-    if url.startswith("https://"):
-        base = url[8:].rstrip("/")
-        if not base.endswith("/rpc"):
-            base += "/rpc"
-        return "wss://" + base
-    if url.startswith("http://"):
-        base = url[7:].rstrip("/")
-        if not base.endswith("/rpc"):
-            base += "/rpc"
-        return "ws://" + base
-    return url  # already ws:// or wss://
-
-
-def _build_url(url=None, ws=False):
-    raw = (
-        url
-        or os.environ.get("SURREAL_URL")
-        or f"ws://{os.environ.get('SURREAL_ADDRESS', 'localhost')}:{os.environ.get('SURREAL_PORT', 8000)}/rpc"
-    )
-    return _to_ws_url(raw) if ws else raw
+from open_notebook.database.repository import get_database_url
 
 
 def _build_signin(user=None, password=None, namespace=None, database=None):
@@ -63,11 +38,11 @@ def _build_signin(user=None, password=None, namespace=None, database=None):
     return data, ns, db_name
 
 
-# Fix 1 & 2: repository helpers (HTTP ok, no LIVE queries)
+# Fix 1: repository helpers — uses shared get_database_url() (always WS/WSS)
 @asynccontextmanager
 async def _patched_db_connection(url=None, user=None, password=None, namespace=None, database=None):
     signin_data, ns, db_name = _build_signin(user, password, namespace, database)
-    db_conn = AsyncSurreal(_build_url(url, ws=False))
+    db_conn = AsyncSurreal(url or get_database_url())
     await db_conn.signin(signin_data)
     await db_conn.use(ns, db_name)
     try:
@@ -79,11 +54,11 @@ async def _patched_db_connection(url=None, user=None, password=None, namespace=N
             pass
 
 
-# Fix 1 & 2: worker LIVE query listener — must use WebSocket URL
+# Fix 2: worker LIVE query listener — also uses shared get_database_url() (always WS/WSS)
 @asynccontextmanager
 async def _patched_db_connection_ws(url=None, user=None, password=None, namespace=None, database=None):
     signin_data, ns, db_name = _build_signin(user, password, namespace, database)
-    db_conn = AsyncSurreal(_build_url(url, ws=True))
+    db_conn = AsyncSurreal(url or get_database_url())
     await db_conn.signin(signin_data)
     await db_conn.use(ns, db_name)
     try:

@@ -10,16 +10,36 @@ from surrealdb import AsyncSurreal, RecordID  # type: ignore
 T = TypeVar("T", Dict[str, Any], List[Dict[str, Any]])
 
 
+def _to_ws_url(url: str) -> str:
+    """Convert HTTP(S) URLs to WS(S) for SurrealDB connections.
+
+    The surrealdb Python SDK creates AsyncHttpSurrealConnection for https://
+    URLs, which returns id=None for table scans. WebSocket connections work
+    correctly for all query types.
+    """
+    if url.startswith("https://"):
+        base = url[8:].rstrip("/")
+        if not base.endswith("/rpc"):
+            base += "/rpc"
+        return "wss://" + base
+    if url.startswith("http://"):
+        base = url[7:].rstrip("/")
+        if not base.endswith("/rpc"):
+            base += "/rpc"
+        return "ws://" + base
+    return url
+
+
 def get_database_url():
-    """Get database URL with backward compatibility"""
+    """Get database URL, always as WebSocket for SurrealDB SDK compatibility."""
     surreal_url = os.getenv("SURREAL_URL")
     if surreal_url:
-        return surreal_url
+        return _to_ws_url(surreal_url)
 
     # Fallback to old format - WebSocket URL format
     address = os.getenv("SURREAL_ADDRESS", "localhost")
     port = os.getenv("SURREAL_PORT", "8000")
-    return f"ws://{address}/rpc:{port}"
+    return f"ws://{address}:{port}/rpc"
 
 
 def get_database_password():
@@ -54,7 +74,9 @@ def ensure_record_id(value: Union[str, RecordID]) -> RecordID:
 
 @asynccontextmanager
 async def db_connection():
-    db = AsyncSurreal(get_database_url())
+    url = get_database_url()
+    logger.debug(f"SurrealDB connecting to {url}")
+    db = AsyncSurreal(url)
     username = os.environ.get("SURREAL_USER")
     signin_data = {
         "username": username,
