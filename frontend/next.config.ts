@@ -1,8 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Enable standalone output for optimized Docker deployment
-  output: "standalone",
+  // standalone output is required for Docker (start-server.js).
+  // Disabled on Vercel (VERCEL=1) to avoid exceeding lambda size limits.
+  output: process.env.VERCEL ? undefined : "standalone",
 
   // Experimental features
   // Type assertion needed: proxyClientMaxBodySize is valid in Next.js 15 but types lag behind
