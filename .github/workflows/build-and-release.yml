@@ -16,7 +16,7 @@ permissions:
   packages: write
 
 env:
-  GHCR_IMAGE: ghcr.io/hubvisory-ai-factory/autonomous_learning
+  GHCR_IMAGE: ghcr.io/gaspardhassenforder/elearning
 
 jobs:
   extract-version:
