@@ -48,8 +48,8 @@ export function SourcesPanel({ notebookId }: SourcesPanelProps) {
   const [highlightedSourceId, setHighlightedSourceId] = useState<string | null>(null)
 
   // Story 4.3: Track timeouts for cleanup on unmount
-  const scrollTimeoutRef = useRef<NodeJS.Timeout>()
-  const highlightTimeoutRef = useRef<NodeJS.Timeout>()
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
+  const highlightTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
 
   // Story 4.3: Listen to scroll target from store
   const scrollToSourceId = useLearnerStore((state) => state.scrollToSourceId)

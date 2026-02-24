@@ -1,8 +1,10 @@
 /**
- * Navigation Assistant Hooks (Story 6.1)
+ * Navigation Hooks
  *
- * TanStack Query hooks for navigation assistant API endpoints.
- * Provides navigation chat mutations and history queries.
+ * Includes:
+ * - useNavigation: Utility hook for managing return paths (back navigation)
+ * - useSendNavigationMessage: TanStack Query mutation for navigation assistant chat
+ * - useNavigationHistory: TanStack Query hook for navigation message history
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -15,6 +17,42 @@ import {
   type NavigationMessage,
 } from '../api/navigation';
 import { useNavigationStore } from '../stores/navigation-store';
+
+// ============================================================================
+// Return Path Navigation Hook
+// ============================================================================
+
+/**
+ * Hook for managing return/back navigation paths.
+ *
+ * Uses sessionStorage to persist return paths across renders.
+ * Callers can set returnTo/returnToLabel in sessionStorage before navigating,
+ * then use this hook at the destination to get back.
+ */
+export function useNavigation() {
+  const getReturnPath = (): string => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('returnTo') || '/sources';
+    }
+    return '/sources';
+  };
+
+  const clearReturnTo = (): void => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('returnTo');
+      sessionStorage.removeItem('returnToLabel');
+    }
+  };
+
+  const getReturnLabel = (): string => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('returnToLabel') || 'Back to Sources';
+    }
+    return 'Back to Sources';
+  };
+
+  return { getReturnPath, clearReturnTo, getReturnLabel };
+}
 
 // ============================================================================
 // Query Keys

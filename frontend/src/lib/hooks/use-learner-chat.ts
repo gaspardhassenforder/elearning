@@ -160,7 +160,6 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
                 ? '🎉 All objectives complete!'
                 : '✓ Objective completed',
               description: objectiveData.objective_text,
-              duration: 5000,
             })
 
             // Story 5.3: Emit custom event for ObjectiveProgressList warm glow

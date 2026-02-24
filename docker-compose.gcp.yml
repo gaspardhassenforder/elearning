@@ -1,0 +1,38 @@
+# GCP e2-micro deployment: SurrealDB v2 + background worker
+# Prerequisites:
+#   - Persistent disk mounted at /mydata
+#   - worker.env file present alongside this file (see worker.env.template)
+#
+# Usage:
+#   docker compose -f docker-compose.gcp.yml up -d
+
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:v2
+    volumes:
+      - /mydata:/mydata
+    ports:
+      - "8000:8000"
+    command: start --log info --user root --pass root rocksdb:/mydata/mydatabase.db
+    pull_policy: always
+    user: root
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  worker:
+    image: ghcr.io/lfnovo/open-notebook:api-v1-latest
+    command: ["uv", "run", "--no-sync", "surreal-commands-worker",
+              "--import-modules", "commands"]
+    env_file:
+      - ./worker.env
+    depends_on:
+      surrealdb:
+        condition: service_healthy
+    volumes:
+      - /app/data:/app/data
+    restart: always

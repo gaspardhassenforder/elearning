@@ -47,7 +47,7 @@ interface ArtifactStatus {
 export function ArtifactGenerationPanel({ moduleId, onComplete }: ArtifactGenerationPanelProps) {
   const { t } = useTranslation();
   const generateMutation = useGenerateAllArtifacts(moduleId);
-  const { data: artifacts } = useArtifacts(moduleId, { pollingInterval: 2000 });
+  const { data: artifacts } = useArtifacts(moduleId);
   const { isEditMode } = useModuleCreationStore();
 
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);

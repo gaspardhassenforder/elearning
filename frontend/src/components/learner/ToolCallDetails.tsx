@@ -86,7 +86,7 @@ export function ToolCallDetails({
                         {t.learner.details.sources}
                       </p>
                       <button
-                        onClick={() => onSourceSelect?.(toolCall.result.source_id)}
+                        onClick={() => onSourceSelect?.(toolCall.result?.source_id)}
                         className="text-xs text-primary hover:underline cursor-pointer transition-colors"
                       >
                         {toolCall.result.title || toolCall.result.source_id}
