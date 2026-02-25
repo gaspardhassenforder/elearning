@@ -20,7 +20,6 @@
 import { FileQuestion, Headphones, FileText, ChevronDown, ChevronUp, Loader2, AlertCircle } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { useLearnerArtifactPreview } from '@/lib/hooks/use-artifacts'
 import { LearnerArtifactListItem, QuizPreview, PodcastPreview, SummaryPreview, TransformationPreview } from '@/lib/api/artifacts'
@@ -29,6 +28,7 @@ import { InlineAudioPlayer } from './InlineAudioPlayer'
 import { cn } from '@/lib/utils'
 import { formatDistanceToNow } from 'date-fns'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface ArtifactCardProps {
   artifact: LearnerArtifactListItem
@@ -205,14 +205,16 @@ export function ArtifactCard({ artifact, isExpanded, onToggleExpand }: ArtifactC
           )}
         </div>
 
-        {/* Content scroll area */}
-        <ScrollArea className="max-h-[calc(100vh-300px)]">
-          <div className="prose prose-sm dark:prose-invert max-w-none pr-4">
-            <ReactMarkdown>
+        {/* Content scroll area — native overflow-y-auto works with max-height;
+            Radix ScrollArea's viewport uses height:100% which can't resolve
+            against a max-height-only parent, so we use a plain div here. */}
+        <div className="overflow-y-auto max-h-[calc(100vh-300px)] pr-1">
+          <div className="prose prose-sm dark:prose-invert max-w-none pr-3">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {content.content || (t.learner?.artifacts?.noContent || 'No content available')}
             </ReactMarkdown>
           </div>
-        </ScrollArea>
+        </div>
       </div>
     )
   }

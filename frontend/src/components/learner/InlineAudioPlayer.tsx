@@ -386,13 +386,13 @@ export function InlineAudioPlayer({
             <p className="text-xs font-medium text-muted-foreground">
               {t.learner.podcast.viewTranscript}
             </p>
-            <div className="h-48 rounded-md border border-warm-neutral-200 dark:border-warm-neutral-700 bg-white dark:bg-warm-neutral-950 overflow-hidden">
+            <div className="h-48 rounded-md border bg-muted/50 overflow-hidden">
               <ScrollArea className="h-full">
                 <div className="p-3">
                   {transcriptLoading ? (
                     <p className="text-xs text-muted-foreground animate-pulse">{t.common.loading}</p>
                   ) : transcript ? (
-                    <div className="text-xs text-foreground leading-relaxed prose prose-xs dark:prose-invert max-w-none">
+                    <div className="text-xs leading-relaxed prose prose-sm dark:prose-invert max-w-none">
                       <ReactMarkdown>{transcript}</ReactMarkdown>
                     </div>
                   ) : (

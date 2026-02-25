@@ -32,7 +32,7 @@ export function LearnerQuizDialog({
   const { t } = useTranslation()
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([])
   const [topic, setTopic] = useState('')
-  const [numQuestions, setNumQuestions] = useState(5)
+  const [numQuestions, setNumQuestions] = useState<string>('5')
 
   const generateMutation = useLearnerGenerateQuiz(notebookId)
 
@@ -44,13 +44,13 @@ export function LearnerQuizDialog({
       {
         source_ids: selectedSourceIds.length > 0 ? selectedSourceIds : undefined,
         topic: topic.trim() || undefined,
-        num_questions: numQuestions,
+        num_questions: Math.min(20, Math.max(1, parseInt(numQuestions) || 5)),
       },
       {
         onSuccess: () => {
           setSelectedSourceIds([])
           setTopic('')
-          setNumQuestions(5)
+          setNumQuestions('5')
           onOpenChange(false)
         },
       }
@@ -90,11 +90,19 @@ export function LearnerQuizDialog({
           <div className="space-y-2">
             <Label>{t.learner?.createArtifact?.numQuestions || 'Number of questions'}</Label>
             <Input
-              type="number"
-              min={1}
-              max={10}
+              type="text"
+              inputMode="numeric"
               value={numQuestions}
-              onChange={(e) => setNumQuestions(Math.min(10, Math.max(1, parseInt(e.target.value) || 5)))}
+              onChange={(e) => {
+                const v = e.target.value
+                if (v === '' || /^\d+$/.test(v)) setNumQuestions(v)
+              }}
+              onBlur={() => {
+                const n = parseInt(numQuestions)
+                if (isNaN(n) || n < 1) setNumQuestions('5')
+                else if (n > 20) setNumQuestions('20')
+              }}
+              placeholder="5"
             />
           </div>
         </div>

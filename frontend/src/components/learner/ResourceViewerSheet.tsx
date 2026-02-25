@@ -32,6 +32,7 @@ import { InlineQuizWidget } from './InlineQuizWidget'
 import { InlineAudioPlayer } from './InlineAudioPlayer'
 import { AlertCircle } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { PdfViewer } from './PdfViewer'
 
 function ArtifactErrorFallback() {
@@ -265,41 +266,43 @@ function ArtifactViewer({
           {tArtifacts?.[preview.artifact_type] || preview.artifact_type}
         </SheetDescription>
       </SheetHeader>
-      <ScrollArea className="flex-1 px-6 py-4">
-        <ErrorBoundary fallback={ArtifactErrorFallback}>
-          {preview.artifact_type === 'quiz' && (
-            <InlineQuizWidget
-              quizId={preview.id}
-              title={preview.title}
-              description=""
-              questions={(preview.questions || []).map((q) => ({
-                text: q.question,
-                options: q.options,
-              }))}
-              totalQuestions={preview.question_count || preview.questions?.length || 0}
-              quizUrl=""
-            />
-          )}
+      <ScrollArea className="flex-1">
+        <div className="px-6 py-4">
+          <ErrorBoundary fallback={ArtifactErrorFallback}>
+            {preview.artifact_type === 'quiz' && (
+              <InlineQuizWidget
+                quizId={preview.id}
+                title={preview.title}
+                description=""
+                questions={(preview.questions || []).map((q) => ({
+                  text: q.question,
+                  options: q.options,
+                }))}
+                totalQuestions={preview.question_count || preview.questions?.length || 0}
+                quizUrl=""
+              />
+            )}
 
-          {preview.artifact_type === 'podcast' && (
-            <InlineAudioPlayer
-              podcastId={preview.id}
-              title={preview.title}
-              audioUrl={preview.audio_url || ''}
-              durationMinutes={0}
-              transcriptUrl={`/api/podcasts/${preview.id}/transcript`}
-              status={preview.audio_url ? 'completed' : 'generating'}
-            />
-          )}
+            {preview.artifact_type === 'podcast' && (
+              <InlineAudioPlayer
+                podcastId={preview.id}
+                title={preview.title}
+                audioUrl={preview.audio_url || ''}
+                durationMinutes={0}
+                transcriptUrl={`/api/podcasts/${preview.id}/transcript`}
+                status={preview.audio_url ? 'completed' : 'generating'}
+              />
+            )}
 
-          {(preview.artifact_type === 'summary' || preview.artifact_type === 'transformation') && (
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              <ReactMarkdown>
-                {preview.content || tArtifacts?.noContent || 'No content available'}
-              </ReactMarkdown>
-            </div>
-          )}
-        </ErrorBoundary>
+            {(preview.artifact_type === 'summary' || preview.artifact_type === 'transformation') && (
+              <div className="prose prose-sm dark:prose-invert max-w-none">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {preview.content || tArtifacts?.noContent || 'No content available'}
+                </ReactMarkdown>
+              </div>
+            )}
+          </ErrorBoundary>
+        </div>
       </ScrollArea>
     </>
   )
