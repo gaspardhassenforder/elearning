@@ -59,15 +59,15 @@ export default function NotebooksPage() {
   return (
     <AppShell>
       <div className="flex-1 overflow-y-auto">
-        <div className="p-6 space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="p-4 md:p-6 space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-4">
             <h1 className="text-2xl font-bold">{t.notebooks.title}</h1>
             <Button variant="outline" size="sm" onClick={() => refetch()}>
               <RefreshCw className="h-4 w-4" />
             </Button>
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-1 rounded-md border p-0.5">
               {(['all', 'published', 'draft'] as const).map((filter) => (
                 <Button
@@ -91,9 +91,9 @@ export default function NotebooksPage() {
               placeholder={t.notebooks.searchPlaceholder}
               autoComplete="off"
               aria-label={t.common.accessibility?.searchNotebooks || "Search notebooks"}
-              className="w-full sm:w-64"
+              className="w-40 lg:w-56"
             />
-            <Button onClick={() => setCreateDialogOpen(true)}>
+            <Button onClick={() => setCreateDialogOpen(true)} size="sm">
               <Plus className="h-4 w-4 mr-2" />
               {t.notebooks.newNotebook}
             </Button>

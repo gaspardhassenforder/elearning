@@ -59,8 +59,8 @@ export function NotebookHeader({ notebook }: NotebookHeaderProps) {
     <>
       <div className="border-b pb-6">
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 flex-1">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
               <InlineEdit
                 id="notebook-name"
                 name="notebook-name"
@@ -77,7 +77,7 @@ export function NotebookHeader({ notebook }: NotebookHeaderProps) {
                 {notebook.published ? t.notebooks.published : t.notebooks.draft}
               </Badge>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-shrink-0">
               <Link href={`/notebooks/${encodeURIComponent(notebook.id)}/configure`}>
                 <Button variant="default" size="sm">
                   <Settings className="h-4 w-4 mr-2" />
