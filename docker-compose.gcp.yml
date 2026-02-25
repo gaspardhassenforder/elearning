@@ -1,4 +1,7 @@
-# GCP e2-micro deployment: SurrealDB v2 + background worker
+# GCP e2-micro deployment: SurrealDB v2 + API + background worker
+# All three containers share app_data volume so uploaded files are
+# accessible to both the API and the worker.
+#
 # Prerequisites:
 #   - Persistent disk mounted at /mydata
 #   - worker.env file present alongside this file (see worker.env.template)
@@ -18,6 +21,18 @@ services:
     user: root
     restart: always
 
+  api:
+    image: ghcr.io/gaspardhassenforder/elearning:api-v1-latest
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./worker.env
+    depends_on:
+      - surrealdb
+    volumes:
+      - app_data:/app/data
+    restart: always
+
   worker:
     image: ghcr.io/gaspardhassenforder/elearning:api-v1-latest
     command: ["uv", "run", "--no-sync", "surreal-commands-worker",
@@ -27,5 +42,8 @@ services:
     depends_on:
       - surrealdb
     volumes:
-      - /app/data:/app/data
+      - app_data:/app/data
     restart: always
+
+volumes:
+  app_data:
