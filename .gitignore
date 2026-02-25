@@ -20,6 +20,11 @@ google-credentials.json
 build/
 # Exception: pdfjs static files needed for PDF viewer in production
 !frontend/public/pdfjs/build/
+# Exclude pdfjs source maps (large, not needed in production)
+frontend/public/pdfjs/**/*.map
+
+# SurrealDB command history
+history.txt
 develop-eggs/
 dist/
 downloads/
