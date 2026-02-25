@@ -23,7 +23,7 @@ services:
   api:
     image: ghcr.io/gaspardhassenforder/elearning:api-v1-latest
     ports:
-      - "8000:8080"  # Reuse port 8000 (already open in GCP firewall)
+      - "80:8080"  # Port 80 opened via http-server network tag
     env_file:
       - ./worker.env
     depends_on:
