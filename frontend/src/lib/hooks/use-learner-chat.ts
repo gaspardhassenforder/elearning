@@ -36,7 +36,11 @@ interface UseLearnerChatResult {
  * @param notebookId - Notebook/module ID
  * @returns Chat state and actions
  */
-export function useLearnerChat(notebookId: string): UseLearnerChatResult {
+export function useLearnerChat(
+  notebookId: string,
+  isLoadingHistory: boolean = false,
+  hasExistingHistory: boolean = false,
+): UseLearnerChatResult {
   const { toast } = useToast()
   const { language } = useTranslation()
   const queryClient = useQueryClient()
@@ -284,6 +288,12 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
   const greetingRequestedRef = useRef(false)
 
   useEffect(() => {
+    // Wait for history check to complete before deciding whether to greet
+    if (isLoadingHistory) return
+
+    // Don't generate a new greeting when history already has messages
+    if (hasExistingHistory) return
+
     // Only request greeting once, when messages are empty and not already requested
     if (messages.length === 0 && !greetingRequestedRef.current && !isLoading && !error) {
       greetingRequestedRef.current = true
@@ -343,7 +353,7 @@ export function useLearnerChat(notebookId: string): UseLearnerChatResult {
 
       requestGreeting()
     }
-  }, [messages.length, notebookId, isLoading, error])
+  }, [messages.length, notebookId, isLoading, error, isLoadingHistory, hasExistingHistory])
 
   return {
     messages,

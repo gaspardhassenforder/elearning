@@ -61,6 +61,9 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
     error: historyError,
   } = useChatHistory(notebookId)
 
+  // Derive history state for greeting guard (must be computed before useLearnerChat)
+  const hasExistingHistory = !!(historyData?.messages?.length)
+
   const {
     isLoading,
     isStreaming,
@@ -69,7 +72,7 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
     messages,
     clearMessages,
     editLastMessage,
-  } = useLearnerChat(notebookId)
+  } = useLearnerChat(notebookId, isLoadingHistory, hasExistingHistory)
 
   // Build source title map for reference display (source:id -> title)
   const { sources: notebookSources } = useNotebookSources(notebookId)
