@@ -29,7 +29,10 @@ export function PdfViewer({ sourceId, pageNumber, searchText }: PdfViewerProps) 
 
   const src = `/pdfjs/web/viewer.html?file=${fileUrl}${hash ? '#' + hash : ''}`
 
-  return <iframe src={src} className="w-full h-full border-0" title="PDF viewer" />
+  // key={src} forces iframe remount when src changes (including hash-only changes).
+  // Browsers ignore fragment-only src updates on existing iframes, so without this
+  // the PDF would stay on the current page when navigating to a new page citation.
+  return <iframe key={src} src={src} className="w-full h-full border-0" title="PDF viewer" />
 }
 
 /**
