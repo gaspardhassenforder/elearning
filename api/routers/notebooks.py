@@ -658,7 +658,12 @@ async def generate_artifacts(
 
         # Execute batch generation
         logger.info(f"Starting batch artifact generation for notebook {notebook_id}")
-        status = await artifact_generation_service.generate_all_artifacts(notebook_id)
+        status = await artifact_generation_service.generate_all_artifacts(
+            notebook_id,
+            quiz_source_ids=request.quiz_source_ids if request else None,
+            podcast_source_ids=request.podcast_source_ids if request else None,
+            podcast_language=request.podcast_language if request else "en",
+        )
 
         # Convert to response model
         response = BatchGenerationResponse(

@@ -671,6 +671,15 @@ class BatchGenerationRequest(BaseModel):
     options: Optional[Dict[str, Any]] = Field(
         None, description="Optional generation options per artifact type"
     )
+    quiz_source_ids: Optional[List[str]] = Field(
+        None, description="Source IDs to use for quiz generation"
+    )
+    podcast_source_ids: Optional[List[str]] = Field(
+        None, description="Source IDs to use for podcast generation"
+    )
+    podcast_language: Optional[str] = Field(
+        "en", description="Podcast language ('en' or 'fr')"
+    )
 
 
 class ArtifactGenerationResult(BaseModel):

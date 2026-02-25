@@ -114,9 +114,14 @@ export const artifactsApi = {
   /**
    * Generate all artifacts for a notebook (Story 3.2, Task 1)
    */
-  generateAll: async (notebookId: string): Promise<BatchGenerationResponse> => {
+  generateAll: async (notebookId: string, options?: {
+    quiz_source_ids?: string[]
+    podcast_source_ids?: string[]
+    podcast_language?: string
+  }): Promise<BatchGenerationResponse> => {
     const response = await apiClient.post<BatchGenerationResponse>(
-      `/notebooks/${notebookId}/generate-artifacts`
+      `/notebooks/${notebookId}/generate-artifacts`,
+      options || {}
     )
     return response.data
   },

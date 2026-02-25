@@ -10,7 +10,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Sparkles, Check, AlertCircle, Loader2, FileText, Mic, BookOpen, RotateCw } from 'lucide-react';
+import { Sparkles, Check, AlertCircle, Loader2, FileText, Mic, BookOpen, RotateCw, ChevronDown, ChevronUp, Languages } from 'lucide-react';
 import { useGenerateAllArtifacts, useArtifacts } from '@/lib/hooks/use-artifacts';
 import { useModuleCreationStore } from '@/lib/stores/module-creation-store';
 import { useTranslation } from '@/lib/hooks/use-translation';
@@ -28,6 +28,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { LearnerSourceSelector } from '@/components/learner/LearnerSourceSelector';
 import { cn } from '@/lib/utils';
 
 interface ArtifactGenerationPanelProps {
@@ -56,6 +64,13 @@ export function ArtifactGenerationPanel({ moduleId, onComplete }: ArtifactGenera
     { type: 'summary', label: 'Summary', icon: BookOpen, status: 'pending' },
     { type: 'podcast', label: 'Podcast', icon: Mic, status: 'pending' },
   ]);
+
+  // Source selection and language state
+  const [selectedQuizSourceIds, setSelectedQuizSourceIds] = useState<string[]>([]);
+  const [selectedPodcastSourceIds, setSelectedPodcastSourceIds] = useState<string[]>([]);
+  const [podcastLanguage, setPodcastLanguage] = useState('en');
+  const [showQuizSourceSelector, setShowQuizSourceSelector] = useState(false);
+  const [showPodcastSourceSelector, setShowPodcastSourceSelector] = useState(false);
 
   // Regenerate individual artifact dialog state (Story 3.6, Task 9)
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
@@ -144,8 +159,12 @@ export function ArtifactGenerationPanel({ moduleId, onComplete }: ArtifactGenera
       }))
     );
 
-    // Trigger generation
-    generateMutation.mutate();
+    // Trigger generation with source filters and language
+    generateMutation.mutate({
+      quiz_source_ids: selectedQuizSourceIds.length > 0 ? selectedQuizSourceIds : undefined,
+      podcast_source_ids: selectedPodcastSourceIds.length > 0 ? selectedPodcastSourceIds : undefined,
+      podcast_language: podcastLanguage,
+    });
   };
 
   const handleRetry = () => {
@@ -173,7 +192,11 @@ export function ArtifactGenerationPanel({ moduleId, onComplete }: ArtifactGenera
     );
 
     // Trigger generation (same endpoint generates all, but only this one will update)
-    generateMutation.mutate();
+    generateMutation.mutate({
+      quiz_source_ids: selectedQuizSourceIds.length > 0 ? selectedQuizSourceIds : undefined,
+      podcast_source_ids: selectedPodcastSourceIds.length > 0 ? selectedPodcastSourceIds : undefined,
+      podcast_language: podcastLanguage,
+    });
   };
 
   const isGenerating = artifactStatuses.some((a) => a.status === 'generating');
@@ -224,12 +247,78 @@ export function ArtifactGenerationPanel({ moduleId, onComplete }: ArtifactGenera
           {/* Artifact Status List */}
           <div className="space-y-4">
             {artifactStatuses.map((artifact) => (
-              <ArtifactStatusItem
-                key={artifact.type}
-                artifact={artifact}
-                isEditMode={isEditMode}
-                onRegenerate={() => handleRegenerateClick(artifact)}
-              />
+              <div key={artifact.type} className="space-y-2">
+                <ArtifactStatusItem
+                  artifact={artifact}
+                  isEditMode={isEditMode}
+                  onRegenerate={() => handleRegenerateClick(artifact)}
+                />
+                {/* Quiz source filter */}
+                {artifact.type === 'quiz' && (
+                  <div className="pl-4">
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={() => setShowQuizSourceSelector(!showQuizSourceSelector)}
+                    >
+                      {showQuizSourceSelector ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                      {t.artifacts?.filterSources || 'Filter by sources (optional)'}
+                      {selectedQuizSourceIds.length > 0 && (
+                        <span className="ml-1 text-primary font-medium">({selectedQuizSourceIds.length})</span>
+                      )}
+                    </button>
+                    {showQuizSourceSelector && (
+                      <div className="mt-2">
+                        <LearnerSourceSelector
+                          notebookId={moduleId}
+                          selectedSourceIds={selectedQuizSourceIds}
+                          onSelectionChange={setSelectedQuizSourceIds}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+                {/* Podcast source filter + language */}
+                {artifact.type === 'podcast' && (
+                  <div className="pl-4 space-y-2">
+                    {/* Language selector */}
+                    <div className="flex items-center gap-2">
+                      <Languages className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">{t.artifacts?.podcastLanguage || 'Language'}:</span>
+                      <Select value={podcastLanguage} onValueChange={setPodcastLanguage}>
+                        <SelectTrigger className="h-7 w-32 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="en">{t.artifacts?.podcastLanguageEn || 'English'}</SelectItem>
+                          <SelectItem value="fr">{t.artifacts?.podcastLanguageFr || 'Français'}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {/* Source filter toggle */}
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={() => setShowPodcastSourceSelector(!showPodcastSourceSelector)}
+                    >
+                      {showPodcastSourceSelector ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                      {t.artifacts?.filterSources || 'Filter by sources (optional)'}
+                      {selectedPodcastSourceIds.length > 0 && (
+                        <span className="ml-1 text-primary font-medium">({selectedPodcastSourceIds.length})</span>
+                      )}
+                    </button>
+                    {showPodcastSourceSelector && (
+                      <div className="mt-2">
+                        <LearnerSourceSelector
+                          notebookId={moduleId}
+                          selectedSourceIds={selectedPodcastSourceIds}
+                          onSelectionChange={setSelectedPodcastSourceIds}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
 

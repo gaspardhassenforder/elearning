@@ -60,4 +60,8 @@ export const learnerArtifactsApi = {
     )
     return response.data
   },
+
+  deleteArtifact: async (artifactId: string): Promise<void> => {
+    await apiClient.delete(`/learner/artifacts/${artifactId}`)
+  },
 }

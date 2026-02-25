@@ -65,7 +65,7 @@ class BatchGenerationStatus:
         }
 
 
-async def generate_quiz_artifact(notebook_id: str) -> Tuple[str, Optional[str], Optional[str]]:
+async def generate_quiz_artifact(notebook_id: str, source_ids: Optional[List[str]] = None) -> Tuple[str, Optional[str], Optional[str]]:
     """
     Generate quiz for notebook.
 
@@ -77,6 +77,7 @@ async def generate_quiz_artifact(notebook_id: str) -> Tuple[str, Optional[str], 
         result = await quiz_service.generate_quiz(
             notebook_id=notebook_id,
             num_questions=5,
+            source_ids=source_ids,
         )
 
         if result.get("error"):
@@ -193,7 +194,7 @@ async def generate_summary_artifact(notebook_id: str) -> Tuple[str, Optional[str
         return ("error", None, str(e))
 
 
-async def generate_podcast_artifact(notebook_id: str) -> Tuple[str, Optional[str], List[str], Optional[str]]:
+async def generate_podcast_artifact(notebook_id: str, source_ids: Optional[List[str]] = None, language: str = "en") -> Tuple[str, Optional[str], List[str], Optional[str]]:
     """
     Submit async podcast generation job for notebook.
 
@@ -221,6 +222,28 @@ async def generate_podcast_artifact(notebook_id: str) -> Tuple[str, Optional[str
             logger.info("Podcast skipped: no 'alex_sarah' speaker profile configured")
             return ("skipped", None, [], None)
 
+        # Build content from specific sources if provided
+        content = None
+        if source_ids:
+            srcs = await repo_query(
+                """
+                select in as source from reference where out=$id
+                fetch source
+                """,
+                {"id": ensure_record_id(notebook_id)},
+            )
+            all_sources = [Source(**src["source"]) for src in srcs] if srcs else []
+            selected_sources = [s for s in all_sources if str(s.id) in source_ids]
+
+            content_parts = []
+            for source in selected_sources[:5]:
+                if source.full_text:
+                    title = source.title or "Untitled Source"
+                    text = source.full_text[:10000]
+                    content_parts.append(f"## {title}\n\n{text}")
+            if content_parts:
+                content = "\n\n---\n\n".join(content_parts)
+
         # Submit podcast generation job with default profiles
         episode_name = f"{notebook.name} - Overview"
 
@@ -229,6 +252,8 @@ async def generate_podcast_artifact(notebook_id: str) -> Tuple[str, Optional[str
             speaker_profile_name="alex_sarah",
             episode_name=episode_name,
             notebook_id=notebook_id,
+            content=content,
+            language=language,
         )
 
         logger.info(f"Podcast job submitted: command={command_id}, artifacts={artifact_ids}")
@@ -268,7 +293,7 @@ async def get_or_create_summary_transformation() -> Optional[Transformation]:
         return None
 
 
-async def generate_all_artifacts(notebook_id: str) -> BatchGenerationStatus:
+async def generate_all_artifacts(notebook_id: str, quiz_source_ids: Optional[List[str]] = None, podcast_source_ids: Optional[List[str]] = None, podcast_language: str = "en") -> BatchGenerationStatus:
     """
     Orchestrate parallel artifact generation for a notebook.
 
@@ -303,7 +328,7 @@ async def generate_all_artifacts(notebook_id: str) -> BatchGenerationStatus:
 
         # Execute sync operations in parallel with error isolation
         results = await asyncio.gather(
-            generate_quiz_artifact(notebook_id),
+            generate_quiz_artifact(notebook_id, source_ids=quiz_source_ids),
             generate_summary_artifact(notebook_id),
             return_exceptions=True,  # Don't fail entire batch if one fails
         )
@@ -331,7 +356,11 @@ async def generate_all_artifacts(notebook_id: str) -> BatchGenerationStatus:
             status.summary_error = summary_error
 
         # Fire-and-forget podcast generation (doesn't block)
-        podcast_status, command_id, artifact_ids, podcast_error = await generate_podcast_artifact(notebook_id)
+        podcast_status, command_id, artifact_ids, podcast_error = await generate_podcast_artifact(
+            notebook_id,
+            source_ids=podcast_source_ids,
+            language=podcast_language,
+        )
         status.podcast_status = podcast_status
         status.podcast_command_id = command_id
         status.podcast_artifact_ids = artifact_ids

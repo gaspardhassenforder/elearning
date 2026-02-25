@@ -101,3 +101,28 @@ export function useLearnerExecuteTransformation(notebookId: string) {
     },
   })
 }
+
+export function useLearnerDeleteArtifact(notebookId: string) {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  const { t } = useTranslation()
+
+  return useMutation({
+    mutationFn: (artifactId: string) => learnerArtifactsApi.deleteArtifact(artifactId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.learnerArtifacts(notebookId) })
+      toast({
+        title: t.common.success,
+        description: t.learner?.artifacts?.deleteSuccess || 'Artifact deleted',
+      })
+    },
+    onError: (error: unknown) => {
+      const errorKey = getApiErrorKey(error)
+      toast({
+        title: t.common.error,
+        description: errorKey && t.errors?.[errorKey] ? t.errors[errorKey] : t.common.error,
+        variant: 'destructive',
+      })
+    },
+  })
+}

@@ -331,9 +331,6 @@ async def learner_execute_transformation(
         )
         await note.save()
 
-        # Link note to notebook (relate only, artifact tracker created below)
-        await note.relate("refers_to", notebook_id)
-
         # Create Artifact tracker
         artifact = await Artifact.create_for_artifact(
             notebook_id=notebook_id,
@@ -360,3 +357,28 @@ async def learner_execute_transformation(
         raise HTTPException(
             status_code=500, detail=f"Failed to execute transformation: {str(e)}"
         )
+
+
+# ============================================================================
+# Endpoint 4: Delete Artifact
+# ============================================================================
+
+
+@router.delete("/learner/artifacts/{artifact_id}")
+async def learner_delete_artifact(
+    artifact_id: str,
+    learner: LearnerContext = Depends(get_current_learner),
+):
+    artifact = await Artifact.get(artifact_id)
+    if not artifact:
+        raise HTTPException(status_code=404, detail="Artifact not found")
+
+    # Security: learner can only delete artifacts they created
+    if artifact.created_by != str(learner.user.id):
+        raise HTTPException(status_code=403, detail="Not authorized to delete this artifact")
+
+    # Validate notebook belongs to learner's company
+    await validate_learner_access_to_notebook(artifact.notebook_id, learner)
+
+    await artifact.delete_with_content()  # Deletes tracker + actual artifact content
+    return {"message": "Artifact deleted"}

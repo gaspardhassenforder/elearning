@@ -1112,6 +1112,11 @@ export const enUS = {
     previewTitle: "Artifact Preview",
     previewError: "Failed to load preview",
     unsupportedType: "Unsupported artifact type",
+    // Batch generation source filtering + podcast language
+    filterSources: "Filter by sources (optional)",
+    podcastLanguage: "Language",
+    podcastLanguageEn: "English",
+    podcastLanguageFr: "Français",
   },
   users: {
     title: "Users",
@@ -1497,6 +1502,11 @@ export const enUS = {
       myArtifacts: "My Artifacts",
       noModuleArtifacts: "No module artifacts",
       noMyArtifacts: "No artifacts created yet",
+      // Learner artifact deletion
+      deleteArtifact: "Delete Artifact",
+      deleteConfirmTitle: "Delete Artifact?",
+      deleteConfirmDesc: "This will permanently delete this artifact. This action cannot be undone.",
+      deleteSuccess: "Artifact deleted successfully",
     },
     // Learner artifact creation dialogs
     createArtifact: {

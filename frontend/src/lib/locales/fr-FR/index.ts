@@ -1112,6 +1112,11 @@ export const frFR = {
     regenerateWarning: "L'artefact existant sera définitivement remplacé. Cette action ne peut pas être annulée.",
     regenerateButton: "Régénérer",
     regenerateError: "Échec de la régénération de l'artefact",
+    // Filtrage de sources + langue podcast
+    filterSources: "Filtrer par sources (optionnel)",
+    podcastLanguage: "Langue",
+    podcastLanguageEn: "English",
+    podcastLanguageFr: "Français",
   },
   users: {
     title: "Utilisateurs",
@@ -1497,6 +1502,11 @@ export const frFR = {
       myArtifacts: "Mes artefacts",
       noModuleArtifacts: "Aucun artefact du module",
       noMyArtifacts: "Aucun artefact créé pour le moment",
+      // Suppression d'artefacts par l'apprenant
+      deleteArtifact: "Supprimer l'artefact",
+      deleteConfirmTitle: "Supprimer l'artefact ?",
+      deleteConfirmDesc: "Ceci supprimera définitivement cet artefact. Cette action est irréversible.",
+      deleteSuccess: "Artefact supprimé avec succès",
     },
     // Dialogues de création d'artefacts par l'apprenant
     createArtifact: {

@@ -23,6 +23,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { EmptyState } from '@/components/common/EmptyState'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { useNotebookArtifacts } from '@/lib/hooks/use-artifacts'
+import { useLearnerDeleteArtifact } from '@/lib/hooks/use-learner-artifacts'
 import { ArtifactCard } from './ArtifactCard'
 
 interface ArtifactsPanelProps {
@@ -37,6 +38,8 @@ export function ArtifactsPanel({ notebookId }: ArtifactsPanelProps) {
 
   // Fetch artifacts for the notebook
   const { data: artifacts, isLoading, error, refetch } = useNotebookArtifacts(notebookId)
+
+  const deleteMutation = useLearnerDeleteArtifact(notebookId)
 
   // Toggle expand handler (accordion behavior)
   const handleToggleExpand = (artifactId: string) => {
@@ -99,6 +102,7 @@ export function ArtifactsPanel({ notebookId }: ArtifactsPanelProps) {
             artifact={artifact}
             isExpanded={expandedArtifactId === artifact.id}
             onToggleExpand={() => handleToggleExpand(artifact.id)}
+            onDelete={(id) => deleteMutation.mutate(id)}
           />
         ))}
       </div>

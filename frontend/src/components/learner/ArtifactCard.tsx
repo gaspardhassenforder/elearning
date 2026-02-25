@@ -17,9 +17,20 @@
  * - Smooth transition animation
  */
 
-import { FileQuestion, Headphones, FileText, ChevronDown, ChevronUp, Loader2, AlertCircle } from 'lucide-react'
+import { useState } from 'react'
+import { FileQuestion, Headphones, FileText, ChevronDown, ChevronUp, Loader2, AlertCircle, Trash2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { useLearnerArtifactPreview } from '@/lib/hooks/use-artifacts'
 import { LearnerArtifactListItem, QuizPreview, PodcastPreview, SummaryPreview, TransformationPreview } from '@/lib/api/artifacts'
@@ -34,9 +45,11 @@ interface ArtifactCardProps {
   artifact: LearnerArtifactListItem
   isExpanded: boolean
   onToggleExpand: () => void
+  onDelete?: (artifactId: string) => void
 }
 
-export function ArtifactCard({ artifact, isExpanded, onToggleExpand }: ArtifactCardProps) {
+export function ArtifactCard({ artifact, isExpanded, onToggleExpand, onDelete }: ArtifactCardProps) {
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const { t } = useTranslation()
 
   // Lazy load preview only when expanded
@@ -249,6 +262,17 @@ export function ArtifactCard({ artifact, isExpanded, onToggleExpand }: ArtifactC
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             )}
           </div>
+          {/* Delete button - only for learner-created artifacts */}
+          {artifact.created_by != null && onDelete && (
+            <button
+              className="flex-shrink-0 p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+              onClick={(e) => { e.stopPropagation(); setShowDeleteDialog(true) }}
+              title={t.learner?.artifacts?.deleteArtifact || 'Delete'}
+              aria-label={t.learner?.artifacts?.deleteArtifact || 'Delete'}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Expanded content section */}
@@ -258,6 +282,34 @@ export function ArtifactCard({ artifact, isExpanded, onToggleExpand }: ArtifactC
           </div>
         )}
       </CardContent>
+      {/* Delete confirmation dialog */}
+      {showDeleteDialog && (
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {t.learner?.artifacts?.deleteConfirmTitle || 'Delete Artifact?'}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {t.learner?.artifacts?.deleteConfirmDesc || 'This will permanently delete this artifact. This action cannot be undone.'}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t.common?.cancel || 'Cancel'}</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDelete?.(artifact.id)
+                  setShowDeleteDialog(false)
+                }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {t.common?.delete || 'Delete'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </Card>
   )
 }

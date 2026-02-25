@@ -99,7 +99,8 @@ export function useGenerateAllArtifacts(notebookId: string) {
   const { t } = useTranslation()
 
   return useMutation({
-    mutationFn: () => artifactsApi.generateAll(notebookId),
+    mutationFn: (options?: { quiz_source_ids?: string[]; podcast_source_ids?: string[]; podcast_language?: string }) =>
+      artifactsApi.generateAll(notebookId, options),
     onSuccess: (data: BatchGenerationResponse) => {
       // Invalidate artifacts queries to pick up new artifacts (admin and learner)
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.artifacts(notebookId) })
