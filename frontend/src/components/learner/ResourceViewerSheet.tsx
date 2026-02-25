@@ -274,7 +274,7 @@ function ArtifactViewer({
               description=""
               questions={(preview.questions || []).map((q) => ({
                 text: q.question,
-                options: q.choices,
+                options: q.options,
               }))}
               totalQuestions={preview.question_count || preview.questions?.length || 0}
               quizUrl=""

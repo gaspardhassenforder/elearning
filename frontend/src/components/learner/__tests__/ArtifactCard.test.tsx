@@ -263,7 +263,7 @@ describe('ArtifactCard', () => {
           questions: [
             {
               question: 'What is ML?',
-              choices: ['A', 'B', 'C'],
+              options: ['A', 'B', 'C'],
             },
           ],
         },

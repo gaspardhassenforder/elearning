@@ -47,7 +47,7 @@ export function QuizPreview({ preview }: QuizPreviewProps) {
 
               {/* Choices */}
               <div className="space-y-2">
-                {question.choices.map((choice, choiceIndex) => {
+                {question.options.map((choice, choiceIndex) => {
                   const isCorrect = choiceIndex === question.correct_answer;
 
                   return (
