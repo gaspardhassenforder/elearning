@@ -35,7 +35,7 @@ export interface BatchGenerationResponse {
 // Preview types (Story 3.2)
 export interface QuizQuestion {
   question: string
-  choices: string[]
+  options: string[]
   correct_answer: number
   explanation?: string
 }

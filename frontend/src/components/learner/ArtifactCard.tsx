@@ -152,7 +152,7 @@ export function ArtifactCard({ artifact, isExpanded, onToggleExpand }: ArtifactC
     // Transform quiz preview data to InlineQuizWidget format
     const questions = quiz.questions.map((q) => ({
       text: q.question,
-      options: q.choices,
+      options: q.options,
     }))
 
     return (

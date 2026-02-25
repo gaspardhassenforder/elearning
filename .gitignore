@@ -18,6 +18,8 @@ google-credentials.json
 # Distribution / packaging
 .Python
 build/
+# Exception: pdfjs static files needed for PDF viewer in production
+!frontend/public/pdfjs/build/
 develop-eggs/
 dist/
 downloads/
