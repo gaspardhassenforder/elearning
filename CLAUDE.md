@@ -2,6 +2,15 @@
 
 This file provides architectural guidance for contributors working on Open Notebook at the project level.
 
+## Deployment
+
+See `deployment-details.md` (gitignored, local only) for full deployment details including:
+- GCP VM credentials, IPs, and SSH commands
+- Cloudflare Tunnel URL and known issues
+- Vercel environment variables
+- Docker Compose setup and useful commands
+- Admin credentials and TODO items
+
 ## Project Overview
 
 **Open Notebook** is evolving from a personal research assistant into a **B2B interactive learning platform**. Organizations can deliver curated educational content through AI-guided notebooks that combine reading materials, interactive AI chat, quizzes, and podcasts—all while maintaining privacy-first, self-hosted architecture.

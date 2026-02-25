@@ -12,6 +12,7 @@ notebook_data/
 __pycache__/
 *.so
 todo.md
+deployment-details.md
 temp/
 google-credentials.json
 # Distribution / packaging
