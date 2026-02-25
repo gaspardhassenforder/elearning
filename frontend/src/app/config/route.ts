@@ -32,37 +32,11 @@ export async function GET(request: NextRequest) {
     })
   }
 
-  // Priority 2: Auto-detect from request headers
-  try {
-    // Get the protocol (http or https)
-    // Check X-Forwarded-Proto first (for reverse proxies), then fallback to request scheme
-    const proto = request.headers.get('x-forwarded-proto') ||
-                  request.nextUrl.protocol.replace(':', '') ||
-                  'http'
-
-    // Get the host header (includes port if non-standard)
-    const hostHeader = request.headers.get('host')
-
-    if (hostHeader) {
-      // Extract just the hostname (remove port if present)
-      const hostname = hostHeader.split(':')[0]
-
-      // Construct the API URL with port 5055
-      const apiUrl = `${proto}://${hostname}:5055`
-
-      console.log(`[runtime-config] Auto-detected API URL: ${apiUrl} (proto=${proto}, host=${hostHeader})`)
-
-      return NextResponse.json({
-        apiUrl,
-      })
-    }
-  } catch (error) {
-    console.error('[runtime-config] Auto-detection failed:', error)
-  }
-
-  // Priority 3: Fallback to localhost
-  console.log('[runtime-config] Using fallback: http://localhost:5055')
+  // Priority 2: Return empty string so the frontend uses relative paths
+  // which are proxied server-side via Next.js rewrites (next.config.ts).
+  // This avoids mixed content errors on HTTPS deployments.
+  console.log('[runtime-config] No API_URL set, using relative path proxy')
   return NextResponse.json({
-    apiUrl: 'http://localhost:5055',
+    apiUrl: '',
   })
 }
