@@ -208,6 +208,8 @@ export function ArtifactCard({ artifact, isExpanded, onToggleExpand, onDelete }:
 
   // Text content (summary/transformation) in ScrollArea
   const renderTextContent = (content: SummaryPreview | TransformationPreview) => {
+    // Normalize single newlines to double newlines so markdown renders them as paragraph breaks
+    const normalizedContent = (content.content || '').replace(/\n(?!\n)/g, '\n\n')
     return (
       <div className="space-y-3">
         {/* Metadata row */}
@@ -224,7 +226,7 @@ export function ArtifactCard({ artifact, isExpanded, onToggleExpand, onDelete }:
         <div className="overflow-y-auto max-h-[calc(100vh-300px)] pr-1">
           <div className="prose prose-sm dark:prose-invert max-w-none pr-3">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {content.content || (t.learner?.artifacts?.noContent || 'No content available')}
+              {normalizedContent || (t.learner?.artifacts?.noContent || 'No content available')}
             </ReactMarkdown>
           </div>
         </div>
