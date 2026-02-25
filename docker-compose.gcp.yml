@@ -14,8 +14,7 @@ services:
     image: surrealdb/surrealdb:v2
     volumes:
       - /mydata:/mydata
-    ports:
-      - "8000:8000"
+    # No external port - only accessible within Docker network
     command: start --log info --user root --pass root rocksdb:/mydata/mydatabase.db
     pull_policy: always
     user: root
@@ -24,7 +23,7 @@ services:
   api:
     image: ghcr.io/gaspardhassenforder/elearning:api-v1-latest
     ports:
-      - "8080:8080"
+      - "8000:8080"  # Reuse port 8000 (already open in GCP firewall)
     env_file:
       - ./worker.env
     depends_on:
