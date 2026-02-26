@@ -105,10 +105,19 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
   const [userHasEdited, setUserHasEdited] = useState(false)
   const textBeforeRecordingRef = useRef('')
 
+  // Strip empty paragraphs (e.g. "[]" from ReAct tool-call messages merged by backend)
+  function cleanMessageContent(content: string): string {
+    return content
+      .split('\n\n')
+      .filter(part => part.trim() !== '[]' && part.trim() !== '')
+      .join('\n\n')
+  }
+
   // Merge history with current messages
-  const allMessages = historyLoaded && historyData?.messages
+  const allMessages = (historyLoaded && historyData?.messages
     ? [...historyData.messages, ...messages]
     : messages
+  ).map(m => ({ ...m, content: cleanMessageContent(m.content) }))
 
   // Track when history finishes loading
   useEffect(() => {
