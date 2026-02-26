@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useRouter } from 'next/navigation'
 import { authApi } from '@/lib/api/auth'
 import { useToast } from '@/lib/hooks/use-toast'
 import { useTranslation } from '@/lib/hooks/use-translation'
@@ -10,6 +11,7 @@ export function useSubmitOnboarding() {
   const { toast } = useToast()
   const { t } = useTranslation()
   const { fetchCurrentUser } = useAuthStore()
+  const router = useRouter()
 
   return useMutation({
     mutationFn: (data: OnboardingSubmit) => authApi.submitOnboarding(data),
@@ -22,6 +24,9 @@ export function useSubmitOnboarding() {
         title: t.common.success,
         description: t.onboarding.success,
       })
+      // Navigate only after the store is updated, so the layout guard
+      // sees onboarding_completed=true and doesn't bounce back to /onboarding
+      router.replace('/modules')
     },
     onError: () => {
       toast({

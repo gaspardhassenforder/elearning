@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,7 +21,6 @@ import { Sparkles, Briefcase, MessageSquare } from 'lucide-react'
 
 export default function OnboardingPage() {
   const { t } = useTranslation()
-  const router = useRouter()
   const submitOnboarding = useSubmitOnboarding()
 
   const [formData, setFormData] = useState({
@@ -61,7 +59,6 @@ export default function OnboardingPage() {
         job_type: formData.job_type.trim(),
         job_description: formData.job_description.trim(),
       })
-      router.replace('/modules')
     } catch {
       // Error handled by hook
     }
