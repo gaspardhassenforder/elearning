@@ -27,6 +27,7 @@ interface ViewerSheet {
   id: string
   searchText?: string  // Excerpt text for PDF search / text highlight
   pageNumber?: number  // PDF page number for navigation (1-indexed)
+  timestampSeconds?: number  // Video timestamp in seconds for seeking
 }
 
 // Current module context (for unified header)

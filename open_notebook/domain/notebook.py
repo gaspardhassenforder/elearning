@@ -362,6 +362,11 @@ class Source(ObjectModel):
             if not self.full_text:
                 raise ValueError(f"Source {self.id} has no text to vectorize")
 
+            # Ensure the vectorize_source command is registered in this process.
+            # surreal_commands registry is memory-only; the worker imports commands at
+            # startup but the API process does not — importing here fixes that.
+            import commands.embedding_commands  # noqa: F401
+
             # Submit the vectorize_source command which will:
             # 1. Delete existing embeddings (idempotency)
             # 2. Split text into chunks
@@ -618,6 +623,7 @@ async def vector_search_for_notebook(
                 content,
                 source.id as parent_id,
                 page_number,
+                timestamp_seconds,
                 vector::similarity::cosine(embedding, $embed) as similarity
             FROM source_embedding
             WHERE source IN $source_ids
@@ -637,6 +643,7 @@ async def vector_search_for_notebook(
                 content,
                 source.id as parent_id,
                 page_number,
+                timestamp_seconds,
                 vector::similarity::cosine(embedding, $embed) as similarity
             FROM source_embedding
             WHERE source IN (SELECT VALUE in FROM reference WHERE out=$notebook_id)

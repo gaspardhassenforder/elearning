@@ -1156,3 +1156,41 @@ async def get_source_file(
     await validate_learner_access_to_source(source_id, learner)
     resolved_path, filename = await _resolve_source_file(source_id)
     return FileResponse(path=resolved_path, filename=filename)
+
+VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".avi", ".m4a"}
+VIDEO_MIME_TYPES = {
+    ".mp4": "video/mp4",
+    ".webm": "video/webm",
+    ".mov": "video/quicktime",
+    ".avi": "video/x-msvideo",
+    ".m4a": "audio/mp4",
+}
+
+
+@router.get("/sources/{source_id}/video")
+async def get_source_video(
+    source_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Stream a video/audio file for a source. Returns the file with appropriate Content-Type."""
+    source = await Source.get(source_id)
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+
+    if not source.asset or not source.asset.file_path:
+        raise HTTPException(status_code=404, detail="Source has no file")
+
+    file_path = Path(source.asset.file_path)
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Video file not found on disk")
+
+    ext = file_path.suffix.lower()
+    if ext not in VIDEO_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="Source is not a video file")
+
+    media_type = VIDEO_MIME_TYPES.get(ext, "application/octet-stream")
+    return FileResponse(
+        path=str(file_path),
+        media_type=media_type,
+        filename=file_path.name,
+    )

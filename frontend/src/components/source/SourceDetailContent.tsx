@@ -67,6 +67,73 @@ import { useTranslation } from '@/lib/hooks/use-translation'
 import { SourceInsightDialog } from '@/components/source/SourceInsightDialog'
 import { NotebookAssociations } from '@/components/source/NotebookAssociations'
 import { RawDocumentViewer } from '@/components/source/RawDocumentViewer'
+import { VideoViewer } from '@/components/learner/VideoViewer'
+import { getVideoType } from '@/lib/utils/source-type'
+
+// ─── Transcript helpers ────────────────────────────────────────────────────
+
+function fmtTimestamp(seconds: number): string {
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = Math.floor(seconds % 60)
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
+function parseAndGroupTranscript(
+  raw: string,
+  intervalSecs = 30,
+): Array<{ seconds: number; text: string }> {
+  // Parse [VIDEO_TIMESTAMP:X]\ntext pairs
+  const segments: Array<{ seconds: number; text: string }> = []
+  let currentSecs = 0
+  for (const line of raw.split('\n')) {
+    const m = line.match(/^\[VIDEO_TIMESTAMP:(\d+(?:\.\d+)?)\]$/)
+    if (m) {
+      currentSecs = parseFloat(m[1])
+    } else if (line.trim()) {
+      segments.push({ seconds: currentSecs, text: line.trim() })
+    }
+  }
+
+  // Group into ~intervalSecs blocks
+  if (!segments.length) return []
+  const groups: Array<{ seconds: number; text: string }> = []
+  let groupStart = segments[0].seconds
+  let texts: string[] = []
+  for (const seg of segments) {
+    if (seg.seconds - groupStart >= intervalSecs && texts.length > 0) {
+      groups.push({ seconds: groupStart, text: texts.join(' ') })
+      groupStart = seg.seconds
+      texts = [seg.text]
+    } else {
+      texts.push(seg.text)
+    }
+  }
+  if (texts.length) groups.push({ seconds: groupStart, text: texts.join(' ') })
+  return groups
+}
+
+function TranscriptViewer({ text }: { text: string }) {
+  const groups = parseAndGroupTranscript(text)
+  if (!groups.length) {
+    return <p className="text-sm text-muted-foreground">No transcript available.</p>
+  }
+  return (
+    <div className="space-y-4">
+      {groups.map((g, i) => (
+        <div key={i} className="border-l-2 border-muted pl-3">
+          <span className="inline-block font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded mb-1">
+            {fmtTimestamp(g.seconds)}
+          </span>
+          <p className="text-sm leading-relaxed">{g.text}</p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ───────────────────────────────────────────────────────────────────────────
 
 interface SourceDetailContentProps {
   sourceId: string
@@ -329,6 +396,11 @@ export function SourceDetailContent({
     return getYouTubeVideoId(source.asset.url)
   }, [source?.asset?.url])
 
+  const videoType = useMemo(() => {
+    if (!source) return null
+    return getVideoType(source)
+  }, [source])
+
   const handleDelete = async () => {
     if (!source) return
 
@@ -449,21 +521,47 @@ export function SourceDetailContent({
           </TabsList>
 
           <TabsContent value="raw" className="flex-1 flex flex-col min-h-0 mt-2">
-            <RawDocumentViewer
-              sourceId={sourceId}
-              filePath={source.asset?.file_path}
-              fileAvailable={fileAvailable}
-            />
+            {videoType ? (
+              <Card className="flex flex-col h-full">
+                <CardHeader className="flex-shrink-0">
+                  <CardTitle className="flex items-center gap-2">
+                    <Youtube className="h-5 w-5" />
+                    {t.sources.raw}
+                  </CardTitle>
+                  {source.asset?.url && (
+                    <CardDescription>
+                      <a
+                        href={source.asset.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:underline text-blue-600 inline-flex items-center gap-1 text-sm"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        {isYouTubeUrl ? (t.sources.openOnYoutube || source.asset.url) : source.asset.url}
+                      </a>
+                    </CardDescription>
+                  )}
+                </CardHeader>
+                <CardContent className="flex-1 min-h-0 p-0">
+                  <VideoViewer source={source} />
+                </CardContent>
+              </Card>
+            ) : (
+              <RawDocumentViewer
+                sourceId={sourceId}
+                filePath={source.asset?.file_path}
+                fileAvailable={fileAvailable}
+              />
+            )}
           </TabsContent>
 
-          <TabsContent value="content" className="mt-6">
+          <TabsContent value="content" className="flex-1 overflow-y-auto min-h-0 mt-2 pb-4">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  {isYouTubeUrl && <Youtube className="h-5 w-5" />}
                   {t.sources.content}
                 </CardTitle>
-                {source.asset?.url && !isYouTubeUrl && (
+                {source.asset?.url && !videoType && (
                   <CardDescription className="flex items-center gap-2">
                     <LinkIcon className="h-4 w-4" />
                     <a
@@ -478,63 +576,41 @@ export function SourceDetailContent({
                 )}
               </CardHeader>
               <CardContent>
-                {isYouTubeUrl && youTubeVideoId && (
-                  <div className="mb-6">
-                    <div className="aspect-video rounded-lg overflow-hidden bg-black">
-                      <iframe
-                        src={`https://www.youtube.com/embed/${youTubeVideoId}`}
-                        title={t.common.accessibility.ytVideo}
-                        className="w-full h-full"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
-                    </div>
-                    {source.asset?.url && (
-                      <div className="mt-2">
-                        <a
-                          href={source.asset.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-muted-foreground hover:underline inline-flex items-center gap-1"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                          {t.sources.openOnYoutube}
-                        </a>
-                      </div>
-                    )}
+                {videoType && source.full_text ? (
+                  <TranscriptViewer text={source.full_text} />
+                ) : (
+                  <div className="prose prose-sm prose-neutral dark:prose-invert max-w-none prose-headings:font-semibold prose-a:text-blue-600 prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-p:mb-4 prose-p:leading-7 prose-li:mb-2">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        p: ({ children }) => <p className="mb-4">{children}</p>,
+                        h1: ({ children }) => <h1 className="text-2xl font-bold mt-6 mb-4">{children}</h1>,
+                        h2: ({ children }) => <h2 className="text-xl font-bold mt-5 mb-3">{children}</h2>,
+                        h3: ({ children }) => <h3 className="text-lg font-semibold mt-4 mb-2">{children}</h3>,
+                        ul: ({ children }) => <ul className="mb-4 list-disc pl-6">{children}</ul>,
+                        ol: ({ children }) => <ol className="mb-4 list-decimal pl-6">{children}</ol>,
+                        li: ({ children }) => <li className="mb-1">{children}</li>,
+                        table: ({ children }) => (
+                          <div className="my-4 overflow-x-auto">
+                            <table className="min-w-full border-collapse border border-border">{children}</table>
+                          </div>
+                        ),
+                        thead: ({ children }) => <thead className="bg-muted">{children}</thead>,
+                        tbody: ({ children }) => <tbody>{children}</tbody>,
+                        tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
+                        th: ({ children }) => <th className="border border-border px-3 py-2 text-left font-semibold">{children}</th>,
+                        td: ({ children }) => <td className="border border-border px-3 py-2">{children}</td>,
+                      }}
+                    >
+                      {source.full_text || t.sources.noContent}
+                    </ReactMarkdown>
                   </div>
                 )}
-                <div className="prose prose-sm prose-neutral dark:prose-invert max-w-none prose-headings:font-semibold prose-a:text-blue-600 prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-p:mb-4 prose-p:leading-7 prose-li:mb-2">
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      p: ({ children }) => <p className="mb-4">{children}</p>,
-                      h1: ({ children }) => <h1 className="text-2xl font-bold mt-6 mb-4">{children}</h1>,
-                      h2: ({ children }) => <h2 className="text-xl font-bold mt-5 mb-3">{children}</h2>,
-                      h3: ({ children }) => <h3 className="text-lg font-semibold mt-4 mb-2">{children}</h3>,
-                      ul: ({ children }) => <ul className="mb-4 list-disc pl-6">{children}</ul>,
-                      ol: ({ children }) => <ol className="mb-4 list-decimal pl-6">{children}</ol>,
-                      li: ({ children }) => <li className="mb-1">{children}</li>,
-                      table: ({ children }) => (
-                        <div className="my-4 overflow-x-auto">
-                          <table className="min-w-full border-collapse border border-border">{children}</table>
-                        </div>
-                      ),
-                      thead: ({ children }) => <thead className="bg-muted">{children}</thead>,
-                      tbody: ({ children }) => <tbody>{children}</tbody>,
-                      tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
-                      th: ({ children }) => <th className="border border-border px-3 py-2 text-left font-semibold">{children}</th>,
-                      td: ({ children }) => <td className="border border-border px-3 py-2">{children}</td>,
-                    }}
-                  >
-                    {source.full_text || t.sources.noContent}
-                  </ReactMarkdown>
-                </div>
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="insights" className="mt-6">
+          <TabsContent value="insights" className="flex-1 overflow-y-auto min-h-0 mt-2 pb-4">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
@@ -642,7 +718,7 @@ export function SourceDetailContent({
             </Card>
           </TabsContent>
 
-          <TabsContent value="details" className="mt-6">
+          <TabsContent value="details" className="flex-1 overflow-y-auto min-h-0 mt-2 pb-4">
             <Card>
               <CardHeader>
                 <CardTitle>{t.sources.details}</CardTitle>

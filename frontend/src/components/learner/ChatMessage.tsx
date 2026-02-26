@@ -188,17 +188,21 @@ export function ChatMessage({ message, index, isLastAssistant, isStreaming, t, i
     )
     let searchText = matchingToolCall?.result?.excerpt as string | undefined
     let pageNumber = matchingToolCall?.result?.page_number as number | undefined
+    let timestampSeconds = matchingToolCall?.result?.timestamp_seconds as number | undefined
 
     // Fallback: extract content from search_knowledge_base results if no surface_document match
     if (!searchText && message.toolCalls) {
       for (const tc of message.toolCalls) {
         if (tc.toolName === 'search_knowledge_base' && tc.result?.items) {
-          const results = tc.result.items as Array<{ source_id?: string; content?: string; page_number?: number }>
+          const results = tc.result.items as Array<{ source_id?: string; content?: string; page_number?: number; timestamp_seconds?: number }>
           const match = results.find((r) => r.source_id === fullId)
           if (match?.content) {
             searchText = match.content
             if (match.page_number && !pageNumber) {
               pageNumber = match.page_number
+            }
+            if (match?.timestamp_seconds !== undefined && !timestampSeconds) {
+              timestampSeconds = match.timestamp_seconds as number
             }
             break
           }
@@ -206,7 +210,7 @@ export function ChatMessage({ message, index, isLastAssistant, isStreaming, t, i
       }
     }
 
-    openViewerSheet({ type: 'source', id: fullId, searchText, pageNumber })
+    openViewerSheet({ type: 'source', id: fullId, searchText, pageNumber, timestampSeconds })
   }, combinedTitleMap)
 
   // Convert references to compact numbered format

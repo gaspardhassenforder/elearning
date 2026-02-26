@@ -1,0 +1,2 @@
+-- Migration 34 down: Remove timestamp_seconds field from source_embedding
+REMOVE FIELD timestamp_seconds ON TABLE source_embedding;

@@ -1,3 +1,4 @@
+import re
 import time
 from typing import Dict, List, Literal, Optional
 
@@ -41,6 +42,7 @@ class EmbedChunkInput(CommandInput):
     chunk_index: int
     chunk_text: str
     page_number: Optional[int] = None  # PDF page number (1-indexed) for navigation
+    timestamp_seconds: Optional[float] = None  # Video timestamp in seconds for navigation
 
 
 class EmbedChunkOutput(CommandOutput):
@@ -248,6 +250,7 @@ async def embed_chunk_command(
             "content": input_data.chunk_text,
             "embedding": embedding,
             "page_number": input_data.page_number,
+            "timestamp_seconds": input_data.timestamp_seconds,
         }
         await repo_query(
             """
@@ -257,6 +260,7 @@ async def embed_chunk_command(
                 "content": $content,
                 "embedding": $embedding,
                 "page_number": $page_number,
+                "timestamp_seconds": $timestamp_seconds,
             };
             """,
             params,
@@ -365,6 +369,11 @@ async def vectorize_source_command(
                 if page_texts:
                     logger.info(f"Extracted {len(page_texts)} page boundaries for PDF page mapping")
 
+        # 3c. Check for video timestamp markers in text
+        _VIDEO_TIMESTAMP_RE = re.compile(r'\[VIDEO_TIMESTAMP:(\d+(?:\.\d+)?)\]')
+        has_video_timestamps = bool(_VIDEO_TIMESTAMP_RE.search(source.full_text))
+        logger.info(f"Video timestamps found in source text: {has_video_timestamps}")
+
         # 4. Submit each chunk as a separate job
         logger.info(f"Submitting {total_chunks} chunk jobs to worker queue")
         jobs_submitted = 0
@@ -377,6 +386,13 @@ async def vectorize_source_command(
                     from open_notebook.utils.pdf_utils import determine_page_number
                     chunk_page_number = determine_page_number(chunk_text, page_texts)
 
+                # Determine timestamp_seconds for this chunk (video sources)
+                chunk_timestamp_seconds = None
+                if has_video_timestamps:
+                    ts_match = _VIDEO_TIMESTAMP_RE.search(chunk_text)
+                    if ts_match:
+                        chunk_timestamp_seconds = float(ts_match.group(1))
+
                 job_id = submit_command(
                     "open_notebook",  # app name
                     "embed_chunk",  # command name
@@ -385,6 +401,7 @@ async def vectorize_source_command(
                         "chunk_index": idx,
                         "chunk_text": chunk_text,
                         "page_number": chunk_page_number,
+                        "timestamp_seconds": chunk_timestamp_seconds,
                     },
                 )
                 jobs_submitted += 1

@@ -1,0 +1,2 @@
+-- Migration 34: Add timestamp_seconds field to source_embedding for video timestamp navigation
+DEFINE FIELD IF NOT EXISTS timestamp_seconds ON TABLE source_embedding TYPE option<float>;

@@ -184,6 +184,7 @@ async def surface_document(
     excerpt_text: str,
     relevance_reason: str,
     page_number: Optional[int] = None,
+    timestamp_seconds: Optional[float] = None,
 ) -> Tuple[str, dict]:
     """Surface a document snippet in the chat conversation.
 
@@ -197,6 +198,9 @@ async def surface_document(
         relevance_reason: Brief explanation of why this document is relevant to the conversation
         page_number: Optional PDF page number where the excerpt is found (1-indexed). Pass this when
             the excerpt comes from search_knowledge_base results that include page_number.
+        timestamp_seconds: Optional video timestamp in seconds where the excerpt is found. Pass this
+            when the excerpt comes from search_knowledge_base results that include timestamp_seconds
+            (for YouTube/video sources).
 
     Returns:
         Tuple of (llm_content, ui_artifact):
@@ -266,6 +270,7 @@ async def surface_document(
             "excerpt": truncated_excerpt,
             "relevance": relevance_reason,
             "page_number": page_number,  # PDF page for navigation (None for non-PDF)
+            "timestamp_seconds": timestamp_seconds,  # Video timestamp in seconds (None for non-video)
             "metadata": {
                 "created": source.created.isoformat() if source.created else None,
                 "file_type": file_type,
@@ -671,6 +676,11 @@ async def search_knowledge_base(
             page_number = r.get("page_number")
             if page_number is not None:
                 entry["page_number"] = page_number
+
+            # Include timestamp_seconds when available (from video source embeddings)
+            timestamp_seconds = r.get("timestamp_seconds")
+            if timestamp_seconds is not None:
+                entry["timestamp_seconds"] = timestamp_seconds
 
             formatted.append(entry)
 

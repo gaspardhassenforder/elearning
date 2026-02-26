@@ -34,6 +34,8 @@ import { AlertCircle } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { PdfViewer } from './PdfViewer'
+import { VideoViewer } from './VideoViewer'
+import { getVideoType } from '@/lib/utils/source-type'
 
 function ArtifactErrorFallback() {
   return (
@@ -66,6 +68,7 @@ export function ResourceViewerSheet({ notebookId }: ResourceViewerSheetProps) {
             sourceId={viewerSheet.id}
             searchText={viewerSheet.searchText}
             pageNumber={viewerSheet.pageNumber}
+            timestampSeconds={viewerSheet.timestampSeconds}
             t={t}
           />
         )}
@@ -86,12 +89,14 @@ function SourceViewer({
   sourceId,
   searchText,
   pageNumber,
+  timestampSeconds,
   t,
 }: {
   notebookId: string
   sourceId: string
   searchText?: string
   pageNumber?: number
+  timestampSeconds?: number
   t: Record<string, unknown>
 }) {
   const { sources } = useNotebookSources(notebookId)
@@ -101,6 +106,7 @@ function SourceViewer({
   const tSources = (t.learner as Record<string, unknown>)?.sources as Record<string, string>
 
   const isPdf = content?.file_type === 'PDF'
+  const videoType = source ? getVideoType(source) : null
 
   return (
     <>
@@ -115,7 +121,11 @@ function SourceViewer({
           </SheetDescription>
         )}
       </SheetHeader>
-      {isPdf ? (
+      {videoType ? (
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <VideoViewer source={source!} timestampSeconds={timestampSeconds} />
+        </div>
+      ) : isPdf ? (
         <div className="flex-1 min-h-0">
           <PdfViewer
             sourceId={sourceId}
