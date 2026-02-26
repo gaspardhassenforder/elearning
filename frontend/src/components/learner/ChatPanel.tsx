@@ -20,6 +20,7 @@ import { MessageSquare, ArrowDown, Mic, MicOff, Send, RotateCcw } from 'lucide-r
 import { Button } from '@/components/ui/button'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { useLearnerChat, useChatHistory } from '@/lib/hooks/use-learner-chat'
+import type { ChatHistoryMessage } from '@/lib/api/learner-chat'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ChatMessage } from './ChatMessage'
 import { AsyncStatusBar } from './AsyncStatusBar'
@@ -106,7 +107,7 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
   const textBeforeRecordingRef = useRef('')
 
   // Deduplicate consecutive leading assistant messages (e.g. duplicate greetings from backend race condition)
-  function deduplicateLeadingAssistants(msgs: typeof historyData.messages) {
+  function deduplicateLeadingAssistants(msgs: ChatHistoryMessage[]) {
     if (!msgs) return msgs
     const firstUserIdx = msgs.findIndex((m) => m.role === 'user')
     const leadingCount = firstUserIdx === -1 ? msgs.length : firstUserIdx
