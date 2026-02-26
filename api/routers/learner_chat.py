@@ -337,13 +337,30 @@ async def get_chat_history(
                 )
                 continue
 
+        # Merge consecutive assistant messages (from ReAct multi-turn LLM invocations).
+        # During streaming, all text deltas accumulate into one bubble; history must match.
+        merged_messages = []
+        for msg in formatted_messages:
+            if (merged_messages
+                    and msg.role == "assistant"
+                    and merged_messages[-1].role == "assistant"):
+                prev = merged_messages[-1]
+                merged_messages[-1] = ChatHistoryMessage(
+                    id=prev.id,
+                    role="assistant",
+                    content=prev.content + "\n\n" + msg.content,
+                    createdAt=prev.createdAt,
+                )
+            else:
+                merged_messages.append(msg)
+
         logger.info(
-            f"Loaded {len(formatted_messages)} messages for thread {thread_id} "
+            f"Loaded {len(merged_messages)} messages for thread {thread_id} "
             f"(page: offset={offset}, limit={limit}, has_more={has_more})"
         )
 
         return ChatHistoryResponse(
-            messages=formatted_messages,
+            messages=merged_messages,
             thread_id=thread_id,
             has_more=has_more
         )
