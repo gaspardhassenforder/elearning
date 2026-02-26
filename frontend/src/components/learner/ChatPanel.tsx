@@ -105,9 +105,18 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
   const [userHasEdited, setUserHasEdited] = useState(false)
   const textBeforeRecordingRef = useRef('')
 
+  // Deduplicate consecutive leading assistant messages (e.g. duplicate greetings from backend race condition)
+  function deduplicateLeadingAssistants(msgs: typeof historyData.messages) {
+    if (!msgs) return msgs
+    const firstUserIdx = msgs.findIndex((m) => m.role === 'user')
+    const leadingCount = firstUserIdx === -1 ? msgs.length : firstUserIdx
+    if (leadingCount <= 1) return msgs
+    return [msgs[leadingCount - 1], ...msgs.slice(leadingCount)]
+  }
+
   // Merge history with current messages
   const allMessages = historyLoaded && historyData?.messages
-    ? [...historyData.messages, ...messages]
+    ? [...deduplicateLeadingAssistants(historyData.messages), ...messages]
     : messages
 
   // Track when history finishes loading
