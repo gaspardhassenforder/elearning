@@ -34,6 +34,7 @@ export function useTranslation() {
       'then', 'catch', 'finally', // Promise methods
       'prototype', 'caller', 'callee', 'arguments', // Function props
       'Symbol(Symbol.toStringTag)', 'Symbol(Symbol.iterator)',
+      'name', 'length', // Function built-in properties that conflict with translation keys
     ]);
     
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -79,17 +80,18 @@ export function useTranslation() {
             return (target as any)[prop];
           }
           
-          // Handle function's own properties
+          if (typeof prop !== 'string') return undefined;
+
+          // Block React internals, JS built-ins, and function built-in properties
+          // MUST run before `prop in target` to prevent function.name/length from leaking
+          if (prop.startsWith('__') || prop.startsWith('@@') || BLOCKED_PROPS.has(prop)) {
+            return undefined;
+          }
+
+          // Handle function's own properties (e.g. call, apply, bind)
           if (prop in target) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             return (target as any)[prop];
-          }
-
-          if (typeof prop !== 'string') return undefined;
-
-          // Block React internals and JS built-ins
-          if (prop.startsWith('__') || prop.startsWith('@@') || BLOCKED_PROPS.has(prop)) {
-            return undefined;
           }
 
           const currentPath = path ? `${path}.${prop}` : prop;
