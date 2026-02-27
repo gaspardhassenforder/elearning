@@ -37,6 +37,8 @@ class ThreadState(TypedDict):
     model_override: Optional[str]
     system_prompt_override: Optional[str]  # Story 4.1: For learner chat with assembled prompts
     user_id: Optional[str]  # Story 4.4: For objective progress tracking
+    lesson_steps: Optional[list]  # Structured lesson plan steps with status
+    current_step: Optional[dict]  # Active lesson step (first incomplete required step)
 
 
 async def _prepare_model_and_payload(

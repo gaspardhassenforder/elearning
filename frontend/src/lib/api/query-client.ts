@@ -51,4 +51,8 @@ export const QUERY_KEYS = {
   learnerArtifactPreview: (artifactId: string) => ['learner-artifacts', 'preview', artifactId] as const,
   transformations: ['transformations'] as const,
   systemPrompt: () => ['system-prompt'] as const,
+  // Lesson plan steps (admin view)
+  lessonSteps: (notebookId: string) => ['lesson-steps', notebookId] as const,
+  // Learner step progress
+  lessonStepsProgress: (notebookId: string) => ['lesson-steps-progress', notebookId] as const,
 }

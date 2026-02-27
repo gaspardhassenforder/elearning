@@ -1,0 +1,4 @@
+-- Migration 36 rollback: Remove lesson steps and learner step progress tables
+
+REMOVE TABLE learner_step_progress;
+REMOVE TABLE lesson_step;

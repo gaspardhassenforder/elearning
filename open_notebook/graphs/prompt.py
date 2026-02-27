@@ -159,6 +159,8 @@ async def assemble_system_prompt(
     context: Optional[str] = None,
     current_focus_objective: Optional[str] = None,  # Story 4.2: Explicit focus objective
     language: Optional[str] = None,  # UI language code for response language
+    lesson_steps: Optional[list[dict]] = None,  # Structured lesson plan steps with status
+    current_step: Optional[dict] = None,  # Current active lesson step
 ) -> str:
     """Assemble final system prompt from global + per-module templates.
 
@@ -230,7 +232,9 @@ async def assemble_system_prompt(
         "current_focus_objective": current_focus_objective,  # Story 4.2: Focus objective for AI
         "context": context,
         "ai_familiarity": ai_familiarity,  # Story 4.5: For adaptive teaching strategy
-        "artifacts_list": artifacts_list  # Story 4.6: Available quizzes and podcasts
+        "artifacts_list": artifacts_list,  # Story 4.6: Available quizzes and podcasts
+        "lesson_steps": lesson_steps or [],  # Structured lesson plan with statuses
+        "current_step": current_step,  # Active lesson step (first incomplete required step)
     }
 
     try:

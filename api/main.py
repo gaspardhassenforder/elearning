@@ -36,6 +36,7 @@ from api.routers import (
     learner_artifacts,
     learner_chat,
     learning_objectives,
+    lesson_plan,
     logs,
     models,
     module_assignments,
@@ -209,6 +210,8 @@ app.include_router(learner.router, prefix="/api", tags=["learner"])
 app.include_router(learner_chat.router, prefix="/api", tags=["learner-chat"])
 app.include_router(learning_objectives.router, prefix="/api", tags=["learning-objectives"])
 app.include_router(learning_objectives.learner_router, prefix="/api", tags=["learner-objectives"])  # Story 4.4
+app.include_router(lesson_plan.router, prefix="/api", tags=["lesson-plan"])
+app.include_router(lesson_plan.learner_router, prefix="/api", tags=["learner-lesson-plan"])
 app.include_router(module_prompts.router, prefix="/api", tags=["module-prompts"])
 app.include_router(admin_chat.router, prefix="/api", tags=["admin-chat"])
 app.include_router(learner_artifacts.router, prefix="/api", tags=["learner-artifacts"])

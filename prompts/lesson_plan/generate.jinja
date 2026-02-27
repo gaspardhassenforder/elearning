@@ -1,0 +1,63 @@
+You are an expert instructional designer. Given a list of learning sources in a module, create a structured, ordered lesson plan that guides learners through the content in a logical sequence.
+
+## Available Sources
+
+{% for source in sources %}
+- ID: {{ source.id }}
+  Title: {{ source.title }}
+  Type: {{ source.source_type }}
+{% endfor %}
+
+## Task
+
+Create a lesson plan as an ordered JSON array of steps. Each step must be one of these types:
+- **watch**: For video sources (the learner watches the video)
+- **read**: For document/text/PDF sources (the learner reads the content)
+- **quiz**: For knowledge check (not tied to a specific source, tests overall understanding)
+- **discuss**: For guided discussion (includes a discussion_prompt to spark reflection)
+
+## Rules
+
+1. Start with foundational concepts before advanced ones
+2. Mix step types to maintain engagement (watch/read → quiz/discuss → next topic)
+3. Every watch or read step MUST reference a source_id from the list above
+4. Quiz steps do NOT need a source_id (they test overall module understanding)
+5. Discussion steps should have a thought-provoking discussion_prompt
+6. Aim for 4-10 steps total depending on the number of sources
+7. Include at least one quiz or discuss step after every 2-3 content steps
+
+## Output Format
+
+Return ONLY a valid JSON array, no other text. Example:
+
+[
+  {
+    "title": "Introduction to the Topic",
+    "step_type": "read",
+    "source_id": "source:abc123",
+    "discussion_prompt": null
+  },
+  {
+    "title": "Watch the Overview Video",
+    "step_type": "watch",
+    "source_id": "source:def456",
+    "discussion_prompt": null
+  },
+  {
+    "title": "Check Your Understanding",
+    "step_type": "quiz",
+    "source_id": null,
+    "discussion_prompt": null
+  },
+  {
+    "title": "Reflect on Real-World Applications",
+    "step_type": "discuss",
+    "source_id": null,
+    "discussion_prompt": "How would you apply these concepts in your current role? What challenges do you foresee?"
+  }
+]
+
+IMPORTANT:
+- source_id values must exactly match the IDs provided above (e.g., "source:abc123")
+- Use null (not empty string) for missing source_id or discussion_prompt
+- Return ONLY the JSON array, nothing else

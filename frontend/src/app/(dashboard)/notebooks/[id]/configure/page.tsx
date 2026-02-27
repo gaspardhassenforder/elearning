@@ -6,6 +6,7 @@ import { ArrowLeft } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { useNotebook } from '@/lib/hooks/use-notebooks'
 import { LearningObjectivesEditor } from '@/components/admin/LearningObjectivesEditor'
+import { LessonPlanEditor } from '@/components/admin/LessonPlanEditor'
 import { ModulePromptEditor } from '@/components/admin/ModulePromptEditor'
 import { ModulePublishFlow } from '@/components/admin/ModulePublishFlow'
 import { useTranslation } from '@/lib/hooks/use-translation'
@@ -80,7 +81,18 @@ export default function ConfigurePage() {
             </CardContent>
           </Card>
 
-          {/* Section 2: AI Teacher Prompt */}
+          {/* Section 2: Lesson Plan */}
+          <Card>
+            <CardHeader>
+              <CardTitle>{t.lessonPlan.title}</CardTitle>
+              <CardDescription>{t.lessonPlan.subtitle}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <LessonPlanEditor moduleId={notebookId} />
+            </CardContent>
+          </Card>
+
+          {/* Section 3: AI Teacher Prompt */}
           <ModulePromptEditor moduleId={notebookId} />
 
           {/* Section 3: Publish */}

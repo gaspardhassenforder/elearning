@@ -1,0 +1,20 @@
+-- Migration 36: Lesson steps and learner step progress for structured learning paths
+
+DEFINE TABLE IF NOT EXISTS lesson_step SCHEMAFULL;
+DEFINE FIELD IF NOT EXISTS notebook_id ON lesson_step TYPE record<notebook>;
+DEFINE FIELD IF NOT EXISTS title ON lesson_step TYPE string;
+DEFINE FIELD IF NOT EXISTS step_type ON lesson_step TYPE string;
+DEFINE FIELD IF NOT EXISTS source_id ON lesson_step TYPE option<record<source>>;
+DEFINE FIELD IF NOT EXISTS discussion_prompt ON lesson_step TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS order ON lesson_step TYPE int DEFAULT 0;
+DEFINE FIELD IF NOT EXISTS required ON lesson_step TYPE bool DEFAULT true;
+DEFINE FIELD IF NOT EXISTS auto_generated ON lesson_step TYPE bool DEFAULT true;
+DEFINE FIELD IF NOT EXISTS created ON lesson_step TYPE datetime DEFAULT time::now();
+DEFINE FIELD IF NOT EXISTS updated ON lesson_step TYPE datetime DEFAULT time::now();
+
+DEFINE TABLE IF NOT EXISTS learner_step_progress SCHEMAFULL;
+DEFINE FIELD IF NOT EXISTS user_id ON learner_step_progress TYPE record<user>;
+DEFINE FIELD IF NOT EXISTS step_id ON learner_step_progress TYPE record<lesson_step>;
+DEFINE FIELD IF NOT EXISTS completed_at ON learner_step_progress TYPE option<datetime>;
+DEFINE FIELD IF NOT EXISTS created ON learner_step_progress TYPE datetime DEFAULT time::now();
+DEFINE INDEX IF NOT EXISTS unique_user_step ON learner_step_progress FIELDS user_id, step_id UNIQUE;

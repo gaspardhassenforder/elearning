@@ -17,6 +17,7 @@ from open_notebook.domain.notebook import Notebook
 from open_notebook.domain.module_assignment import ModuleAssignment
 from open_notebook.domain.learning_objective import LearningObjective
 from open_notebook.domain.learner_objective_progress import LearnerObjectiveProgress
+from open_notebook.domain.lesson_step import LessonStep
 from open_notebook.graphs.prompt import assemble_system_prompt
 from open_notebook.ai.provision import provision_langchain_model
 from open_notebook.utils import extract_text_from_response
@@ -116,6 +117,103 @@ async def get_learner_objectives_with_status(
         except Exception as e2:
             logger.error(f"Fallback objectives load also failed: {e2}")
             return []
+
+
+async def get_lesson_steps_with_status(
+    notebook_id: str, user_id: str
+) -> tuple[list[dict], Optional[dict]]:
+    """Load lesson steps with learner's completion status.
+
+    Fetches ordered lesson steps and merges with learner progress to
+    assign status: completed | current | upcoming. The first incomplete
+    required step is marked "current".
+
+    Args:
+        notebook_id: Notebook/module record ID
+        user_id: Learner's user record ID
+
+    Returns:
+        Tuple of (steps_with_status, current_step)
+        steps_with_status: List of step dicts with 'status' field
+        current_step: The first incomplete required step (or None)
+    """
+    from open_notebook.database.repository import repo_query
+
+    # Ensure IDs have correct format
+    if not notebook_id.startswith("notebook:"):
+        notebook_id = f"notebook:{notebook_id}"
+    if not user_id.startswith("user:"):
+        user_id = f"user:{user_id}"
+
+    try:
+        # Load all steps for notebook ordered by position
+        steps = await LessonStep.get_for_notebook(notebook_id, ordered=True)
+        if not steps:
+            return [], None
+
+        # Load completed step IDs for this user in this notebook
+        step_ids = [str(s.id) for s in steps if s.id]
+        if step_ids:
+            completed_result = await repo_query(
+                """
+                SELECT VALUE type::string(step_id) FROM learner_step_progress
+                WHERE user_id = $user_id
+                  AND step_id IN $step_ids
+                """,
+                {
+                    "user_id": ensure_record_id(user_id),
+                    "step_ids": [ensure_record_id(sid) for sid in step_ids],
+                },
+            )
+            completed_ids = set(completed_result or [])
+        else:
+            completed_ids = set()
+
+        # Build steps with status
+        steps_with_status = []
+        current_step_found = False
+        current_step = None
+
+        for step in steps:
+            step_id = str(step.id) if step.id else ""
+            is_completed = step_id in completed_ids
+
+            if is_completed:
+                status = "completed"
+            elif not current_step_found and step.required:
+                status = "current"
+                current_step_found = True
+                current_step = {
+                    "id": step_id,
+                    "title": step.title,
+                    "step_type": step.step_type,
+                    "source_id": step.source_id,
+                    "discussion_prompt": step.discussion_prompt,
+                    "status": "current",
+                }
+            else:
+                status = "upcoming"
+
+            steps_with_status.append({
+                "id": step_id,
+                "title": step.title,
+                "step_type": step.step_type,
+                "source_id": step.source_id,
+                "discussion_prompt": step.discussion_prompt,
+                "order": step.order,
+                "required": step.required,
+                "status": status,
+            })
+
+        logger.debug(
+            f"Loaded {len(steps_with_status)} lesson steps for user {user_id} in notebook {notebook_id}; "
+            f"current: {current_step['title'] if current_step else 'none'}"
+        )
+        return steps_with_status, current_step
+
+    except Exception as e:
+        logger.error("Error loading lesson steps with status: {}", str(e))
+        return [], None
 
 
 async def build_source_context_for_learner(notebook_id: str) -> Optional[str]:
@@ -446,7 +544,18 @@ async def prepare_chat_context(
         logger.warning("Failed to build source context for notebook {}: {}", notebook_id, str(e))
         source_context = None
 
-    # 4. Assemble system prompt (global + per-module from Story 3.4)
+    # 4. Load lesson steps with completion status (if notebook has a lesson plan)
+    try:
+        lesson_steps, current_step = await get_lesson_steps_with_status(
+            notebook_id=notebook_id,
+            user_id=learner.user.id,
+        )
+        logger.debug(f"Loaded {len(lesson_steps)} lesson steps for notebook {notebook_id}")
+    except Exception as e:
+        logger.warning("Failed to load lesson steps for notebook {}: {}", notebook_id, str(e))
+        lesson_steps, current_step = [], None
+
+    # 5. Assemble system prompt (global + per-module from Story 3.4)
     try:
         system_prompt = await assemble_system_prompt(
             notebook_id=notebook_id,
@@ -454,6 +563,8 @@ async def prepare_chat_context(
             objectives_with_status=objectives_with_status,
             context=source_context,
             language=language,
+            lesson_steps=lesson_steps if lesson_steps else None,
+            current_step=current_step,
         )
         logger.info(
             f"System prompt assembled: {len(system_prompt)} chars for notebook {notebook_id}"

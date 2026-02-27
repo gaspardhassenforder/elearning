@@ -1017,3 +1017,81 @@ class NavigationMessage(BaseModel):
     role: Literal["user", "assistant"]
     content: str
     timestamp: Optional[str] = None  # ISO timestamp
+
+
+# ============================================================
+# Lesson Plan models
+# ============================================================
+
+
+class LessonStepCreate(BaseModel):
+    """Request body for creating a manual lesson step."""
+
+    title: str = Field(..., description="Step title")
+    step_type: Literal["watch", "read", "quiz", "discuss"] = Field(
+        ..., description="Type of action required"
+    )
+    source_id: Optional[str] = Field(None, description="Source record ID (optional)")
+    discussion_prompt: Optional[str] = Field(
+        None, description="Prompt for discussion-type steps"
+    )
+    order: int = Field(0, description="Display order")
+    required: bool = Field(True, description="Whether step is mandatory")
+
+
+class LessonStepUpdate(BaseModel):
+    """Request body for updating a lesson step."""
+
+    title: Optional[str] = Field(None, description="Updated title")
+    step_type: Optional[Literal["watch", "read", "quiz", "discuss"]] = Field(
+        None, description="Updated step type"
+    )
+    source_id: Optional[str] = Field(None, description="Updated source reference")
+    discussion_prompt: Optional[str] = Field(
+        None, description="Updated discussion prompt"
+    )
+    order: Optional[int] = Field(None, description="Updated order")
+    required: Optional[bool] = Field(None, description="Updated required flag")
+
+
+class LessonStepResponse(BaseModel):
+    """Response model for a lesson step."""
+
+    id: str
+    notebook_id: str
+    title: str
+    step_type: str
+    source_id: Optional[str] = None
+    source_title: Optional[str] = None  # Resolved from source_id for display
+    discussion_prompt: Optional[str] = None
+    order: int
+    required: bool
+    auto_generated: bool
+    created: Optional[str] = None
+    updated: Optional[str] = None
+
+
+class LessonStepReorder(BaseModel):
+    """Request body for bulk-reordering lesson steps."""
+
+    steps: List[dict] = Field(
+        ..., description="List of {id, order} dicts for bulk update"
+    )
+
+
+class LessonPlanGenerationResponse(BaseModel):
+    """Response from lesson plan generation."""
+
+    status: str = Field(..., description="completed|failed")
+    step_ids: Optional[List[str]] = Field(None, description="IDs of created steps")
+    error: Optional[str] = None
+
+
+class LearnerStepProgressResponse(BaseModel):
+    """Learner progress on lesson steps."""
+
+    completed_step_ids: List[str] = Field(
+        default_factory=list, description="IDs of completed steps"
+    )
+    total_steps: int = Field(0, description="Total number of steps in the lesson plan")
+    completed_count: int = Field(0, description="Number of completed steps")
