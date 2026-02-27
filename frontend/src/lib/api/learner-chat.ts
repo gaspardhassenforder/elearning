@@ -12,6 +12,7 @@ export interface LearnerChatMessage {
   timestamp?: string
   toolCalls?: ToolCall[]  // Story 4.3: Track tool calls for document snippets
   sseError?: SSEErrorData  // Story 7.1: Inline error from SSE stream
+  quickReplies?: string[]  // LLM-generated contextual reply suggestions
 }
 
 // Story 4.3: Tool call tracking
@@ -110,12 +111,13 @@ export interface SSEErrorData {
 // Story 4.4: Added objective_checked event type
 // Story 7.1: Added error event type for inline error display
 export interface StreamEvent {
-  type: 'text' | 'tool_call' | 'tool_result' | 'message_complete' | 'objective_checked' | 'error'
+  type: 'text' | 'tool_call' | 'tool_result' | 'message_complete' | 'objective_checked' | 'error' | 'quick_replies'
   delta?: string
   toolCall?: ToolCall
   toolResult?: { id: string; result: Record<string, any> }
   objectiveChecked?: ObjectiveCheckedData  // Story 4.4
   errorData?: SSEErrorData  // Story 7.1
+  replies?: string[]  // LLM-generated quick reply suggestions
 }
 
 /**
@@ -227,6 +229,11 @@ export async function* parseLearnerChatStream(
                 message: data.message,
               },
             }
+          }
+
+          // LLM-generated contextual quick replies
+          if (eventType === 'quick_replies' && Array.isArray(data.replies)) {
+            yield { type: 'quick_replies', replies: data.replies }
           }
         } catch (e) {
           console.error('Failed to parse SSE data:', e, dataStr)

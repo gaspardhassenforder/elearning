@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 from api.auth import LearnerContext, get_current_learner
 from api.learner_chat_service import (
     generate_proactive_greeting,
+    generate_quick_replies,
     prepare_chat_context,
     stream_proactive_greeting,
     validate_learner_access_to_notebook,
@@ -115,6 +116,12 @@ class SSEObjectiveCheckedEvent(BaseModel):
     total_completed: int
     total_objectives: int
     all_complete: bool
+
+
+class SSEQuickRepliesEvent(BaseModel):
+    """SSE event with LLM-generated contextual quick-reply suggestions."""
+
+    replies: list[str]
 
 
 # ============================================================================
@@ -723,6 +730,24 @@ async def stream_learner_chat(
                     result_queue=examiner_queue,
                 )
             )
+
+            # Generate contextual quick replies concurrently with examiner
+            # Uses cheap gemini-2.0-flash-lite; runs while examiner is in flight
+            try:
+                replies = await asyncio.wait_for(
+                    generate_quick_replies(
+                        user_message=request.message,
+                        ai_response="".join(collected_ai_text),
+                    ),
+                    timeout=8.0,
+                )
+                if replies:
+                    quick_replies_event = SSEQuickRepliesEvent(replies=replies)
+                    yield f"event: quick_replies\ndata: {quick_replies_event.model_dump_json()}\n\n"
+            except asyncio.TimeoutError:
+                logger.warning("Quick replies timed out for thread {}", thread_id)
+            except Exception as e:
+                logger.warning("Quick replies failed for thread {}: {}", thread_id, str(e))
 
             # Wait for examiner results (with 15s timeout) — SSE stays alive
             try:

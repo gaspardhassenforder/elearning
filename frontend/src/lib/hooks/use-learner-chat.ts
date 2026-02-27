@@ -171,6 +171,16 @@ export function useLearnerChat(
             window.dispatchEvent(new CustomEvent('objective_checked', {
               detail: objectiveData
             }))
+          } else if (event.type === 'quick_replies' && event.replies?.length) {
+            // Attach LLM-generated quick reply suggestions to the last assistant message
+            setMessages((prev) => {
+              const updated = [...prev]
+              const lastMessage = updated[updated.length - 1]
+              if (lastMessage && lastMessage.role === 'assistant') {
+                lastMessage.quickReplies = event.replies
+              }
+              return updated
+            })
           } else if (event.type === 'error' && event.errorData) {
             // Story 7.1: Handle SSE error events - attach to current assistant message
             setMessages((prev) => {

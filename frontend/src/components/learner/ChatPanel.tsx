@@ -423,27 +423,37 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
             <div className="flex-shrink-0 border-t bg-background">
               <div className="max-w-3xl mx-auto px-4 py-3 relative">
                 {/* Dynamic quick replies — shown after each AI message (or before first user message) */}
-                {!isStreaming && (allMessages.length === 0 || allMessages[allMessages.length - 1]?.role === 'assistant') && (
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {(allMessages.some((m) => m.role === 'user')
-                      ? quickReplies
-                      : [
-                          t.learner.chat.suggestions.whatAbout as string,
-                          t.learner.chat.suggestions.summarize as string,
-                          t.learner.chat.suggestions.focusFirst as string,
-                        ]
-                    ).filter(Boolean).map((reply: string) => (
-                      <button
-                        key={reply}
-                        type="button"
-                        onClick={() => sendMessage(reply)}
-                        className="text-sm px-3 py-1.5 rounded-full border bg-background hover:bg-accent hover:text-accent-foreground transition-colors text-muted-foreground"
-                      >
-                        {reply}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                {!isStreaming && (allMessages.length === 0 || allMessages[allMessages.length - 1]?.role === 'assistant') && (() => {
+                  const hasUserMessage = allMessages.some((m) => m.role === 'user')
+                  let replies: string[]
+                  if (!hasUserMessage) {
+                    replies = [
+                      t.learner.chat.suggestions.whatAbout as string,
+                      t.learner.chat.suggestions.summarize as string,
+                      t.learner.chat.suggestions.focusFirst as string,
+                    ]
+                  } else {
+                    // LLM-generated replies if available, fall back to step-based
+                    const lastMsg = allMessages[allMessages.length - 1] as { quickReplies?: string[] }
+                    replies = lastMsg?.quickReplies?.length ? lastMsg.quickReplies : quickReplies
+                  }
+                  const filtered = replies.filter(Boolean)
+                  if (!filtered.length) return null
+                  return (
+                    <div className="flex flex-wrap justify-center gap-2 mb-3">
+                      {filtered.map((reply: string) => (
+                        <button
+                          key={reply}
+                          type="button"
+                          onClick={() => sendMessage(reply)}
+                          className="text-sm px-3 py-1.5 rounded-full border bg-background hover:bg-accent hover:text-accent-foreground transition-colors text-muted-foreground"
+                        >
+                          {reply}
+                        </button>
+                      ))}
+                    </div>
+                  )
+                })()}
                 {/* Voice recording overlay */}
                 {isListening && (
                   <VoiceRecordingOverlay
