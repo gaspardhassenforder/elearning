@@ -1,0 +1,15 @@
+-- Migration 35: Add Google Gemini 2.0 Flash as default speech-to-text model
+-- Uses Gemini's audio understanding via generateContent endpoint (no Cloud Speech API needed)
+
+-- Create the model record if it doesn't already exist
+IF array::len(SELECT * FROM model WHERE name = "gemini-2.0-flash" AND provider = "google" AND type = "speech_to_text") == 0 THEN
+    CREATE model CONTENT {
+        name: "gemini-2.0-flash",
+        provider: "google",
+        type: "speech_to_text"
+    }
+END;
+
+-- Set as default speech-to-text model
+LET $stt_model_id = (SELECT VALUE id FROM model WHERE name = "gemini-2.0-flash" AND provider = "google" AND type = "speech_to_text" LIMIT 1)[0];
+UPDATE open_notebook:default_models SET default_speech_to_text_model = $stt_model_id;

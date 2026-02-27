@@ -19,7 +19,7 @@ from open_notebook.domain.transformation import Transformation
 from open_notebook.graphs.transformation import graph as transform_graph
 
 
-VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".avi", ".m4a", ".mp3", ".wav"}
+VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".avi", ".mkv", ".flv", ".m4v", ".m4a", ".mp3", ".wav"}
 YOUTUBE_HOSTS = {"youtube.com", "youtu.be", "www.youtube.com"}
 _VIDEO_TIMESTAMP_RE = re.compile(r'\[VIDEO_TIMESTAMP:(\d+(?:\.\d+)?)\]')
 
@@ -104,8 +104,28 @@ async def content_process(state: SourceState) -> dict:
         logger.warning("Failed to retrieve speech-to-text model configuration: {}", str(e))
         # Continue without custom audio model (content-core will use its default)
 
-    processed_state = await extract_content(content_state)
-    return {"content_state": processed_state}
+    try:
+        processed_state = await extract_content(content_state)
+        return {"content_state": processed_state}
+    except Exception as e:
+        if is_video_source(content_state):
+            logger.warning(
+                "content_core failed to process video source '{}' — "
+                "likely missing system ffmpeg/ffprobe. "
+                "video_process will attempt moviepy fallback. Error: {}",
+                content_state.get("file_path") or content_state.get("url", ""),
+                str(e),
+            )
+            fp = content_state.get("file_path") or ""
+            fallback_state = ProcessSourceState(
+                file_path=fp,
+                url=content_state.get("url") or "",
+                audio_provider=content_state.get("audio_provider"),
+                audio_model=content_state.get("audio_model"),
+                title=Path(fp).stem if fp else "",
+            )
+            return {"content_state": fallback_state}
+        raise
 
 
 async def save_source(state: SourceState) -> dict:
@@ -213,6 +233,33 @@ async def video_process(state: SourceState) -> dict:
         else:
             logger.warning("youtube-transcript-api also returned no transcript for {}", url)
             return {}
+
+    # --- Local video fallback: content_core's ffprobe-based pipeline failed.
+    # Use moviepy/imageio-ffmpeg (bundled, no system install needed) to transcribe directly.
+    file_path = getattr(content_state, "file_path", None) or ""
+    if not full_text and file_path:
+        ext = Path(file_path).suffix.lower()
+        if ext in {".mp4", ".webm", ".mov", ".avi", ".mkv", ".flv", ".m4v"}:
+            logger.info(
+                "content_core returned no content for local video '{}' — "
+                "attempting direct moviepy/STT fallback.",
+                file_path,
+            )
+            transcript = await _extract_local_video_transcript(file_path, content_state)
+            if transcript:
+                try:
+                    updated_state = content_state.model_copy(update={"content": transcript})
+                except AttributeError:
+                    updated_state = content_state.copy(update={"content": transcript})
+                return {"content_state": updated_state}
+            else:
+                logger.warning(
+                    "All extraction methods failed for local video '{}'. "
+                    "Source saved with no text. Configure a speech-to-text model in "
+                    "Default Models settings for video transcription.",
+                    file_path,
+                )
+                return {}
 
     # If already has VIDEO_TIMESTAMP markers, nothing to do
     if _VIDEO_TIMESTAMP_RE.search(full_text):
@@ -331,6 +378,124 @@ async def _fetch_youtube_transcript(url: str) -> str:
 
     except Exception as e:
         logger.warning("youtube-transcript-api failed for {}: {}", video_id, str(e))
+        return ""
+
+
+async def _extract_local_video_transcript(file_path: str, content_state) -> str:
+    """Extract and transcribe audio from a local video file using moviepy + STT.
+
+    Splits the video into 2-minute segments using moviepy/imageio-ffmpeg (bundled,
+    no system ffmpeg needed), transcribes each in parallel, and combines with
+    [VIDEO_TIMESTAMP:SECONDS] markers so the viewer can navigate to each segment.
+    """
+    import asyncio
+    import math
+    import os
+    import tempfile
+
+    from esperanto import AIFactory
+    from moviepy import AudioFileClip  # reads via imageio-ffmpeg bundled binary
+
+    audio_provider = getattr(content_state, "audio_provider", None)
+    audio_model = getattr(content_state, "audio_model", None)
+
+    if not audio_provider or not audio_model:
+        logger.warning(
+            "No speech-to-text model configured — cannot transcribe local video '{}'. "
+            "Go to Settings → Default Models and configure a Speech-to-Text model "
+            "(e.g. openai/whisper-1, groq/whisper-large-v3-turbo).",
+            file_path,
+        )
+        return ""
+
+    SEGMENT_LENGTH_S = 120  # 2-minute segments for good timestamp granularity
+
+    try:
+        import wave
+
+        import numpy as np
+        from content_core.config import CONFIG
+
+        timeout = (CONFIG.get("speech_to_text") or {}).get("timeout", 3600)
+        stt_config = {"timeout": timeout} if timeout else {}
+        stt_model = AIFactory.create_speech_to_text(audio_provider, audio_model, stt_config)
+
+        logger.info("Extracting audio segments from local video: {}", file_path)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            # Load the entire audio into a numpy array in one shot.
+            # subclipped() creates a new FFMPEG reader subprocess per segment (fails without
+            # system ffmpeg). Reading everything at once uses imageio-ffmpeg's bundled binary
+            # for a single decode pass; all segmentation is then done in numpy.
+            clip = AudioFileClip(file_path)
+            duration_s = clip.duration
+            fps = int(clip.fps)
+            full_audio = clip.to_soundarray()  # shape: (n_frames,) or (n_frames, channels)
+            clip.close()
+
+            if full_audio.ndim == 1:
+                full_audio = full_audio.reshape(-1, 1)
+            n_channels = full_audio.shape[1]
+            total_frames = full_audio.shape[0]
+            frames_per_segment = int(fps * SEGMENT_LENGTH_S)
+            n_segments = max(1, math.ceil(total_frames / frames_per_segment))
+
+            segments: list[tuple[float, str]] = []
+            for i in range(n_segments):
+                start_frame = i * frames_per_segment
+                end_frame = min((i + 1) * frames_per_segment, total_frames)
+                start_s = i * SEGMENT_LENGTH_S
+
+                seg_audio = full_audio[start_frame:end_frame]
+                audio_int16 = (np.clip(seg_audio, -1.0, 1.0) * 32767).astype(np.int16)
+
+                seg_path = os.path.join(tmp_dir, f"seg_{i:03d}.wav")
+                with wave.open(seg_path, "w") as wf:
+                    wf.setnchannels(n_channels)
+                    wf.setsampwidth(2)  # 16-bit PCM
+                    wf.setframerate(fps)
+                    wf.writeframes(audio_int16.tobytes())
+
+                segments.append((start_s, seg_path))
+
+            logger.debug("Exported {} audio segments ({:.0f}s total)", n_segments, duration_s)
+
+            semaphore = asyncio.Semaphore(3)
+
+            async def _transcribe(seg_path: str) -> str:
+                async with semaphore:
+                    return (await stt_model.atranscribe(seg_path)).text
+
+            transcriptions = await asyncio.gather(
+                *[_transcribe(seg_path) for _, seg_path in segments]
+            )
+
+        lines = []
+        for (start_s, _), text in zip(segments, transcriptions):
+            text = (text or "").strip()
+            if text:
+                lines.append(f"[VIDEO_TIMESTAMP:{float(start_s)}]")
+                lines.append(text)
+
+        transcript = "\n".join(lines)
+        if transcript:
+            logger.info(
+                "Successfully transcribed local video ({} chars, {} segments): {}",
+                len(transcript), len(segments), file_path,
+            )
+        else:
+            logger.warning(
+                "STT model returned empty transcript for '{}'. "
+                "Check that a speech-to-text model is configured in Default Models.",
+                file_path,
+            )
+        return transcript
+    except Exception as e:
+        logger.error(
+            "Failed to extract audio from local video '{}': {}. "
+            "Install ffmpeg for reliable video processing: https://ffmpeg.org/download.html",
+            file_path, str(e),
+        )
         return ""
 
 

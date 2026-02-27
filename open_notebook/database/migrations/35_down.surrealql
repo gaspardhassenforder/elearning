@@ -1,0 +1,3 @@
+-- Migration 35 down: Remove Google Gemini 2.0 Flash speech-to-text model
+UPDATE open_notebook:default_models SET default_speech_to_text_model = NONE;
+DELETE model WHERE name = "gemini-2.0-flash" AND provider = "google" AND type = "speech_to_text";
