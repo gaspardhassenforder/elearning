@@ -1360,6 +1360,26 @@ export const enUS = {
     progressPreservationTitle: "Learner Progress Preservation",
     progressPreservationDesc: "When editing objectives, existing learner progress on unchanged objectives is preserved. Only deleted or significantly modified objectives will reset progress.",
   },
+  lessonPlan: {
+    title: "Lesson Plan",
+    subtitle: "Structure learning into ordered steps tied to specific sources",
+    generate: "Generate Lesson Plan",
+    generating: "Generating...",
+    regenerate: "Regenerate",
+    noSteps: "No Lesson Plan Yet",
+    emptyDescription: "Generate a structured lesson plan from this notebook's sources, or add steps manually.",
+    stepsCount: "{count} steps",
+    deleteTitle: "Delete Step",
+    deleteConfirm: "Are you sure you want to delete this lesson step? This action cannot be undone.",
+    step: "Step",
+    of: "of",
+    stepTypes: {
+      watch: "Watch",
+      read: "Read",
+      quiz: "Quiz",
+      discuss: "Discuss",
+    },
+  },
   modulePrompt: {
     title: "AI Teacher Prompt",
     description: "Customize how the AI teacher interacts with learners in this module",
@@ -1410,6 +1430,26 @@ export const enUS = {
         whatAbout: "What is this module about?",
         summarize: "Can you summarize the key concepts?",
         focusFirst: "What should I focus on first?",
+      },
+      // Dynamic quick replies — shown after each AI message
+      quickReplies: {
+        // Watch step
+        watchedVideo: "I've watched the video",
+        needMoreContext: "I need more context",
+        // Read step
+        readIt: "I've read it",
+        canYouSummarize: "Can you summarize the key points?",
+        // Discuss step
+        understood: "Yes, I understood",
+        explainDifferently: "Can you explain that differently?",
+        showExample: "Show me an example",
+        // Quiz step
+        completedQuiz: "I completed the quiz",
+        // General
+        haveQuestion: "I have a question",
+        whatsNext: "What should I do next?",
+        notReadyYet: "I'm not ready yet",
+        tellMeMore: "Tell me more",
       },
       // Story 6.2: Voice Input
       voiceInput: {

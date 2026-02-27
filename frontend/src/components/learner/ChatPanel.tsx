@@ -30,6 +30,8 @@ import { learnerToast } from '@/lib/utils/learner-toast'
 import { useVoiceInput } from '@/lib/hooks/use-voice-input'
 import { VoiceRecordingOverlay } from './VoiceRecordingOverlay'
 import { useNotebookSources } from '@/lib/hooks/use-sources'
+import { useLessonSteps, useLessonStepsProgress } from '@/lib/hooks/use-lesson-plan'
+import type { LessonStepResponse } from '@/lib/api/lesson-plan'
 
 interface ChatPanelProps {
   notebookId: string
@@ -74,6 +76,17 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
     editLastMessage,
   } = useLearnerChat(notebookId, isLoadingHistory, hasExistingHistory)
 
+  // Lesson step progress
+  const { data: stepProgress } = useLessonStepsProgress(notebookId)
+  const { data: lessonSteps } = useLessonSteps(notebookId)
+
+  // Derive the current (first incomplete required) lesson step
+  const currentStep = useMemo<LessonStepResponse | null>(() => {
+    if (!lessonSteps || !stepProgress) return null
+    const completedIds = new Set(stepProgress.completed_step_ids)
+    return lessonSteps.find((s) => s.required && !completedIds.has(s.id)) ?? null
+  }, [lessonSteps, stepProgress])
+
   // Build source title map for reference display (source:id -> title)
   const { sources: notebookSources } = useNotebookSources(notebookId)
   const sourceTitleMap = useMemo(() => {
@@ -87,6 +100,28 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
     }
     return map
   }, [notebookSources])
+
+  // Compute contextual quick replies for the current lesson step
+  const quickReplies = useMemo<string[]>(() => {
+    const chat = t.learner?.chat as Record<string, unknown>
+    const qrKeys = chat?.quickReplies as Record<string, string> | undefined
+    if (!qrKeys) return []
+    if (!currentStep) {
+      return [qrKeys.tellMeMore, qrKeys.whatsNext, qrKeys.haveQuestion]
+    }
+    switch (currentStep.step_type) {
+      case 'watch':
+        return [qrKeys.watchedVideo, qrKeys.needMoreContext, qrKeys.haveQuestion]
+      case 'read':
+        return [qrKeys.readIt, qrKeys.canYouSummarize, qrKeys.haveQuestion]
+      case 'discuss':
+        return [qrKeys.understood, qrKeys.explainDifferently, qrKeys.showExample]
+      case 'quiz':
+        return [qrKeys.completedQuiz, qrKeys.haveQuestion]
+      default:
+        return [qrKeys.tellMeMore, qrKeys.whatsNext, qrKeys.haveQuestion]
+    }
+  }, [currentStep, t])
 
   // Voice input
   const {
@@ -284,6 +319,7 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
           </div>
         ) : (
           <>
+
             {/* Messages Area */}
             <div
               ref={messagesContainerRef}
@@ -386,21 +422,24 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
             {/* Input Area - ChatGPT style */}
             <div className="flex-shrink-0 border-t bg-background">
               <div className="max-w-3xl mx-auto px-4 py-3 relative">
-                {/* Conversation starter suggestions - show when no user message sent yet */}
-                {!isStreaming && !messages.some(m => m.role === 'user') && !historyData?.messages?.some((m: { role: string }) => m.role === 'user') && (
+                {/* Dynamic quick replies — shown after each AI message (or before first user message) */}
+                {!isStreaming && (allMessages.length === 0 || allMessages[allMessages.length - 1]?.role === 'assistant') && (
                   <div className="flex flex-wrap gap-2 mb-3">
-                    {[
-                      t.learner.chat.suggestions.whatAbout,
-                      t.learner.chat.suggestions.summarize,
-                      t.learner.chat.suggestions.focusFirst,
-                    ].map((suggestion: string) => (
+                    {(allMessages.some((m) => m.role === 'user')
+                      ? quickReplies
+                      : [
+                          t.learner.chat.suggestions.whatAbout as string,
+                          t.learner.chat.suggestions.summarize as string,
+                          t.learner.chat.suggestions.focusFirst as string,
+                        ]
+                    ).filter(Boolean).map((reply: string) => (
                       <button
-                        key={suggestion}
+                        key={reply}
                         type="button"
-                        onClick={() => sendMessage(suggestion)}
+                        onClick={() => sendMessage(reply)}
                         className="text-sm px-3 py-1.5 rounded-full border bg-background hover:bg-accent hover:text-accent-foreground transition-colors text-muted-foreground"
                       >
-                        {suggestion}
+                        {reply}
                       </button>
                     ))}
                   </div>

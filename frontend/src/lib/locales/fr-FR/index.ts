@@ -1360,6 +1360,26 @@ export const frFR = {
     progressPreservationTitle: "Préservation de la progression des apprenants",
     progressPreservationDesc: "Lors de la modification des objectifs, la progression existante des apprenants sur les objectifs inchangés est préservée. Seuls les objectifs supprimés ou considérablement modifiés réinitialiseront la progression.",
   },
+  lessonPlan: {
+    title: "Plan de cours",
+    subtitle: "Structurez l'apprentissage en étapes ordonnées liées à des sources spécifiques",
+    generate: "Générer le plan de cours",
+    generating: "Génération en cours...",
+    regenerate: "Régénérer",
+    noSteps: "Aucun plan de cours pour l'instant",
+    emptyDescription: "Générez un plan de cours structuré à partir des sources de ce notebook, ou ajoutez des étapes manuellement.",
+    stepsCount: "{count} étapes",
+    deleteTitle: "Supprimer l'étape",
+    deleteConfirm: "Êtes-vous sûr de vouloir supprimer cette étape ? Cette action est irréversible.",
+    step: "Étape",
+    of: "sur",
+    stepTypes: {
+      watch: "Regarder",
+      read: "Lire",
+      quiz: "Quiz",
+      discuss: "Discuter",
+    },
+  },
   modulePrompt: {
     title: "Invite de l'enseignant IA",
     description: "Personnalisez la façon dont l'enseignant IA interagit avec les apprenants dans ce module",
@@ -1410,6 +1430,26 @@ export const frFR = {
         whatAbout: "De quoi parle ce module ?",
         summarize: "Peux-tu résumer les concepts clés ?",
         focusFirst: "Par quoi devrais-je commencer ?",
+      },
+      // Réponses rapides dynamiques — affichées après chaque message IA
+      quickReplies: {
+        // Étape vidéo
+        watchedVideo: "J'ai regardé la vidéo",
+        needMoreContext: "J'ai besoin de plus de contexte",
+        // Étape lecture
+        readIt: "Je l'ai lu",
+        canYouSummarize: "Peux-tu résumer les points clés ?",
+        // Étape discussion
+        understood: "Oui, j'ai compris",
+        explainDifferently: "Peux-tu expliquer autrement ?",
+        showExample: "Montre-moi un exemple",
+        // Étape quiz
+        completedQuiz: "J'ai terminé le quiz",
+        // Général
+        haveQuestion: "J'ai une question",
+        whatsNext: "Que dois-je faire ensuite ?",
+        notReadyYet: "Je ne suis pas encore prêt",
+        tellMeMore: "Dis-m'en plus",
       },
       // Story 6.2: Saisie vocale
       voiceInput: {
