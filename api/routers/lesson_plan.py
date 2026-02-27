@@ -10,7 +10,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
 
 from api import lesson_plan_service
-from api.auth import LearnerContext, get_current_learner, require_admin
+from api.auth import LearnerContext, get_current_learner, get_current_user, require_admin
+from open_notebook.domain.user import User
 from api.learner_chat_service import validate_learner_access_to_notebook
 from api.models import (
     LessonStepCreate,
@@ -73,9 +74,12 @@ async def generate_lesson_plan(notebook_id: str):
 )
 async def list_lesson_steps(
     notebook_id: str,
-    user: User = Depends(require_admin),
+    user: User = Depends(get_current_user),
 ):
-    """Get ordered list of lesson steps for a notebook (admin).
+    """Get ordered list of lesson steps for a notebook (admin and learner).
+
+    Read-only — accessible to all authenticated users so learners can
+    load step data needed for contextual quick-reply buttons.
 
     Args:
         notebook_id: Notebook record ID
