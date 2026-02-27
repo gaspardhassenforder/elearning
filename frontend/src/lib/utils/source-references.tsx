@@ -336,7 +336,12 @@ export function createReferenceLinkComponent(
  * Input: "See [source:abc] and [note:xyz]. Also [source:abc] again."
  * Output: "See [1] and [2]. Also [1] again.\n\nReferences:\n[1] - [source:abc]\n[2] - [note:xyz]"
  */
-export function convertReferencesToCompactMarkdown(text: string, referencesLabel: string = 'References', titleMap?: Map<string, string>): string {
+export function convertReferencesToCompactMarkdown(
+  text: string,
+  referencesLabel: string = 'References',
+  titleMap?: Map<string, string>,
+  metaMap?: Map<string, { pageNumber?: number; timestampSeconds?: number }>
+): string {
   // Step 1: Parse all references using existing function
   const references = parseSourceReferences(text)
 
@@ -402,12 +407,22 @@ export function convertReferencesToCompactMarkdown(text: string, referencesLabel
   // Iterate through reference map in insertion order (Map preserves order)
   for (const [refKey, refData] of referenceMap) {
     const displayName = titleMap?.get(refKey) || `${refData.type}:${refData.id}`
-    const refListItem = `[${refData.number}] - [${displayName}](#ref-${refData.type}-${refData.id})`
+    const meta = metaMap?.get(refKey)
+    let metaLabel = ''
+    if (meta?.timestampSeconds !== undefined) {
+      const totalSecs = Math.floor(meta.timestampSeconds)
+      const mins = Math.floor(totalSecs / 60)
+      const secs = totalSecs % 60
+      metaLabel = ` *(${mins}:${secs.toString().padStart(2, '0')})*`
+    } else if (meta?.pageNumber !== undefined) {
+      metaLabel = ` *(p.${meta.pageNumber})*`
+    }
+    const refListItem = `[${refData.number}] - [${displayName}](#ref-${refData.type}-${refData.id})${metaLabel}`
     refListLines.push(refListItem)
   }
 
   // Step 6: Append reference list to result
-  result = result + refListLines.join('\n')
+  result = result + refListLines.join('  \n')
 
   return result
 }

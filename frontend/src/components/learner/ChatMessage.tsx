@@ -213,11 +213,29 @@ export function ChatMessage({ message, index, isLastAssistant, isStreaming, t, i
     openViewerSheet({ type: 'source', id: fullId, searchText, pageNumber, timestampSeconds })
   }, combinedTitleMap)
 
+  // Build metadata map for timestamp/page display in references
+  const referenceMetaMap = useMemo(() => {
+    const map = new Map<string, { pageNumber?: number; timestampSeconds?: number }>()
+    if (message.toolCalls) {
+      for (const tc of message.toolCalls) {
+        if (tc.toolName === 'surface_document' && tc.result?.source_id) {
+          const sourceId = tc.result.source_id as string
+          map.set(sourceId, {
+            pageNumber: tc.result.page_number as number | undefined,
+            timestampSeconds: tc.result.timestamp_seconds as number | undefined,
+          })
+        }
+      }
+    }
+    return map
+  }, [message.toolCalls])
+
   // Convert references to compact numbered format
   const processedContent = convertReferencesToCompactMarkdown(
     message.content,
     tCommon?.references || 'References',
-    combinedTitleMap
+    combinedTitleMap,
+    referenceMetaMap
   )
 
   // Hide phantom empty assistant messages: no content, no tool calls, no SSE error, and not the currently streaming message

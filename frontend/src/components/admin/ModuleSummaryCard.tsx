@@ -41,6 +41,7 @@ export function ModuleSummaryCard({ validation, isLoading }: ModuleSummaryCardPr
 
   const summaryItems = [
     {
+      id: 'documents',
       label: t.modules.publish.documents,
       count: validation.sourceCount,
       icon: FileText,
@@ -48,6 +49,7 @@ export function ModuleSummaryCard({ validation, isLoading }: ModuleSummaryCardPr
       required: true,
     },
     {
+      id: 'objectives',
       label: t.modules.publish.objectives,
       count: validation.objectiveCount,
       icon: Target,
@@ -55,6 +57,7 @@ export function ModuleSummaryCard({ validation, isLoading }: ModuleSummaryCardPr
       required: true,
     },
     {
+      id: 'artifacts',
       label: t.modules.publish.artifacts,
       count: validation.artifactCount ?? 0,
       icon: Wand2,
@@ -62,6 +65,7 @@ export function ModuleSummaryCard({ validation, isLoading }: ModuleSummaryCardPr
       required: false,
     },
     {
+      id: 'prompt',
       label: t.modules.publish.prompt,
       count: validation.hasPrompt ? 1 : 0,
       icon: MessageSquare,
@@ -96,7 +100,7 @@ export function ModuleSummaryCard({ validation, isLoading }: ModuleSummaryCardPr
           {summaryItems.map((item) => {
             const Icon = item.icon
             return (
-              <div key={item.label} className="flex items-center gap-3">
+              <div key={item.id} className="flex items-center gap-3">
                 <Icon
                   className={cn(
                     'h-5 w-5',

@@ -36,7 +36,9 @@ function getFileIcon(source: { asset?: { file_path?: string; url?: string } | nu
   if (['ppt', 'pptx'].includes(ext)) return '📙'
   if (['mp4', 'avi', 'mov', 'webm'].includes(ext)) return '🎬'
   if (['mp3', 'wav', 'ogg', 'm4a'].includes(ext)) return '🎵'
-  if (source.asset?.url) return '🔗'
+  const url = source.asset?.url || ''
+  if (/youtube\.com|youtu\.be/i.test(url)) return '🎬'
+  if (url) return '🔗'
   return '📄'
 }
 
