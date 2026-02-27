@@ -9,9 +9,10 @@ interface VideoViewerProps {
     asset?: { file_path?: string | null; url?: string | null } | null
   }
   timestampSeconds?: number
+  onProgress?: (ratio: number) => void
 }
 
-export function VideoViewer({ source, timestampSeconds }: VideoViewerProps) {
+export function VideoViewer({ source, timestampSeconds, onProgress }: VideoViewerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const videoType = getVideoType(source)
 
@@ -67,6 +68,12 @@ export function VideoViewer({ source, timestampSeconds }: VideoViewerProps) {
           style={{ height: '100%', aspectRatio: '16 / 9', maxWidth: '100%' }}
           controls
           src={videoUrl}
+          onTimeUpdate={() => {
+            const v = videoRef.current
+            if (v && v.duration > 0 && onProgress) {
+              onProgress(v.currentTime / v.duration)
+            }
+          }}
         >
           Your browser does not support the video tag.
         </video>

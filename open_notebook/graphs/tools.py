@@ -271,6 +271,8 @@ async def surface_document(
             "relevance": relevance_reason,
             "page_number": page_number,  # PDF page for navigation (None for non-PDF)
             "timestamp_seconds": timestamp_seconds,  # Video timestamp in seconds (None for non-video)
+            "asset_url": source.asset.url if source.asset else None,  # For inline video/PDF detection
+            "asset_file_path": source.asset.file_path if source.asset else None,  # For getVideoType()
             "metadata": {
                 "created": source.created.isoformat() if source.created else None,
                 "file_type": file_type,

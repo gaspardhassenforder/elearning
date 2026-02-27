@@ -20,7 +20,10 @@ import { DocumentSnippetCard } from './DocumentSnippetCard'
 import { ModuleSuggestionCard } from './ModuleSuggestionCard'
 import { InlineQuizWidget } from './InlineQuizWidget'
 import { InlineAudioPlayer } from './InlineAudioPlayer'
+import { InlineVideoPlayer } from './InlineVideoPlayer'
+import { InlinePdfViewer } from './InlinePdfViewer'
 import { ChatErrorMessage } from './ChatErrorMessage'
+import { getVideoType } from '@/lib/utils/source-type'
 import { DetailsToggle } from './DetailsToggle'
 import { ToolCallDetails } from './ToolCallDetails'
 import { useLearnerStore } from '@/lib/stores/learner-store'
@@ -37,6 +40,7 @@ interface ChatMessageProps {
   isEditable?: boolean
   onEdit?: (newContent: string) => void
   sourceTitleMap?: Map<string, string>
+  onConfirm?: (message: string) => void
 }
 
 function QuizErrorFallback() {
@@ -55,7 +59,7 @@ function PodcastErrorFallback() {
   )
 }
 
-export function ChatMessage({ message, index, isLastAssistant, isStreaming, t, isEditable, onEdit, sourceTitleMap }: ChatMessageProps) {
+export function ChatMessage({ message, index, isLastAssistant, isStreaming, t, isEditable, onEdit, sourceTitleMap, onConfirm }: ChatMessageProps) {
   const [detailsExpanded, setDetailsExpanded] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editContent, setEditContent] = useState('')
@@ -299,20 +303,60 @@ export function ChatMessage({ message, index, isLastAssistant, isStreaming, t, i
         {/* Tool call artifacts */}
         {message.toolCalls && message.toolCalls.length > 0 && (
           <div className="mt-3 space-y-2">
-            {/* Document snippets */}
+            {/* Document snippets — type-aware: video → InlineVideoPlayer, PDF → InlinePdfViewer, other → DocumentSnippetCard */}
             {message.toolCalls
               .filter((tc) => tc.toolName === 'surface_document' && tc.result && !tc.result.error)
-              .map((tc, tcIndex) => (
-                <DocumentSnippetCard
-                  key={`doc-${index}-${tcIndex}`}
-                  sourceId={tc.result!.source_id as string}
-                  title={tc.result!.title as string}
-                  excerpt={tc.result!.excerpt as string}
-                  sourceType={tc.result!.source_type as string}
-                  relevance={tc.result!.relevance as string}
-                  pageNumber={tc.result!.page_number as number | undefined}
-                />
-              ))}
+              .map((tc, tcIndex) => {
+                const assetUrl = tc.result!.asset_url as string | undefined
+                const assetFilePath = tc.result!.asset_file_path as string | undefined
+                const sourceType = tc.result!.source_type as string
+                const syntheticSource = {
+                  id: tc.result!.source_id as string,
+                  asset: { url: assetUrl ?? null, file_path: assetFilePath ?? null },
+                }
+                const videoType = getVideoType(syntheticSource)
+
+                if (videoType) {
+                  return (
+                    <InlineVideoPlayer
+                      key={`video-${index}-${tcIndex}`}
+                      sourceId={tc.result!.source_id as string}
+                      title={tc.result!.title as string}
+                      assetUrl={assetUrl}
+                      assetFilePath={assetFilePath}
+                      timestampSeconds={tc.result!.timestamp_seconds as number | undefined}
+                      relevance={tc.result!.relevance as string | undefined}
+                      onConfirm={onConfirm ?? (() => {})}
+                    />
+                  )
+                }
+
+                if (sourceType === 'pdf') {
+                  return (
+                    <InlinePdfViewer
+                      key={`pdf-${index}-${tcIndex}`}
+                      sourceId={tc.result!.source_id as string}
+                      title={tc.result!.title as string}
+                      pageNumber={tc.result!.page_number as number | undefined}
+                      searchText={tc.result!.excerpt as string | undefined}
+                      relevance={tc.result!.relevance as string | undefined}
+                      onConfirm={onConfirm ?? (() => {})}
+                    />
+                  )
+                }
+
+                return (
+                  <DocumentSnippetCard
+                    key={`doc-${index}-${tcIndex}`}
+                    sourceId={tc.result!.source_id as string}
+                    title={tc.result!.title as string}
+                    excerpt={tc.result!.excerpt as string}
+                    sourceType={sourceType}
+                    relevance={tc.result!.relevance as string}
+                    pageNumber={tc.result!.page_number as number | undefined}
+                  />
+                )
+              })}
 
             {/* Inline quiz widgets */}
             {message.toolCalls
@@ -344,6 +388,7 @@ export function ChatMessage({ message, index, isLastAssistant, isStreaming, t, i
                     durationMinutes={tc.result!.duration_minutes as number}
                     transcriptUrl={tc.result!.transcript_url as string}
                     status={tc.result!.status as string}
+                    onConfirm={onConfirm}
                   />
                 </ErrorBoundary>
               ))}

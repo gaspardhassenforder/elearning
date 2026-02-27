@@ -636,7 +636,7 @@ async def stream_learner_chat(
                 # Tool call start — emit tool_call + tool_status events
                 elif event_type == "on_tool_start":
                     tool_data = event.get("data", {})
-                    tool_name = tool_data.get("name", "unknown")
+                    tool_name = event.get("name", "unknown")  # name is at event root, not inside data
                     tool_input = tool_data.get("input", {})
                     tool_run_id = event.get("run_id", f"call_{event.get('name', 'unknown')}")
 

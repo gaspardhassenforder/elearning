@@ -15,7 +15,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Play, Pause, Headphones } from 'lucide-react'
+import { Play, Pause, Headphones, CheckCircle2 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -30,6 +30,7 @@ interface InlineAudioPlayerProps {
   durationMinutes: number
   transcriptUrl?: string
   status: string
+  onConfirm?: (message: string) => void
 }
 
 export function InlineAudioPlayer({
@@ -39,6 +40,7 @@ export function InlineAudioPlayer({
   durationMinutes,
   transcriptUrl,
   status,
+  onConfirm,
 }: InlineAudioPlayerProps) {
   const { t } = useTranslation()
   const audioRef = useRef<HTMLAudioElement>(null)
@@ -46,6 +48,10 @@ export function InlineAudioPlayer({
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
+  const [listenedEnough, setListenedEnough] = useState(false)
+  const [confirmed, setConfirmed] = useState(false)
+  const durationRef = useRef(0)
+  const listenedEnoughRef = useRef(false)
   const [playbackSpeed, setPlaybackSpeed] = useState(() => {
     // Restore playback speed from localStorage
     if (typeof window !== 'undefined') {
@@ -75,8 +81,16 @@ export function InlineAudioPlayer({
     // Apply saved playback speed on mount
     audio.playbackRate = playbackSpeed
 
-    const updateTime = () => setCurrentTime(audio.currentTime)
+    const updateTime = () => {
+      const current = audio.currentTime
+      setCurrentTime(current)
+      if (durationRef.current > 0 && !listenedEnoughRef.current && current / durationRef.current >= 0.9) {
+        listenedEnoughRef.current = true
+        setListenedEnough(true)
+      }
+    }
     const updateDuration = () => {
+      durationRef.current = audio.duration
       setDuration(audio.duration)
       setIsLoadingMetadata(false)
     }
@@ -402,6 +416,20 @@ export function InlineAudioPlayer({
               </ScrollArea>
             </div>
           </div>
+
+          {/* 90% confirmation button */}
+          {listenedEnough && !confirmed && onConfirm && (
+            <Button
+              onClick={() => {
+                setConfirmed(true)
+                onConfirm("I've listened to the podcast")
+              }}
+              className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white animate-pulse"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              I&apos;ve listened to this
+            </Button>
+          )}
         </div>
       </div>
     </Card>

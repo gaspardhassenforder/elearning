@@ -17,6 +17,7 @@ import { learnerToast } from '../utils/learner-toast'
 import { useLearnerStore } from '../stores/learner-store'
 import { learningObjectivesKeys } from './use-learning-objectives'
 import { useTranslation } from './use-translation'
+import { getVideoType } from '../utils/source-type'
 
 interface UseLearnerChatResult {
   messages: LearnerChatMessage[]
@@ -194,12 +195,27 @@ export function useLearnerChat(
               return updated
             })
 
-            // Extract document references from surface_document tool calls
+            // Extract document references from surface_document tool calls,
+            // excluding sources that render inline (video, PDF) — those don't need the viewer sheet
             const documentRefs = completedToolCalls
-              .filter((tc) => tc.toolName === 'surface_document' && tc.result?.source_id)
+              .filter((tc) => {
+                if (tc.toolName !== 'surface_document' || !tc.result?.source_id) return false
+                const sourceType = tc.result.source_type as string
+                const syntheticSource = {
+                  id: tc.result.source_id as string,
+                  asset: {
+                    url: (tc.result.asset_url as string | null) ?? null,
+                    file_path: (tc.result.asset_file_path as string | null) ?? null,
+                  },
+                }
+                // Skip inline-rendered sources — viewer sheet would duplicate them
+                if (getVideoType(syntheticSource)) return false
+                if (sourceType === 'pdf') return false
+                return true
+              })
               .map((tc) => tc.result!.source_id as string)
 
-            // Open viewer sheet for first referenced document
+            // Open viewer sheet for first non-inline document
             if (documentRefs.length > 0) {
               const firstDocId = documentRefs[0]
               setScrollToSourceId(firstDocId)
