@@ -4,11 +4,11 @@
  * InlinePdfViewer
  *
  * Embeds a PDF viewer inline in chat when the AI surfaces a PDF source.
- * Collapsed by default (PDFs need vertical space). Shows "I've read this"
- * confirmation button whenever the PDF is expanded.
+ * Collapsed by default (PDFs need vertical space). Shows a confirmation
+ * button (i18n: learner.sources.readThis) whenever the PDF is expanded.
  *
  * - Collapsed: shows PDF icon + title + optional page badge + relevance
- * - Expanded: renders PdfViewer (height-fixed, jumps to page) + "I've read this" button
+ * - Expanded: renders PdfViewer (height-fixed, jumps to page) + confirmation button
  */
 
 import { useState } from 'react'
@@ -16,6 +16,7 @@ import { ChevronDown, ChevronUp, FileText, CheckCircle2 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { PdfViewer } from './PdfViewer'
+import { useTranslation } from '@/lib/hooks/use-translation'
 
 interface InlinePdfViewerProps {
   sourceId: string
@@ -34,13 +35,14 @@ export function InlinePdfViewer({
   relevance,
   onConfirm,
 }: InlinePdfViewerProps) {
+  const { t } = useTranslation()
   const [isExpanded, setIsExpanded] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
 
   const handleConfirm = () => {
     setConfirmed(true)
     setIsExpanded(false)
-    onConfirm("I've read the document")
+    onConfirm(t.learner.sources.readDocumentMessage)
   }
 
   return (
@@ -70,7 +72,7 @@ export function InlinePdfViewer({
         {confirmed && (
           <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 font-medium flex-shrink-0">
             <CheckCircle2 className="h-3.5 w-3.5" />
-            Done
+            {t.common.done}
           </div>
         )}
         {isExpanded ? (
@@ -99,7 +101,7 @@ export function InlinePdfViewer({
               className="w-full gap-2 border-green-500 text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-950/30"
             >
               <CheckCircle2 className="h-4 w-4" />
-              I&apos;ve read this
+              {t.learner.sources.readThis}
             </Button>
           )}
         </div>

@@ -1492,6 +1492,8 @@ export const frFR = {
       processing: "Traitement",
       error: "Erreur",
       ready: "Prêt",
+      readThis: "Je l'ai lu",
+      readDocumentMessage: "J'ai lu le document",
       // Story 5.1: Développer/réduire les documents
       expandDocument: "Développer le document",
       collapseDocument: "Réduire le document",

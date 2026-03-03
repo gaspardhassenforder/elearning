@@ -1492,6 +1492,8 @@ export const enUS = {
       processing: "Processing",
       error: "Error",
       ready: "Ready",
+      readThis: "I've read this",
+      readDocumentMessage: "I've read the document",
       // Story 5.1: Document expand/collapse
       expandDocument: "Expand document",
       collapseDocument: "Collapse document",
