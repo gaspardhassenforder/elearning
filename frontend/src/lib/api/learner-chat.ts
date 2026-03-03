@@ -91,6 +91,7 @@ export interface ChatHistoryMessage {
   role: 'assistant' | 'user'
   content: string
   createdAt: string  // ISO 8601 timestamp
+  toolCalls?: ToolCall[]  // Inline artifact data reconstructed from LangGraph checkpoint
 }
 
 export interface ChatHistoryResponse {

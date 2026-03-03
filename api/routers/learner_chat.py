@@ -16,6 +16,7 @@ from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from loguru import logger
 from pydantic import BaseModel, Field
+from typing import Optional
 
 from api.auth import LearnerContext, get_current_learner
 from api.learner_chat_service import (
@@ -40,6 +41,15 @@ router = APIRouter()
 # ============================================================================
 
 
+class ToolCallData(BaseModel):
+    """Tool call with result, for inline artifact rendering on history reload."""
+
+    id: str = Field(..., description="Tool call ID")
+    toolName: str = Field(..., description="Name of the tool called")
+    args: dict = Field(default_factory=dict, description="Arguments passed to the tool")
+    result: Optional[dict] = Field(None, description="Tool result data for frontend rendering")
+
+
 class ChatHistoryMessage(BaseModel):
     """Single message in chat history."""
 
@@ -47,6 +57,9 @@ class ChatHistoryMessage(BaseModel):
     role: str = Field(..., description="Message role: 'assistant' or 'user'")
     content: str = Field(..., description="Message content")
     createdAt: str = Field(..., description="ISO 8601 timestamp")
+    toolCalls: Optional[list[ToolCallData]] = Field(
+        None, description="Tool calls with results for inline artifact rendering"
+    )
 
 
 class ChatHistoryResponse(BaseModel):
@@ -287,20 +300,55 @@ async def get_chat_history(
         )
 
         # 4. Transform messages to frontend format (assistant-ui compatible)
-        # Filter out ToolMessage from display (internal ReAct loop messages).
+        # ToolMessages are used to reconstruct tool call results for inline artifacts.
         # The AsyncSqliteSaver checkpoint still stores them for LLM context.
         import uuid
         from datetime import datetime
 
         formatted_messages = []
+        # Buffer of tool calls waiting for their ToolMessage results.
+        # Key: tool_call_id, Value: ToolCallData (result=None until ToolMessage matched).
+        tool_call_buffer: dict[str, ToolCallData] = {}
+
         for msg in paginated_messages:
-            # Skip internal ToolMessage objects from ReAct loop
+            # ToolMessage: extract result and match to pending tool call in buffer
             if isinstance(msg, ToolMessage):
+                tool_call_id = getattr(msg, "tool_call_id", None)
+                if tool_call_id and tool_call_id in tool_call_buffer:
+                    try:
+                        # content_and_artifact tools (e.g. surface_document) store the
+                        # frontend-ready dict in .artifact; regular tools store JSON in .content
+                        if hasattr(msg, "artifact") and msg.artifact:
+                            result = msg.artifact
+                        elif isinstance(msg.content, str) and msg.content:
+                            result = json.loads(msg.content)
+                        else:
+                            result = {}
+                    except (json.JSONDecodeError, TypeError):
+                        result = {"content": str(msg.content) if msg.content else ""}
+                    pending = tool_call_buffer[tool_call_id]
+                    tool_call_buffer[tool_call_id] = ToolCallData(
+                        id=pending.id,
+                        toolName=pending.toolName,
+                        args=pending.args,
+                        result=result,
+                    )
                 continue
 
-            # Skip AIMessages that only contain tool_calls (no user-facing text)
-            if isinstance(msg, AIMessage) and getattr(msg, "tool_calls", None) and not msg.content:
-                continue
+            # AIMessage with tool_calls: collect stubs into buffer
+            if isinstance(msg, AIMessage) and getattr(msg, "tool_calls", None):
+                for tc in msg.tool_calls:
+                    tc_id = tc.get("id") or str(uuid.uuid4())
+                    if tc_id not in tool_call_buffer:
+                        tool_call_buffer[tc_id] = ToolCallData(
+                            id=tc_id,
+                            toolName=tc["name"],
+                            args=tc.get("args", {}),
+                            result=None,
+                        )
+                # Skip intermediate AIMessages that have only tool_calls (no user-facing text)
+                if not msg.content:
+                    continue
 
             try:
                 # Determine role
@@ -328,12 +376,20 @@ async def get_chat_history(
                 if not isinstance(created_at, str):
                     created_at = datetime.now().isoformat()
 
+                # Attach all completed tool calls to assistant messages, then clear buffer
+                tool_calls_for_msg = None
+                if role == "assistant" and tool_call_buffer:
+                    completed = [tc for tc in tool_call_buffer.values() if tc.result is not None]
+                    tool_calls_for_msg = completed if completed else None
+                    tool_call_buffer = {}
+
                 formatted_messages.append(
                     ChatHistoryMessage(
                         id=message_id,
                         role=role,
                         content=content,
                         createdAt=created_at,
+                        toolCalls=tool_calls_for_msg,
                     )
                 )
             except Exception as e:
@@ -346,17 +402,22 @@ async def get_chat_history(
 
         # Merge consecutive assistant messages (from ReAct multi-turn LLM invocations).
         # During streaming, all text deltas accumulate into one bubble; history must match.
+        # Also merge their toolCalls arrays so inline artifacts are preserved.
         merged_messages = []
         for msg in formatted_messages:
             if (merged_messages
                     and msg.role == "assistant"
                     and merged_messages[-1].role == "assistant"):
                 prev = merged_messages[-1]
+                combined_tool_calls = None
+                if prev.toolCalls or msg.toolCalls:
+                    combined_tool_calls = (prev.toolCalls or []) + (msg.toolCalls or [])
                 merged_messages[-1] = ChatHistoryMessage(
                     id=prev.id,
                     role="assistant",
                     content=prev.content + "\n\n" + msg.content,
                     createdAt=prev.createdAt,
+                    toolCalls=combined_tool_calls,
                 )
             else:
                 merged_messages.append(msg)
