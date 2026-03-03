@@ -4,7 +4,7 @@ import asyncio
 import hashlib
 import json
 import re
-from typing import List, Literal, Optional, TypedDict
+from typing import Any, List, Literal, Optional, TypedDict
 
 from langchain_core.runnables import RunnableConfig
 
@@ -40,6 +40,7 @@ class QuizGenerationState(TypedDict):
     user_id: Optional[str]
     company_id: Optional[str]
     created_by: Optional[str]
+    langsmith_callback: Optional[Any]  # LangSmith tracer for this quiz run
 
 
 class QuizSearch(BaseModel):
@@ -84,8 +85,11 @@ async def generate_rag_queries(state: QuizGenerationState) -> dict:
             structured=dict(type="json"),
         )
 
-        # Story 7.7: Token tracking for quiz generation
+        # Story 7.7: Token tracking + LangSmith tracing for quiz generation
         callbacks = []
+        langsmith_cb = state.get("langsmith_callback")
+        if langsmith_cb:
+            callbacks.append(langsmith_cb)
         if state.get("user_id") or state.get("company_id"):
             callbacks.append(
                 TokenTrackingCallback(
@@ -338,8 +342,11 @@ async def generate_questions(state: QuizGenerationState) -> dict:
             max_tokens=4096,
         )
 
-        # Story 7.7: Token tracking for quiz generation
+        # Story 7.7: Token tracking + LangSmith tracing for quiz generation
         callbacks = []
+        langsmith_cb = state.get("langsmith_callback")
+        if langsmith_cb:
+            callbacks.append(langsmith_cb)
         if state.get("user_id") or state.get("company_id"):
             callbacks.append(
                 TokenTrackingCallback(
@@ -518,6 +525,17 @@ async def generate_quiz(
     """
     logger.info(f"Starting quiz generation for notebook {notebook_id}")
 
+    # Create LangSmith callback for end-to-end tracing of this quiz run
+    from open_notebook.observability.langsmith_handler import get_langsmith_callback
+
+    langsmith_cb = get_langsmith_callback(
+        user_id=user_id,
+        company_id=company_id,
+        notebook_id=notebook_id,
+        workflow_name="quiz_generation",
+        run_name=f"quiz:{notebook_id}",
+    )
+
     # Initialize state
     state: QuizGenerationState = {
         "notebook_id": notebook_id,
@@ -535,6 +553,7 @@ async def generate_quiz(
         "user_id": user_id,  # Story 7.7: Token tracking context
         "company_id": company_id,  # Story 7.7: Token tracking context
         "created_by": created_by,
+        "langsmith_callback": langsmith_cb,
     }
 
     # Run workflow steps sequentially

@@ -18,6 +18,7 @@
 import { useEffect, useState, useRef, useMemo } from 'react'
 import { MessageSquare, ArrowDown, Mic, MicOff, Send, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { VoiceRecordingOverlay } from './VoiceRecordingOverlay'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { useLearnerChat, useChatHistory } from '@/lib/hooks/use-learner-chat'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
@@ -28,7 +29,6 @@ import { useLearnerStore } from '@/lib/stores/learner-store'
 import { useToast } from '@/lib/hooks/use-toast'
 import { learnerToast } from '@/lib/utils/learner-toast'
 import { useVoiceInput } from '@/lib/hooks/use-voice-input'
-import { VoiceRecordingOverlay } from './VoiceRecordingOverlay'
 import { useNotebookSources } from '@/lib/hooks/use-sources'
 import { useLessonSteps, useLessonStepsProgress } from '@/lib/hooks/use-lesson-plan'
 import type { LessonStepResponse } from '@/lib/api/lesson-plan'
@@ -330,16 +330,17 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
               {allMessages.length > 0 && !isStreaming && (
                 <div className="sticky top-2 z-10 flex justify-end px-4">
                   <Button
-                    size="sm"
+                    size="icon"
                     variant="outline"
-                    className="rounded-full shadow-sm text-xs gap-1.5"
+                    className="rounded-full shadow-sm h-7 w-7"
                     onClick={() => {
                       clearMessages()
                       setHistoryLoaded(false)
                     }}
+                    aria-label={t.learner.chat.newConversation}
+                    title={t.learner.chat.newConversation}
                   >
-                    <RotateCcw className="h-3 w-3" />
-                    {t.learner.chat.newConversation}
+                    <RotateCcw className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               )}
@@ -422,6 +423,13 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
             {/* Input Area - ChatGPT style */}
             <div className="flex-shrink-0 border-t bg-background">
               <div className="max-w-3xl mx-auto px-4 py-3 relative">
+                {/* Voice recording overlay */}
+                {isListening && (
+                  <VoiceRecordingOverlay
+                    analyserNode={analyserNode}
+                    onStop={stopListening}
+                  />
+                )}
                 {/* Dynamic quick replies — shown after each AI message (or before first user message) */}
                 {!isStreaming && (allMessages.length === 0 || allMessages[allMessages.length - 1]?.role === 'assistant') && (() => {
                   const hasUserMessage = allMessages.some((m) => m.role === 'user')
@@ -454,13 +462,6 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
                     </div>
                   )
                 })()}
-                {/* Voice recording overlay */}
-                {isListening && (
-                  <VoiceRecordingOverlay
-                    analyserNode={analyserNode}
-                    onStop={stopListening}
-                  />
-                )}
                 <form
                   onSubmit={handleSubmit}
                   className="relative flex items-end gap-2 rounded-2xl border bg-background px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 transition-all"
@@ -474,13 +475,13 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
                       onClick={isListening ? stopListening : startListening}
                       disabled={isRequestingPermission}
                       aria-label={isListening ? t.learner.chat.voiceInput.stopRecording : t.learner.chat.voiceInput.startRecording}
-                      className={`flex-shrink-0 h-8 w-8 ${(isListening || isRequestingPermission) ? 'text-red-500 animate-pulse' : 'text-muted-foreground'}`}
+                      className={`flex-shrink-0 h-8 w-8 ${
+                        isListening || isRequestingPermission
+                          ? 'text-red-500 animate-pulse'
+                          : 'text-muted-foreground animate-breathe'
+                      }`}
                     >
-                      {isListening ? (
-                        <MicOff className="h-4 w-4" />
-                      ) : (
-                        <Mic className="h-4 w-4" />
-                      )}
+                      {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                     </Button>
                   )}
 

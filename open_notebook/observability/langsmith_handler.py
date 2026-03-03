@@ -52,8 +52,11 @@ def get_langsmith_callback(
         >>> config = RunnableConfig(callbacks=[callback] if callback else [])
         >>> result = await graph.ainvoke(state, config)
     """
-    # Check if LangSmith is enabled
-    tracing_enabled = os.getenv("LANGCHAIN_TRACING_V2", "").lower() == "true"
+    # Check if LangSmith is enabled (support both new and legacy env var names)
+    tracing_enabled = (
+        os.getenv("LANGSMITH_TRACING", "").lower() == "true"
+        or os.getenv("LANGCHAIN_TRACING_V2", "").lower() == "true"
+    )
     if not tracing_enabled:
         logger.debug("LangSmith tracing disabled - skipping callback handler")
         return None
@@ -78,14 +81,13 @@ def get_langsmith_callback(
     tags.append(f"workflow:{workflow_name}")
     metadata["workflow_name"] = workflow_name
 
-    # Get project name from environment or use default
-    project_name = os.getenv("LANGCHAIN_PROJECT", "Open Notebook")
+    # Get project name from environment or use default (support both new and legacy names)
+    project_name = os.getenv("LANGSMITH_PROJECT") or os.getenv("LANGCHAIN_PROJECT", "Open Notebook")
 
-    # Create tracer with metadata
+    # Create tracer — LangChainTracer accepts tags but not metadata in its constructor
     tracer = LangChainTracer(
         project_name=project_name,
         tags=tags,
-        metadata=metadata,
     )
 
     # Set custom run name if provided
