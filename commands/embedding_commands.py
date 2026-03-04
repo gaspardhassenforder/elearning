@@ -149,10 +149,11 @@ async def embed_single_item_command(
 
             # Update insight with new embedding
             await repo_query(
-                "UPDATE $insight_id SET embedding = $embedding",
+                "UPDATE $insight_id SET embedding = $embedding, embedding_dimension = $embedding_dimension",
                 {
                     "insight_id": ensure_record_id(input_data.item_id),
                     "embedding": embedding,
+                    "embedding_dimension": len(embedding),
                 },
             )
             logger.info(f"Insight embedded: {input_data.item_id}")
@@ -243,14 +244,23 @@ async def embed_chunk_command(
         # Generate embedding for the chunk
         embedding = (await EMBEDDING_MODEL.aembed([input_data.chunk_text]))[0]
 
+        # Look up notebook_ids for this source (denormalized for fast filtering)
+        notebook_ids_result = await repo_query(
+            "SELECT VALUE out FROM reference WHERE in = $source_id",
+            {"source_id": ensure_record_id(input_data.source_id)},
+        )
+        notebook_ids = [ensure_record_id(nid) for nid in (notebook_ids_result or [])]
+
         # Insert chunk embedding into database (with optional page_number)
         params = {
             "source_id": ensure_record_id(input_data.source_id),
             "order": input_data.chunk_index,
             "content": input_data.chunk_text,
             "embedding": embedding,
+            "embedding_dimension": len(embedding),
             "page_number": input_data.page_number,
             "timestamp_seconds": input_data.timestamp_seconds,
+            "notebook_ids": notebook_ids,
         }
         await repo_query(
             """
@@ -259,8 +269,10 @@ async def embed_chunk_command(
                 "order": $order,
                 "content": $content,
                 "embedding": $embedding,
+                "embedding_dimension": $embedding_dimension,
                 "page_number": $page_number,
                 "timestamp_seconds": $timestamp_seconds,
+                "notebook_ids": $notebook_ids,
             };
             """,
             params,
@@ -303,7 +315,18 @@ async def embed_chunk_command(
         )
 
 
-@command("vectorize_source", app="open_notebook", retry=None)
+@command(
+    "vectorize_source",
+    app="open_notebook",
+    retry={
+        "max_attempts": 5,
+        "wait_strategy": "exponential_jitter",
+        "wait_min": 1,
+        "wait_max": 30,
+        "retry_on": [RuntimeError],
+        "retry_log_level": "debug",
+    },
+)
 async def vectorize_source_command(
     input_data: VectorizeSourceInput,
 ) -> VectorizeSourceOutput:
@@ -320,8 +343,7 @@ async def vectorize_source_command(
     Natural concurrency control is provided by the worker pool size.
 
     Retry Strategy:
-    - Retries disabled (retry=None) - fails fast on job submission errors
-    - This ensures immediate visibility when orchestration fails
+    - Retries up to 5 times for RuntimeError (SurrealDB transaction conflicts)
     - Individual embed_chunk jobs have their own retry logic for DB conflicts
     """
     start_time = time.time()
@@ -392,6 +414,8 @@ async def vectorize_source_command(
                     ts_match = _VIDEO_TIMESTAMP_RE.search(chunk_text)
                     if ts_match:
                         chunk_timestamp_seconds = float(ts_match.group(1))
+                    # Strip ALL timestamp markers from chunk text before embedding
+                    chunk_text = _VIDEO_TIMESTAMP_RE.sub("", chunk_text).strip()
 
                 job_id = submit_command(
                     "open_notebook",  # app name
@@ -428,6 +452,12 @@ async def vectorize_source_command(
             processing_time=processing_time,
         )
 
+    except RuntimeError as e:
+        # SurrealDB transaction conflicts - re-raise for retry mechanism
+        logger.debug(
+            "Vectorization transaction conflict for source {}, will retry: {}", input_data.source_id, str(e)
+        )
+        raise
     except Exception as e:
         processing_time = time.time() - start_time
         logger.error(
@@ -631,10 +661,11 @@ async def rebuild_embeddings_command(
 
                 # Update insight with new embedding
                 await repo_query(
-                    "UPDATE $insight_id SET embedding = $embedding",
+                    "UPDATE $insight_id SET embedding = $embedding, embedding_dimension = $embedding_dimension",
                     {
                         "insight_id": ensure_record_id(insight_id),
                         "embedding": embedding,
+                        "embedding_dimension": len(embedding),
                     },
                 )
                 insights_processed += 1

@@ -58,7 +58,9 @@ import {
   Lightbulb,
   Database,
   AlertCircle,
+  AlertTriangle,
   MessageSquare,
+  RefreshCw,
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { getDateLocale } from '@/lib/utils/date-locale'
@@ -268,13 +270,13 @@ export function SourceDetailContent({
     }
   }
 
-  const handleEmbedContent = async () => {
+  const handleEmbedContent = async (isReEmbed = false) => {
     if (!source) return
 
     try {
       setIsEmbedding(true)
       const response = await embeddingApi.embedContent(sourceId, 'source')
-      toast.success(response.message || t.common.success)
+      toast.success(isReEmbed ? t.sources.reEmbedStarted : (response.message || t.common.success))
       await fetchSource()
     } catch (err) {
       console.error('Failed to embed content:', err)
@@ -487,13 +489,23 @@ export function SourceDetailContent({
                     <DropdownMenuSeparator />
                   </>
                 )}
-                <DropdownMenuItem
-                  onClick={handleEmbedContent}
-                  disabled={isEmbedding || source.embedded}
-                >
-                  <Database className="mr-2 h-4 w-4" />
-                  {isEmbedding ? t.sources.embedding : source.embedded ? t.sources.alreadyEmbedded : t.sources.embedContent}
-                </DropdownMenuItem>
+                {source.embedded ? (
+                  <DropdownMenuItem
+                    onClick={() => handleEmbedContent(true)}
+                    disabled={isEmbedding}
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    {isEmbedding ? t.sources.reEmbedding : t.sources.reEmbed}
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    onClick={() => handleEmbedContent(false)}
+                    disabled={isEmbedding}
+                  >
+                    <Database className="mr-2 h-4 w-4" />
+                    {isEmbedding ? t.sources.embedding : t.sources.embedContent}
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-destructive"
@@ -724,8 +736,8 @@ export function SourceDetailContent({
                 <CardTitle>{t.sources.details}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Embedding Alert */}
-                {!source.embedded && (
+                {/* Embedding Alert - 3 states: Not Embedded / Stale / Valid */}
+                {!source.embedded ? (
                   <Alert>
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle>
@@ -735,7 +747,7 @@ export function SourceDetailContent({
                       {t.sources.notEmbeddedDesc}
                       <div className="mt-3">
                         <Button
-                          onClick={handleEmbedContent}
+                          onClick={() => handleEmbedContent(false)}
                           disabled={isEmbedding}
                           size="sm"
                         >
@@ -745,6 +757,57 @@ export function SourceDetailContent({
                       </div>
                     </AlertDescription>
                   </Alert>
+                ) : source.embedding_stale ? (
+                  <Alert variant="destructive" className="border-amber-500/50 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200 [&>svg]:text-amber-600">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>
+                      {t.sources.embeddingStaleAlert}
+                    </AlertTitle>
+                    <AlertDescription>
+                      {t.sources.embeddingStaleDesc}
+                      {source.embedded_chunks != null && source.embedded_chunks > 0 && (
+                        <span className="ml-1 text-xs">
+                          ({source.embedded_chunks} {t.sources.embeddedChunks})
+                        </span>
+                      )}
+                      <div className="mt-3">
+                        <Button
+                          onClick={() => handleEmbedContent(true)}
+                          disabled={isEmbedding}
+                          size="sm"
+                        >
+                          <RefreshCw className={`mr-2 h-4 w-4 ${isEmbedding ? 'animate-spin' : ''}`} />
+                          {isEmbedding ? t.sources.reEmbedding : t.sources.reEmbed}
+                        </Button>
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <div className="rounded-lg border bg-muted/30 p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Database className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">{t.sources.embedded}</span>
+                        {source.embedded_chunks != null && source.embedded_chunks > 0 && (
+                          <Badge variant="secondary" className="text-xs">
+                            {source.embedded_chunks} {t.sources.embeddedChunks}
+                          </Badge>
+                        )}
+                      </div>
+                      <Button
+                        onClick={() => handleEmbedContent(true)}
+                        disabled={isEmbedding}
+                        size="sm"
+                        variant="outline"
+                      >
+                        <RefreshCw className={`mr-2 h-4 w-4 ${isEmbedding ? 'animate-spin' : ''}`} />
+                        {isEmbedding ? t.sources.reEmbedding : t.sources.reEmbed}
+                      </Button>
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      {t.sources.reEmbedDesc}
+                    </p>
+                  </div>
                 )}
 
                 {/* Source Information */}
@@ -827,9 +890,15 @@ export function SourceDetailContent({
                     <h3 className="text-sm font-semibold">{t.sources.metadata}</h3>
                     <div className="flex items-center gap-2">
                       <Database className="h-3.5 w-3.5 text-muted-foreground" />
-                      <Badge variant={source.embedded ? "default" : "secondary"} className="text-xs">
-                        {source.embedded ? t.sources.embedded : t.sources.notEmbedded}
-                      </Badge>
+                      {source.embedded && source.embedding_stale ? (
+                        <Badge variant="outline" className="text-xs border-amber-500 text-amber-600 dark:text-amber-400">
+                          {t.sources.embeddingStale}
+                        </Badge>
+                      ) : (
+                        <Badge variant={source.embedded ? "default" : "secondary"} className="text-xs">
+                          {source.embedded ? t.sources.embedded : t.sources.notEmbedded}
+                        </Badge>
+                      )}
                     </div>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">

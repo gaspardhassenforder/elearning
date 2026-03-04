@@ -1,0 +1,17 @@
+-- Migration 39 rollback: Revert HNSW indexes back to 768 dimensions
+
+REMOVE INDEX IF EXISTS idx_source_embedding_hnsw ON TABLE source_embedding;
+REMOVE INDEX IF EXISTS idx_source_insight_hnsw ON TABLE source_insight;
+REMOVE INDEX IF EXISTS idx_note_hnsw ON TABLE note;
+
+DEFINE INDEX IF NOT EXISTS idx_source_embedding_hnsw
+    ON TABLE source_embedding FIELDS embedding
+    HNSW DIMENSION 768 DIST COSINE TYPE F32;
+
+DEFINE INDEX IF NOT EXISTS idx_source_insight_hnsw
+    ON TABLE source_insight FIELDS embedding
+    HNSW DIMENSION 768 DIST COSINE TYPE F32;
+
+DEFINE INDEX IF NOT EXISTS idx_note_hnsw
+    ON TABLE note FIELDS embedding
+    HNSW DIMENSION 768 DIST COSINE TYPE F32;

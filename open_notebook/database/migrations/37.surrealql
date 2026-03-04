@@ -1,0 +1,81 @@
+-- Migration 37: HNSW vector indexes + KNN query rewrite
+-- Converts brute-force O(n) cosine scan to O(log n) approximate nearest neighbor search
+-- F32 type = half memory of F64 with negligible precision loss at 768 dims
+
+DEFINE INDEX IF NOT EXISTS idx_source_embedding_hnsw
+    ON TABLE source_embedding FIELDS embedding
+    HNSW DIMENSION 768 DIST COSINE TYPE F32;
+
+DEFINE INDEX IF NOT EXISTS idx_source_insight_hnsw
+    ON TABLE source_insight FIELDS embedding
+    HNSW DIMENSION 768 DIST COSINE TYPE F32;
+
+DEFINE INDEX IF NOT EXISTS idx_note_hnsw
+    ON TABLE note FIELDS embedding
+    HNSW DIMENSION 768 DIST COSINE TYPE F32;
+
+-- Rewrite fn::vector_search to use KNN operator (leverages HNSW index)
+-- <|K, EF|> = KNN operator: K=neighbors to return (must be literal), EF=exploration factor
+-- Over-fetch 50 candidates then LIMIT $match_count at the end (KNN K must be literal, not variable)
+-- vector::distance::knn() returns cosine distance (0=identical); 1.0 - distance = similarity
+REMOVE FUNCTION IF EXISTS fn::vector_search;
+
+DEFINE FUNCTION fn::vector_search(
+    $query: array<float>,
+    $match_count: int,
+    $sources: bool,
+    $show_notes: bool,
+    $min_similarity: float
+) {
+    LET $source_embedding_search =
+        IF $sources {(
+            SELECT
+                source.id AS id,
+                source.title AS title,
+                content,
+                source.id AS parent_id,
+                (1.0 - vector::distance::knn()) AS similarity
+            FROM source_embedding
+            WHERE embedding <|50, 100|> $query
+        )} ELSE { [] };
+
+    LET $source_insight_search =
+        IF $sources {(
+            SELECT
+                id,
+                insight_type + ' - ' + (source.title OR '') AS title,
+                content,
+                source.id AS parent_id,
+                (1.0 - vector::distance::knn()) AS similarity
+            FROM source_insight
+            WHERE embedding <|50, 100|> $query
+        )} ELSE { [] };
+
+    LET $note_content_search =
+        IF $show_notes {(
+            SELECT
+                id,
+                title,
+                content,
+                id AS parent_id,
+                (1.0 - vector::distance::knn()) AS similarity
+            FROM note
+            WHERE embedding <|50, 100|> $query
+        )} ELSE { [] };
+
+    LET $all_results = array::union(
+        array::union($source_embedding_search, $source_insight_search),
+        $note_content_search
+    );
+
+    RETURN (
+        SELECT id, parent_id, title,
+            math::max(similarity) AS similarity,
+            array::flatten(content) AS matches
+        FROM $all_results
+        WHERE id IS NOT NONE AND similarity >= $min_similarity
+        GROUP BY id, parent_id, title
+        ORDER BY similarity DESC
+        LIMIT $match_count
+    );
+};

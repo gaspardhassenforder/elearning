@@ -1,0 +1,2 @@
+REMOVE FIELD IF EXISTS notebook_ids ON TABLE source_embedding;
+REMOVE FIELD IF EXISTS notebook_ids ON TABLE source_insight;

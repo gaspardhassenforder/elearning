@@ -32,6 +32,7 @@ from api.models import (
 from commands.source_commands import SourceProcessingInput
 from open_notebook.config import UPLOADS_FOLDER
 from open_notebook.database.repository import ensure_record_id, repo_query
+from open_notebook.ai.models import EXPECTED_EMBEDDING_DIMENSION
 from open_notebook.domain.notebook import Notebook, Source
 from open_notebook.domain.transformation import Transformation
 from open_notebook.exceptions import InvalidInputError
@@ -188,7 +189,8 @@ async def get_sources(
             query = f"""
                 SELECT id, asset, created, title, updated, topics, command,
                 (SELECT VALUE count() FROM source_insight WHERE source = $parent.id GROUP ALL)[0].count OR 0 AS insights_count,
-                (SELECT VALUE id FROM source_embedding WHERE source = $parent.id LIMIT 1) != [] AS embedded
+                (SELECT VALUE id FROM source_embedding WHERE source = $parent.id LIMIT 1) != [] AS embedded,
+                (SELECT VALUE id FROM source_embedding WHERE source = $parent.id AND (embedding_dimension != $expected_dim OR embedding_dimension = NONE) LIMIT 1) != [] AS embedding_stale
                 FROM (select value in from reference where out=$notebook_id)
                 {order_clause}
                 LIMIT $limit START $offset
@@ -200,6 +202,7 @@ async def get_sources(
                     "notebook_id": ensure_record_id(notebook_id),
                     "limit": limit,
                     "offset": offset,
+                    "expected_dim": EXPECTED_EMBEDDING_DIMENSION,
                 },
             )
         else:
@@ -207,13 +210,14 @@ async def get_sources(
             query = f"""
                 SELECT id, asset, created, title, updated, topics, command,
                 (SELECT VALUE count() FROM source_insight WHERE source = $parent.id GROUP ALL)[0].count OR 0 AS insights_count,
-                (SELECT VALUE id FROM source_embedding WHERE source = $parent.id LIMIT 1) != [] AS embedded
+                (SELECT VALUE id FROM source_embedding WHERE source = $parent.id LIMIT 1) != [] AS embedded,
+                (SELECT VALUE id FROM source_embedding WHERE source = $parent.id AND (embedding_dimension != $expected_dim OR embedding_dimension = NONE) LIMIT 1) != [] AS embedding_stale
                 FROM source
                 {order_clause}
                 LIMIT $limit START $offset
                 FETCH command
             """
-            result = await repo_query(query, {"limit": limit, "offset": offset})
+            result = await repo_query(query, {"limit": limit, "offset": offset, "expected_dim": EXPECTED_EMBEDDING_DIMENSION})
 
         # Convert result to response model
         # Command data is already fetched via FETCH command clause
@@ -260,6 +264,7 @@ async def get_sources(
                     else None,
                     embedded=row.get("embedded", False),
                     embedded_chunks=0,  # Not needed in list view
+                    embedding_stale=row.get("embedding_stale", False),
                     insights_count=row.get("insights_count", 0),
                     created=str(row["created"]),
                     updated=str(row["updated"]),
@@ -614,6 +619,8 @@ async def get_source(source_id: str):
                 status = "unknown"
 
         embedded_chunks = await source.get_embedded_chunks()
+        stale_chunks = await source.get_stale_embedded_chunks(EXPECTED_EMBEDDING_DIMENSION) if embedded_chunks > 0 else 0
+        embedding_stale = stale_chunks > 0
 
         # Get associated notebooks
         notebooks_query = await repo_query(
@@ -637,6 +644,7 @@ async def get_source(source_id: str):
             full_text=source.full_text,
             embedded=embedded_chunks > 0,
             embedded_chunks=embedded_chunks,
+            embedding_stale=embedding_stale,
             file_available=_is_source_file_available(source),
             created=str(source.created),
             updated=str(source.updated),

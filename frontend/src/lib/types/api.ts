@@ -31,6 +31,7 @@ export interface SourceListResponse {
   } | null
   embedded: boolean
   embedded_chunks: number            // ADD: From Python API
+  embedding_stale?: boolean          // True if embeddings have wrong dimension
   insights_count: number
   created: string
   updated: string

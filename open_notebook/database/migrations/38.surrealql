@@ -1,0 +1,9 @@
+-- Migration 38: Denormalize notebook_ids onto source_embedding and source_insight
+-- Enables efficient notebook-scoped filtering via CONTAINS instead of subquery join
+
+DEFINE FIELD IF NOT EXISTS notebook_ids ON TABLE source_embedding TYPE option<array<record<notebook>>>;
+DEFINE FIELD IF NOT EXISTS notebook_ids ON TABLE source_insight TYPE option<array<record<notebook>>>;
+
+-- Backfill existing rows from reference graph edges
+UPDATE source_embedding SET notebook_ids = (SELECT VALUE out FROM reference WHERE in = source);
+UPDATE source_insight SET notebook_ids = (SELECT VALUE out FROM reference WHERE in = source);

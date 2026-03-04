@@ -572,6 +572,7 @@ class SourceResponse(BaseModel):
     full_text: Optional[str]
     embedded: bool
     embedded_chunks: int
+    embedding_stale: bool = False
     file_available: Optional[bool] = None
     created: str
     updated: str
@@ -590,6 +591,7 @@ class SourceListResponse(BaseModel):
     asset: Optional[AssetModel]
     embedded: bool  # Boolean flag indicating if source has embeddings
     embedded_chunks: int  # Number of embedded chunks
+    embedding_stale: bool = False  # True if any chunks have wrong dimension
     insights_count: int
     created: str
     updated: str

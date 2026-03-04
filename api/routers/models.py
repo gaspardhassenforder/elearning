@@ -13,11 +13,43 @@ from api.models import (
     ModelResponse,
     ProviderAvailabilityResponse,
 )
-from open_notebook.ai.models import DefaultModels, Model
+from open_notebook.ai.models import (
+    EXPECTED_EMBEDDING_DIMENSION,
+    DefaultModels,
+    Model,
+    model_manager,
+)
 from open_notebook.domain.user import User
 from open_notebook.exceptions import InvalidInputError
 
 router = APIRouter()
+async def _validate_embedding_model_dimension(model_id: str) -> None:
+    """Validate selected embedding model output dimension against DB expectation."""
+    model_record = await Model.get(model_id)
+    if not model_record:
+        raise HTTPException(status_code=400, detail=f"Model '{model_id}' not found")
+    if model_record.type != "embedding":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Model '{model_id}' is type '{model_record.type}', expected 'embedding'",
+        )
+
+    embedding_model = await model_manager.get_model(model_id)
+    if embedding_model is None:
+        raise HTTPException(status_code=400, detail="Embedding model could not be loaded")
+
+    vector = (await embedding_model.aembed(["dimension-check"]))[0]
+    dim = len(vector)
+    if dim != EXPECTED_EMBEDDING_DIMENSION:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Embedding model '{model_record.name}' returns dimension {dim}, "
+                f"but current DB vector indexes expect {EXPECTED_EMBEDDING_DIMENSION}. "
+                f"Select a {EXPECTED_EMBEDDING_DIMENSION}-dimension embedding model or migrate indexes."
+            ),
+        )
+
 
 
 def _check_openai_compatible_support(mode: str) -> bool:
@@ -207,6 +239,7 @@ async def update_default_models(defaults_data: DefaultModelsResponse):
                 defaults_data.default_speech_to_text_model
             )  # type: ignore[attr-defined]
         if defaults_data.default_embedding_model is not None:
+            await _validate_embedding_model_dimension(defaults_data.default_embedding_model)
             defaults.default_embedding_model = defaults_data.default_embedding_model  # type: ignore[attr-defined]
         if defaults_data.default_tools_model is not None:
             defaults.default_tools_model = defaults_data.default_tools_model  # type: ignore[attr-defined]

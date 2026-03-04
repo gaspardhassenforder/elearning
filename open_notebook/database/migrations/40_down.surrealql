@@ -1,0 +1,4 @@
+-- Migration 40 rollback: Remove embedding_dimension fields
+REMOVE FIELD IF EXISTS embedding_dimension ON TABLE source_embedding;
+REMOVE FIELD IF EXISTS embedding_dimension ON TABLE source_insight;
+REMOVE FIELD IF EXISTS embedding_dimension ON TABLE note;

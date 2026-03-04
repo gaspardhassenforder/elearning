@@ -1,0 +1,11 @@
+-- Migration 40: Add embedding_dimension field to track vector dimensions
+-- This allows detecting stale embeddings after an embedding model change.
+
+DEFINE FIELD IF NOT EXISTS embedding_dimension ON TABLE source_embedding TYPE option<int>;
+DEFINE FIELD IF NOT EXISTS embedding_dimension ON TABLE source_insight TYPE option<int>;
+DEFINE FIELD IF NOT EXISTS embedding_dimension ON TABLE note TYPE option<int>;
+
+-- Backfill existing records: compute dimension from current embedding vectors
+UPDATE source_embedding SET embedding_dimension = array::len(embedding) WHERE embedding != NONE AND embedding_dimension = NONE;
+UPDATE source_insight SET embedding_dimension = array::len(embedding) WHERE embedding != NONE AND embedding_dimension = NONE;
+UPDATE note SET embedding_dimension = array::len(embedding) WHERE embedding != NONE AND embedding_dimension = NONE;

@@ -301,6 +301,25 @@ async def remove_source_from_notebook(notebook_id: str, source_id: str, admin: U
             },
         )
 
+        # Remove notebook_id from denormalized arrays on embeddings/insights
+        import asyncio
+        notebook_rid = ensure_record_id(notebook_id)
+        source_rid = ensure_record_id(source_id)
+        await asyncio.gather(
+            repo_query(
+                """UPDATE source_embedding
+                SET notebook_ids = array::complement(notebook_ids OR [], [$notebook_id])
+                WHERE source = $source_id""",
+                {"notebook_id": notebook_rid, "source_id": source_rid},
+            ),
+            repo_query(
+                """UPDATE source_insight
+                SET notebook_ids = array::complement(notebook_ids OR [], [$notebook_id])
+                WHERE source = $source_id""",
+                {"notebook_id": notebook_rid, "source_id": source_rid},
+            ),
+        )
+
         return {"message": "Source removed from notebook successfully"}
     except HTTPException:
         raise
@@ -487,6 +506,7 @@ class NotebookTransformationRequest(BaseModel):
     """Request body for notebook transformation generation."""
     transformation_id: str = Field(..., description="ID of the transformation to apply")
     model_id: Optional[str] = Field(None, description="Optional model ID to use")
+    source_ids: Optional[List[str]] = Field(None, description="Optional list of source IDs to use (defaults to all)")
 
 
 @router.post("/notebooks/{notebook_id}/transformations/generate")
@@ -520,6 +540,11 @@ async def generate_transformation(notebook_id: str, request: NotebookTransformat
             {"id": ensure_record_id(notebook_id)},
         )
         sources = [Source(**src["source"]) for src in srcs] if srcs else []
+
+        # Filter to selected source IDs if provided
+        if request.source_ids:
+            requested_ids = set(request.source_ids)
+            sources = [s for s in sources if s.id and s.id in requested_ids]
 
         if not sources:
             raise HTTPException(

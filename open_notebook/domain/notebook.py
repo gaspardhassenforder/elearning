@@ -1,5 +1,6 @@
 import asyncio
 import os
+import time
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Literal, Optional, Tuple, Union
 
@@ -322,6 +323,26 @@ class Source(ObjectModel):
             logger.exception(e)
             raise DatabaseOperationError(f"Failed to count chunks for source: {str(e)}")
 
+    async def get_stale_embedded_chunks(self, expected_dim: int) -> int:
+        """Count chunks whose embedding_dimension differs from expected_dim (stale embeddings)."""
+        try:
+            result = await repo_query(
+                """
+                SELECT count() as stale FROM source_embedding
+                WHERE source = $id
+                  AND (embedding_dimension != $expected_dim OR embedding_dimension = NONE)
+                GROUP ALL
+                """,
+                {"id": ensure_record_id(self.id), "expected_dim": expected_dim},
+            )
+            if len(result) == 0:
+                return 0
+            return result[0]["stale"]
+        except Exception as e:
+            logger.error("Error fetching stale chunks count for source {}: {}", self.id, str(e))
+            logger.exception(e)
+            raise DatabaseOperationError(f"Failed to count stale chunks for source: {str(e)}")
+
     async def get_insights(self) -> List[SourceInsight]:
         try:
             result = await repo_query(
@@ -339,7 +360,25 @@ class Source(ObjectModel):
     async def add_to_notebook(self, notebook_id: str) -> Any:
         if not notebook_id:
             raise InvalidInputError("Notebook ID must be provided")
-        return await self.relate("reference", notebook_id)
+        result = await self.relate("reference", notebook_id)
+        # Propagate to denormalized notebook_ids on existing embedding/insight rows
+        notebook_rid = ensure_record_id(notebook_id)
+        source_rid = ensure_record_id(self.id)
+        await asyncio.gather(
+            repo_query(
+                """UPDATE source_embedding
+                SET notebook_ids = array::union(notebook_ids OR [], [$notebook_id])
+                WHERE source = $source_id""",
+                {"notebook_id": notebook_rid, "source_id": source_rid},
+            ),
+            repo_query(
+                """UPDATE source_insight
+                SET notebook_ids = array::union(notebook_ids OR [], [$notebook_id])
+                WHERE source = $source_id""",
+                {"notebook_id": notebook_rid, "source_id": source_rid},
+            ),
+        )
+        return result
 
     async def vectorize(self) -> str:
         """
@@ -405,6 +444,12 @@ class Source(ObjectModel):
             embedding = (
                 (await EMBEDDING_MODEL.aembed([content]))[0] if EMBEDDING_MODEL else []
             )
+            # Look up notebook_ids for this source (denormalized for fast filtering)
+            notebook_ids_result = await repo_query(
+                "SELECT VALUE out FROM reference WHERE in = $source_id",
+                {"source_id": ensure_record_id(self.id)},
+            )
+            notebook_ids = notebook_ids_result if notebook_ids_result else []
             return await repo_query(
                 """
                 CREATE source_insight CONTENT {
@@ -412,12 +457,16 @@ class Source(ObjectModel):
                         "insight_type": $insight_type,
                         "content": $content,
                         "embedding": $embedding,
+                        "embedding_dimension": $embedding_dimension,
+                        "notebook_ids": $notebook_ids,
                 };""",
                 {
                     "source_id": ensure_record_id(self.id),
                     "insight_type": insight_type,
                     "content": content,
                     "embedding": embedding,
+                    "embedding_dimension": len(embedding) if embedding else None,
+                    "notebook_ids": notebook_ids,
                 },
             )
         except Exception as e:
@@ -523,6 +572,33 @@ class ChatSession(ObjectModel):
         return await self.relate("refers_to", source_id)
 
 
+# Module-level cache for query embeddings (avoids redundant API calls)
+# TTL 1 hour; max 500 entries; evicts oldest 100 when full
+_embedding_cache: dict = {}
+_EMBEDDING_CACHE_TTL = 3600
+_EMBEDDING_CACHE_MAX = 500
+
+
+async def _get_cached_embedding(keyword: str) -> List[float]:
+    """Get embedding for keyword, using in-memory cache to avoid redundant API calls."""
+    cache_key = keyword
+    now = time.time()
+    if cache_key in _embedding_cache:
+        embed, cached_at = _embedding_cache[cache_key]
+        if now - cached_at < _EMBEDDING_CACHE_TTL:
+            return embed
+    EMBEDDING_MODEL = await model_manager.get_embedding_model()
+    if EMBEDDING_MODEL is None:
+        raise ValueError("EMBEDDING_MODEL is not configured")
+    embed = (await EMBEDDING_MODEL.aembed([keyword]))[0]
+    _embedding_cache[cache_key] = (embed, now)
+    if len(_embedding_cache) > _EMBEDDING_CACHE_MAX:
+        oldest = sorted(_embedding_cache, key=lambda k: _embedding_cache[k][1])
+        for k in oldest[:100]:
+            del _embedding_cache[k]
+    return embed
+
+
 async def text_search(
     keyword: str, results: int, source: bool = True, note: bool = True
 ):
@@ -548,15 +624,12 @@ async def vector_search(
     results: int,
     source: bool = True,
     note: bool = True,
-    minimum_score=0.2,
+    minimum_score=0.45,
 ):
     if not keyword:
         raise InvalidInputError("Search keyword cannot be empty")
     try:
-        EMBEDDING_MODEL = await model_manager.get_embedding_model()
-        if EMBEDDING_MODEL is None:
-            raise ValueError("EMBEDDING_MODEL is not configured")
-        embed = (await EMBEDDING_MODEL.aembed([keyword]))[0]
+        embed = await _get_cached_embedding(keyword)
         search_results = await repo_query(
             """
             SELECT * FROM fn::vector_search($embed, $results, $source, $note, $minimum_score);
@@ -599,97 +672,102 @@ async def vector_search_for_notebook(
         raise InvalidInputError("Search keyword cannot be empty")
     
     try:
-        EMBEDDING_MODEL = await model_manager.get_embedding_model()
-        if EMBEDDING_MODEL is None:
-            raise ValueError("EMBEDDING_MODEL is not configured")
-        
-        embed = (await EMBEDDING_MODEL.aembed([keyword]))[0]
+        embed = await _get_cached_embedding(keyword)
         notebook_id_clean = ensure_record_id(notebook_id)
-        
+
         # Build base params
         params = {
             "notebook_id": notebook_id_clean,
             "embed": embed,
             "results": results,
         }
-        
-        # Query source_embedding table
+
+        # Brute-force cosine scan for notebook-scoped search.
+        # KNN <|K,EF|> can't pre-filter by notebook — it returns global top-K then
+        # post-filters, which drops most results. Cosine scan is correct here because
+        # the WHERE clause narrows to notebook sources BEFORE ranking by similarity.
+        # (fn::vector_search for global search still benefits from HNSW indexes.)
+        # Notebook filter: use denormalized notebook_ids when set; fallback to reference
+        # subquery for rows not yet backfilled (migration 38) so search works in both cases.
+        notebook_filter_embed = (
+            "(notebook_ids CONTAINS $notebook_id OR ((notebook_ids = none OR array::len(notebook_ids) = 0) AND source IN (SELECT VALUE in FROM reference WHERE out = $notebook_id)))"
+        )
+        notebook_filter_insight = (
+            "(notebook_ids CONTAINS $notebook_id OR ((notebook_ids = none OR array::len(notebook_ids) = 0) AND source IN (SELECT VALUE in FROM reference WHERE out = $notebook_id)))"
+        )
         if source_ids:
             source_ids_clean = [ensure_record_id(sid) for sid in source_ids]
-            query = """
+            query = f"""
             SELECT
-                source.id as id,
-                source.title as title,
+                source.id AS id,
+                source.title AS title,
                 content,
-                source.id as parent_id,
+                source.id AS parent_id,
                 page_number,
                 timestamp_seconds,
-                vector::similarity::cosine(embedding, $embed) as similarity
+                vector::similarity::cosine(embedding, $embed) AS similarity
             FROM source_embedding
             WHERE source IN $source_ids
-                AND source IN (SELECT VALUE in FROM reference WHERE out=$notebook_id)
+                AND {notebook_filter_embed}
                 AND embedding != none
                 AND array::len(embedding) = array::len($embed)
             ORDER BY similarity DESC
             LIMIT $results
             """
-            params_with_sources = {**params, "source_ids": source_ids_clean}
-            source_results = await repo_query(query, params_with_sources)
-        else:
-            query = """
+            insight_query = f"""
             SELECT
-                source.id as id,
-                source.title as title,
+                id,
+                insight_type + ' - ' + (source.title OR '') AS title,
                 content,
-                source.id as parent_id,
-                page_number,
-                timestamp_seconds,
-                vector::similarity::cosine(embedding, $embed) as similarity
-            FROM source_embedding
-            WHERE source IN (SELECT VALUE in FROM reference WHERE out=$notebook_id)
+                source.id AS parent_id,
+                vector::similarity::cosine(embedding, $embed) AS similarity
+            FROM source_insight
+            WHERE source IN $source_ids
+                AND {notebook_filter_insight}
                 AND embedding != none
                 AND array::len(embedding) = array::len($embed)
             ORDER BY similarity DESC
             LIMIT $results
             """
-            source_results = await repo_query(query, params)
-        
-        # Query source_insight table
-        if source_ids:
-            source_ids_clean = [ensure_record_id(sid) for sid in source_ids]
-            insight_query = """
-            SELECT 
-                id,
-                insight_type + ' - ' + (source.title OR '') as title,
-                content,
-                source.id as parent_id,
-                vector::similarity::cosine(embedding, $embed) as similarity
-            FROM source_insight
-            WHERE source IN $source_ids
-                AND source IN (SELECT VALUE in FROM reference WHERE out=$notebook_id)
-                AND embedding != none 
-                AND array::len(embedding) = array::len($embed)
-            ORDER BY similarity DESC
-            LIMIT $results
-            """
-            params_with_sources = {**params, "source_ids": source_ids_clean}
-            insight_results = await repo_query(insight_query, params_with_sources)
+            query_params = {**params, "source_ids": source_ids_clean}
         else:
-            insight_query = """
-            SELECT 
-                id,
-                insight_type + ' - ' + (source.title OR '') as title,
+            query = f"""
+            SELECT
+                source.id AS id,
+                source.title AS title,
                 content,
-                source.id as parent_id,
-                vector::similarity::cosine(embedding, $embed) as similarity
-            FROM source_insight
-            WHERE source IN (SELECT VALUE in FROM reference WHERE out=$notebook_id)
-                AND embedding != none 
+                source.id AS parent_id,
+                page_number,
+                timestamp_seconds,
+                vector::similarity::cosine(embedding, $embed) AS similarity
+            FROM source_embedding
+            WHERE {notebook_filter_embed}
+                AND embedding != none
                 AND array::len(embedding) = array::len($embed)
             ORDER BY similarity DESC
             LIMIT $results
             """
-            insight_results = await repo_query(insight_query, params)
+            insight_query = f"""
+            SELECT
+                id,
+                insight_type + ' - ' + (source.title OR '') AS title,
+                content,
+                source.id AS parent_id,
+                vector::similarity::cosine(embedding, $embed) AS similarity
+            FROM source_insight
+            WHERE {notebook_filter_insight}
+                AND embedding != none
+                AND array::len(embedding) = array::len($embed)
+            ORDER BY similarity DESC
+            LIMIT $results
+            """
+            query_params = params
+
+        # Run both queries in parallel
+        source_results, insight_results = await asyncio.gather(
+            repo_query(query, query_params),
+            repo_query(insight_query, query_params),
+        )
         
         # Combine and sort all results
         all_results = []

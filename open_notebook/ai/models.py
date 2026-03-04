@@ -1,3 +1,4 @@
+import os
 from typing import ClassVar, Dict, Optional, Union
 
 from esperanto import (
@@ -13,6 +14,7 @@ from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.base import ObjectModel, RecordModel
 
 ModelType = Union[LanguageModel, EmbeddingModel, SpeechToTextModel, TextToSpeechModel]
+EXPECTED_EMBEDDING_DIMENSION = int(os.getenv("OPEN_NOTEBOOK_EMBEDDING_DIMENSION", "3072"))
 
 
 class Model(ObjectModel):
@@ -95,6 +97,10 @@ class ModelManager:
                 config=kwargs,
             )
         elif model.type == "embedding":
+            # Keep runtime output dimension aligned with DB vector indexes.
+            # Can be overridden explicitly by caller kwargs when needed.
+            if "dimensions" not in kwargs:
+                kwargs = {**kwargs, "dimensions": EXPECTED_EMBEDDING_DIMENSION}
             return AIFactory.create_embedding(
                 model_name=model.name,
                 provider=model.provider,
