@@ -252,6 +252,32 @@ def should_continue(state: ThreadState) -> str:
     return "tools"
 
 
+# Surface-only tools are terminal — no further LLM reasoning needed after them.
+# (Retrieval tools like search_knowledge_base still need a follow-up LLM turn.)
+_SURFACE_ONLY_TOOLS = frozenset({"surface_document", "surface_quiz", "surface_podcast"})
+
+
+def after_tools(state: ThreadState) -> str:
+    """Route after tool execution.
+
+    Surface-only tools display content and are terminal — skip the next LLM turn.
+    Retrieval/generation tools produce information the LLM must reason about.
+    If the last AIMessage used ONLY surface tools → END.
+    If any retrieval or generation tool was called → back to agent.
+    """
+    messages = state.get("messages", [])
+    for msg in reversed(messages):
+        if isinstance(msg, ToolMessage):
+            continue  # Skip tool results, find the AIMessage that triggered them
+        if isinstance(msg, AIMessage) and getattr(msg, "tool_calls", None):
+            called = {tc["name"] for tc in msg.tool_calls}
+            if called.issubset(_SURFACE_ONLY_TOOLS):
+                return "__end__"
+            return "agent"
+        break
+    return "agent"
+
+
 learner_state = StateGraph(ThreadState)
 learner_state.add_node("agent", call_model_async)
 learner_state.add_node("tools", tool_executor)
@@ -259,7 +285,9 @@ learner_state.add_edge(START, "agent")
 learner_state.add_conditional_edges(
     "agent", should_continue, {"tools": "tools", "__end__": END}
 )
-learner_state.add_edge("tools", "agent")
+learner_state.add_conditional_edges(
+    "tools", after_tools, {"agent": "agent", "__end__": END}
+)
 
 
 # ---------------------------------------------------------------------------
