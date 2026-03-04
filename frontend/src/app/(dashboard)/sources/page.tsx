@@ -388,9 +388,15 @@ export default function SourcesPage() {
                     <span className="text-sm font-medium">{source.insights_count || 0}</span>
                   </td>
                   <td className="h-12 px-4 text-center hidden lg:table-cell">
-                    <Badge variant={source.embedded ? "default" : "secondary"} className="text-xs">
-                      {source.embedded ? t.sources.yes : t.sources.no}
-                    </Badge>
+                    {source.embedded && source.embedding_stale ? (
+                      <Badge variant="outline" className="text-xs border-amber-500 text-amber-600 dark:text-amber-400">
+                        {t.sources.embeddingStale}
+                      </Badge>
+                    ) : (
+                      <Badge variant={source.embedded ? "default" : "secondary"} className="text-xs">
+                        {source.embedded ? t.sources.yes : t.sources.no}
+                      </Badge>
+                    )}
                   </td>
                   <td className="h-12 px-4 text-right">
                     <Button

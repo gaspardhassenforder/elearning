@@ -54,7 +54,7 @@ export default function NotebookPage() {
   // Resizable column widths
   const [documentsWidth, setDocumentsWidth] = useState(33.33) // percentage
   const [notesArtifactsWidth, setNotesArtifactsWidth] = useState(33.33) // percentage
-  const [notesHeight, setNotesHeight] = useState(50) // percentage of Notes+Artifacts column (notes vs artifacts; 50 = equal)
+  const [notesHeight, setNotesHeight] = useState(25) // percentage of Notes+Artifacts column (notes vs artifacts; 25 = 1/4 notes, 3/4 artifacts)
   const [isResizing, setIsResizing] = useState<'documents' | 'notes-artifacts' | 'notes-vertical' | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const resizeStartRef = useRef({ x: 0, y: 0, documentsWidth: 0, notesArtifactsWidth: 0, notesHeight: 0 })

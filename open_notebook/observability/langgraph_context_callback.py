@@ -51,6 +51,9 @@ class ContextLoggingCallback(BaseCallbackHandler):
         if run_id:
             self.run_id_to_name[str(run_id)] = chain_name
 
+        # Normalize inputs to dict (LangChain/LangGraph may pass non-dict)
+        if not isinstance(inputs, dict):
+            inputs = {"value": inputs}
         # Sanitize inputs (truncate long strings)
         sanitized_inputs = self._sanitize_dict(inputs)
 
@@ -72,6 +75,9 @@ class ContextLoggingCallback(BaseCallbackHandler):
         run_id = kwargs.get("run_id")
         chain_name = self.run_id_to_name.get(str(run_id), "unknown") if run_id else "unknown"
 
+        # Normalize outputs to dict (LangChain/LangGraph may pass string or other type)
+        if not isinstance(outputs, dict):
+            outputs = {"value": outputs}
         # Sanitize outputs
         sanitized_outputs = self._sanitize_dict(outputs)
 

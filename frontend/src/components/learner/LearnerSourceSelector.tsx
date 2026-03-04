@@ -87,12 +87,12 @@ export function LearnerSourceSelector({
             : (t.learner?.createArtifact?.selectAll || 'Select All')}
         </button>
       </div>
-      <ScrollArea className="max-h-[200px] rounded-md border p-2">
+      <ScrollArea className="w-full max-h-[200px] rounded-md border p-2">
         <div className="space-y-1">
           {sources.map((source) => (
             <label
               key={source.id}
-              className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-accent/50 cursor-pointer text-sm"
+              className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-accent/50 cursor-pointer text-sm min-w-0"
             >
               <Checkbox
                 checked={selectedSourceIds.includes(source.id)}

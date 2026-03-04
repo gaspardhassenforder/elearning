@@ -24,6 +24,7 @@ import { Loader2 } from 'lucide-react'
 import apiClient from '@/lib/api/client'
 import { useQueryClient } from '@tanstack/react-query'
 import { QUERY_KEYS } from '@/lib/api/query-client'
+import { LearnerSourceSelector } from '@/components/learner/LearnerSourceSelector'
 
 interface GenerateTransformationDialogProps {
   notebookId: string
@@ -41,12 +42,14 @@ export function GenerateTransformationDialog({
   const queryClient = useQueryClient()
   const { data: transformations, isLoading: transformationsLoading } = useTransformations()
   const [selectedTransformationId, setSelectedTransformationId] = useState<string>('')
+  const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
 
   // Reset selection when dialog opens/closes
   useEffect(() => {
     if (!open) {
       setSelectedTransformationId('')
+      setSelectedSourceIds([])
     }
   }, [open])
 
@@ -58,6 +61,7 @@ export function GenerateTransformationDialog({
     try {
       await apiClient.post(`/notebooks/${notebookId}/transformations/generate`, {
         transformation_id: selectedTransformationId,
+        source_ids: selectedSourceIds.length > 0 ? selectedSourceIds : undefined,
       })
       
       // Invalidate artifacts queries
@@ -69,6 +73,7 @@ export function GenerateTransformationDialog({
       })
       
       setSelectedTransformationId('')
+      setSelectedSourceIds([])
       onOpenChange(false)
     } catch (error: any) {
       toast({
@@ -87,8 +92,8 @@ export function GenerateTransformationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col overflow-hidden">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>
             {t.artifacts?.generateTransformation || 'Generate Transformation'}
           </DialogTitle>
@@ -98,7 +103,13 @@ export function GenerateTransformationDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 flex-1 overflow-y-auto min-h-0 pr-1">
+          <LearnerSourceSelector
+            notebookId={notebookId}
+            selectedSourceIds={selectedSourceIds}
+            onSelectionChange={setSelectedSourceIds}
+          />
+
           <div className="space-y-2">
             <Label htmlFor="transformation">
               {t.transformations?.title || 'Transformation'} *
@@ -153,7 +164,7 @@ export function GenerateTransformationDialog({
             </Button>
             <Button
               type="submit"
-              disabled={!selectedTransformationId || isGenerating || transformationsLoading}
+              disabled={!selectedTransformationId || isGenerating || transformationsLoading || selectedSourceIds.length === 0}
             >
               {isGenerating ? (
                 <>

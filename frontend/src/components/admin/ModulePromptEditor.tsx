@@ -13,7 +13,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Info, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { useModulePrompt, useUpdateModulePrompt } from '@/lib/hooks/use-module-prompts'
 import { Button } from '@/components/ui/button'
@@ -75,7 +75,6 @@ export function ModulePromptEditor({ moduleId, onNext, onBack }: ModulePromptEdi
   // Local state
   const [promptText, setPromptText] = useState('')
   const [hasChanges, setHasChanges] = useState(false)
-  const [showInfoBox, setShowInfoBox] = useState(true)
 
   // Initialize prompt text from API or default template
   useEffect(() => {
@@ -150,32 +149,6 @@ export function ModulePromptEditor({ moduleId, onNext, onBack }: ModulePromptEdi
 
   return (
     <div className="space-y-6">
-      {/* Info Box */}
-      {showInfoBox && (
-        <Alert>
-          <Info className="h-4 w-4" />
-          <AlertDescription>
-            <div className="space-y-2">
-              <p className="font-semibold">{t.modulePrompt.infoTitle}</p>
-              <p className="text-sm">{t.modulePrompt.infoDescription}</p>
-              <ul className="text-sm list-disc list-inside space-y-1 ml-2">
-                <li>{t.modulePrompt.infoGlobal}</li>
-                <li>{t.modulePrompt.infoModule}</li>
-              </ul>
-              <p className="text-sm text-muted-foreground mt-2">{t.modulePrompt.infoOptional}</p>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowInfoBox(false)}
-                className="mt-2"
-              >
-                {t.common.dismiss}
-              </Button>
-            </div>
-          </AlertDescription>
-        </Alert>
-      )}
-
       {/* Prompt Editor Card */}
       <Card>
         <CardHeader>

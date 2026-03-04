@@ -136,11 +136,13 @@ class ObjectModel(BaseModel):
                         logger.warning(
                             "No embedding model found. Content will not be searchable."
                         )
-                    data["embedding"] = (
+                    embedding_vector = (
                         (await EMBEDDING_MODEL.aembed([embedding_content]))[0]
                         if EMBEDDING_MODEL
                         else []
                     )
+                    data["embedding"] = embedding_vector
+                    data["embedding_dimension"] = len(embedding_vector) if embedding_vector else None
 
             repo_result: Union[List[Dict[str, Any]], Dict[str, Any]]
             if self.id is None:

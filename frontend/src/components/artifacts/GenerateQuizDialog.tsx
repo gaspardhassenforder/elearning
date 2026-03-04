@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useGenerateQuiz } from '@/lib/hooks/use-artifacts'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { Loader2 } from 'lucide-react'
+import { LearnerSourceSelector } from '@/components/learner/LearnerSourceSelector'
 
 interface GenerateQuizDialogProps {
   notebookId: string
@@ -27,6 +28,7 @@ export function GenerateQuizDialog({ notebookId, open, onOpenChange }: GenerateQ
   const [topic, setTopic] = useState('')
   const [numQuestions, setNumQuestions] = useState<string>('5')
   const [instructions, setInstructions] = useState('')
+  const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([])
   const generateQuiz = useGenerateQuiz()
 
   const handleNumQuestionsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -61,11 +63,13 @@ export function GenerateQuizDialog({ notebookId, open, onOpenChange }: GenerateQ
           topic: topic.trim() || undefined,
           num_questions: finalNum,
           instructions: instructions.trim() || undefined,
+          source_ids: selectedSourceIds.length > 0 ? selectedSourceIds : undefined,
         },
       })
       setTopic('')
       setNumQuestions('5')
       setInstructions('')
+      setSelectedSourceIds([])
       onOpenChange(false)
     } catch (error) {
       // Error is handled by the mutation hook
@@ -74,15 +78,21 @@ export function GenerateQuizDialog({ notebookId, open, onOpenChange }: GenerateQ
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col overflow-hidden">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>{t.artifacts?.generateQuiz || 'Generate Quiz'}</DialogTitle>
           <DialogDescription>
             {t.artifacts?.generateQuizDesc || 'Create a quiz from your notebook sources'}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 flex-1 overflow-y-auto min-h-0 pr-1">
+          <LearnerSourceSelector
+            notebookId={notebookId}
+            selectedSourceIds={selectedSourceIds}
+            onSelectionChange={setSelectedSourceIds}
+          />
+
           <div className="space-y-2">
             <Label htmlFor="topic">{t.artifacts?.quizTopic || 'Topic (optional)'}</Label>
             <Input
@@ -132,7 +142,7 @@ export function GenerateQuizDialog({ notebookId, open, onOpenChange }: GenerateQ
             >
               {t.common.cancel}
             </Button>
-            <Button type="submit" disabled={generateQuiz.isPending}>
+            <Button type="submit" disabled={generateQuiz.isPending || selectedSourceIds.length === 0}>
               {generateQuiz.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />

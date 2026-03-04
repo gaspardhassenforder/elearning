@@ -5,6 +5,7 @@ tracking for learners working through lesson steps.
 """
 
 import json
+import re
 from typing import Dict, List, Optional
 
 from loguru import logger
@@ -14,6 +15,20 @@ from open_notebook.domain.lesson_step import LessonStep
 from open_notebook.domain.learner_step_progress import LearnerStepProgress
 from open_notebook.domain.notebook import Notebook
 from open_notebook.exceptions import DatabaseOperationError
+
+
+def _is_video_source(source) -> bool:
+    """Detect video sources by mirroring frontend getVideoType() logic."""
+    asset = getattr(source, "asset", None)
+    if not asset:
+        return False
+    url = getattr(asset, "url", None) or ""
+    if re.search(r"youtube\.com|youtu\.be", url):
+        return True
+    file_path = getattr(asset, "file_path", None) or ""
+    if re.search(r"\.(mp4|webm|mov|avi)$", file_path, re.IGNORECASE):
+        return True
+    return False
 
 
 async def generate_lesson_plan(notebook_id: str) -> Dict:
@@ -56,7 +71,7 @@ async def generate_lesson_plan(notebook_id: str) -> Dict:
                 {
                     "id": source_id,
                     "title": getattr(source, "title", "Untitled") or "Untitled",
-                    "source_type": getattr(source, "source_type", "document") or "document",
+                    "source_type": "video" if _is_video_source(source) else "document",
                 }
             )
 

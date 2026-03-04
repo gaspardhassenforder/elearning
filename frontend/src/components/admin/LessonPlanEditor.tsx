@@ -55,19 +55,19 @@ interface LessonPlanEditorProps {
 const STEP_TYPE_CONFIG = {
   watch: {
     icon: PlayCircle,
-    className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+    className: 'bg-blue-500 text-white border-transparent dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
   },
   read: {
     icon: BookOpen,
-    className: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+    className: 'bg-green-500 text-white border-transparent dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
   },
   quiz: {
     icon: HelpCircle,
-    className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+    className: 'bg-amber-500 text-white border-transparent dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800',
   },
   discuss: {
     icon: MessageSquare,
-    className: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+    className: 'bg-purple-500 text-white border-transparent dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800',
   },
 } as const
 
