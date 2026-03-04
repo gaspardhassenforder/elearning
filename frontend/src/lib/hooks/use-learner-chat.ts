@@ -23,11 +23,11 @@ interface UseLearnerChatResult {
   messages: LearnerChatMessage[]
   isLoading: boolean
   isStreaming: boolean
+  quickRepliesReady: boolean
   error: Error | null
   sendMessage: (content: string) => Promise<void>
   clearMessages: () => Promise<void>
   editLastMessage: (newContent: string) => Promise<void>
-  greetingRequested: boolean  // Story 4.2: Track if greeting was requested
   lastObjectiveChecked: ObjectiveCheckedData | null  // Story 4.4: Last checked objective for inline confirmation
 }
 
@@ -41,12 +41,20 @@ export function useLearnerChat(
   notebookId: string,
   isLoadingHistory: boolean = false,
   hasExistingHistory: boolean = false,
+  isHistoryFetching: boolean = false,
 ): UseLearnerChatResult {
   const { toast } = useToast()
   const { language } = useTranslation()
   const queryClient = useQueryClient()
   const [messages, setMessages] = useState<LearnerChatMessage[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
+  // true by default so pre-first-message suggestions render immediately
+  const [quickRepliesReady, setQuickRepliesReady] = useState(true)
+  const quickRepliesTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Clear timeout on unmount to prevent state update on unmounted component
+  useEffect(() => () => {
+    if (quickRepliesTimeoutRef.current) clearTimeout(quickRepliesTimeoutRef.current)
+  }, [])
   // Story 4.4: Track last checked objective for inline confirmation
   const [lastObjectiveChecked, setLastObjectiveChecked] = useState<ObjectiveCheckedData | null>(null)
 
@@ -172,6 +180,12 @@ export function useLearnerChat(
               detail: objectiveData
             }))
           } else if (event.type === 'quick_replies' && event.replies?.length) {
+            // LLM replies arrived — clear timeout and mark ready
+            if (quickRepliesTimeoutRef.current) {
+              clearTimeout(quickRepliesTimeoutRef.current)
+              quickRepliesTimeoutRef.current = null
+            }
+            setQuickRepliesReady(true)
             // Attach LLM-generated quick reply suggestions to the last assistant message
             setMessages((prev) => {
               const updated = [...prev]
@@ -192,7 +206,14 @@ export function useLearnerChat(
               return updated
             })
           } else if (event.type === 'message_complete') {
-            // Story 4.3: Message streaming complete - trigger reactive scroll
+            // Message streaming complete: stop loading state so user can read and type next.
+            // quick_replies and objective_checked may still arrive later and update the UI.
+            setIsStreaming(false)
+            // Wait for LLM quick replies; fall back to step-based after 5s
+            setQuickRepliesReady(false)
+            if (quickRepliesTimeoutRef.current) clearTimeout(quickRepliesTimeoutRef.current)
+            quickRepliesTimeoutRef.current = setTimeout(() => setQuickRepliesReady(true), 5000)
+            // Story 4.3: Trigger reactive scroll
             const completedToolCalls = Array.from(toolCallsMap.values())
 
             // Attach tool calls to message
@@ -280,8 +301,7 @@ export function useLearnerChat(
 
   const clearMessages = useCallback(async () => {
     setMessages([])
-    greetingRequestedRef.current = false  // Allow greeting to fire again
-    setGreetingRequested(false)
+    greetingRequestedRef.current = false  // Allow greeting to fire again after reset
     try {
       const { resetLearnerChat } = await import('../api/learner-chat')
       await resetLearnerChat(notebookId)
@@ -309,87 +329,107 @@ export function useLearnerChat(
     [sendMessageMutation, isStreaming, messages]
   )
 
-  // Story 4.2: Request proactive greeting on first load
-  const [greetingRequested, setGreetingRequested] = useState(false)
+  // Trigger first-visit greeting: send empty message so backend injects hidden intro
   const greetingRequestedRef = useRef(false)
 
+  // Reset state when switching modules so new module gets its own greeting
   useEffect(() => {
-    // Wait for history check to complete before deciding whether to greet
+    setMessages([])
+    greetingRequestedRef.current = false
+    setLastObjectiveChecked(null)
+  }, [notebookId])
+
+  useEffect(() => {
     if (isLoadingHistory) return
-
-    // Don't generate a new greeting when history already has messages
+    if (isHistoryFetching) return   // Wait for background refetches to complete before checking history
     if (hasExistingHistory) return
+    if (messages.length > 0) return
+    if (greetingRequestedRef.current) return
+    if (isLoading || error) return
 
-    // Only request greeting once, when messages are empty and not already requested
-    if (messages.length === 0 && !greetingRequestedRef.current && !isLoading && !error) {
-      greetingRequestedRef.current = true
-      setGreetingRequested(true)
+    greetingRequestedRef.current = true
 
-      // Request greeting-only message
-      const requestGreeting = async () => {
-        try {
-          setIsStreaming(true)
-          const response = await sendLearnerChatMessage(notebookId, {
-            message: '',
-            request_greeting_only: true,
-            language,
-          })
+    const requestGreeting = async () => {
+      try {
+        setIsStreaming(true)
+        setQuickRepliesReady(false)  // Wait for LLM quick replies on greeting
+        const response = await sendLearnerChatMessage(notebookId, { message: '', language })
 
-          // Parse SSE stream and accumulate greeting
-          let greetingContent = ''
-          const greetingMessage: LearnerChatMessage = {
-            role: 'assistant',
-            content: '',
-            timestamp: new Date().toISOString(),
-          }
-
-          // Add empty assistant message that will be updated as stream arrives
-          setMessages([greetingMessage])
-
-          // Stream parsing
-          for await (const event of parseLearnerChatStream(response)) {
-            if (event.type === 'text' && event.delta) {
-              greetingContent += event.delta
-
-              // Update greeting message with accumulated content
-              setMessages((prev) => {
-                const updated = [...prev]
-                const lastMessage = updated[updated.length - 1]
-                if (lastMessage && lastMessage.role === 'assistant') {
-                  lastMessage.content = greetingContent
-                }
-                return updated
-              })
-            }
-          }
-        } catch (err) {
-          console.error('Failed to fetch greeting:', err)
-          // If greeting fails, show empty state and notify user
-          setMessages([])
-
-          toast({
-            title: 'Could not generate greeting',
-            description: 'You can still start the conversation by sending a message.',
-            variant: 'default',  // Non-destructive - not critical failure
-          })
-        } finally {
-          setIsStreaming(false)
+        let greetingContent = ''
+        const greetingToolCallsMap = new Map<string, ToolCall>()
+        const greetingMessage: LearnerChatMessage = {
+          role: 'assistant',
+          content: '',
+          timestamp: new Date().toISOString(),
+          toolCalls: [],
         }
-      }
+        // Use functional update to avoid overwriting any concurrently loaded messages
+        setMessages((prev) => prev.length === 0 ? [greetingMessage] : prev)
 
-      requestGreeting()
+        for await (const event of parseLearnerChatStream(response)) {
+          if (event.type === 'text' && event.delta) {
+            greetingContent += event.delta
+            setMessages((prev) => {
+              const updated = [...prev]
+              const lastMessage = updated[updated.length - 1]
+              if (lastMessage && lastMessage.role === 'assistant') {
+                lastMessage.content = greetingContent
+              }
+              return updated
+            })
+          } else if (event.type === 'tool_call' && event.toolCall) {
+            greetingToolCallsMap.set(event.toolCall.id, event.toolCall)
+          } else if (event.type === 'tool_result' && event.toolResult) {
+            const toolCall = greetingToolCallsMap.get(event.toolResult.id)
+            if (toolCall) {
+              const rawResult = event.toolResult.result
+              toolCall.result = rawResult?.output && typeof rawResult.output === 'object' && !Array.isArray(rawResult.output)
+                ? rawResult.output
+                : rawResult
+            }
+          } else if (event.type === 'message_complete') {
+            const completedToolCalls = Array.from(greetingToolCallsMap.values())
+            setMessages((prev) => {
+              const updated = [...prev]
+              const lastMessage = updated[updated.length - 1]
+              if (lastMessage && lastMessage.role === 'assistant') {
+                lastMessage.toolCalls = completedToolCalls
+              }
+              return updated
+            })
+          } else if (event.type === 'quick_replies' && event.replies?.length) {
+            setQuickRepliesReady(true)
+            setMessages((prev) => {
+              const updated = [...prev]
+              const lastMessage = updated[updated.length - 1]
+              if (lastMessage && lastMessage.role === 'assistant') {
+                lastMessage.quickReplies = event.replies
+              }
+              return updated
+            })
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch greeting:', err)
+        setMessages([])
+      } finally {
+        setIsStreaming(false)
+        setQuickRepliesReady(true)  // Fallback: show step-based replies if quick_replies never arrived
+      }
     }
-  }, [messages.length, notebookId, isLoading, error, isLoadingHistory, hasExistingHistory])
+
+    requestGreeting()
+  }, [notebookId, isLoadingHistory, isHistoryFetching, hasExistingHistory])
 
   return {
     messages,
     isLoading,
     isStreaming,
+    quickRepliesReady,
     error: error as Error | null,
     sendMessage,
     clearMessages,
     editLastMessage,
-    greetingRequested,
     lastObjectiveChecked,  // Story 4.4: Expose for inline confirmation
   }
 }
@@ -410,7 +450,7 @@ export function useChatHistory(notebookId: string) {
       const { getChatHistory } = await import('../api/learner-chat')
       return getChatHistory(notebookId)
     },
-    staleTime: 1000 * 60 * 5, // 5 minutes - history doesn't change frequently
+    staleTime: 0, // Always refetch on mount so hasExistingHistory is accurate and prevents duplicate greetings
     retry: 1, // Retry once on failure
   })
 }

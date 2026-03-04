@@ -5,7 +5,7 @@ You are an expert instructional designer. Given a list of learning sources in a 
 {% for source in sources %}
 - ID: {{ source.id }}
   Title: {{ source.title }}
-  Type: {{ source.source_type }}
+  Type: {{ source.source_type }}{% if source.source_type == "video" %} (note: stored as transcript, learner watches it){% endif %}
 {% endfor %}
 
 ## Task

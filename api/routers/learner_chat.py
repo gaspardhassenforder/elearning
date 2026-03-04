@@ -20,13 +20,11 @@ from typing import Optional
 
 from api.auth import LearnerContext, get_current_learner
 from api.learner_chat_service import (
-    generate_proactive_greeting,
+    build_intro_message,
     generate_quick_replies,
     prepare_chat_context,
-    stream_proactive_greeting,
     validate_learner_access_to_notebook,
 )
-from open_notebook.graphs.prompt import generate_re_engagement_greeting
 from open_notebook.graphs.chat import get_async_graph, get_async_memory
 from open_notebook.utils import extract_text_from_response
 from open_notebook.observability.langsmith_handler import get_langsmith_callback
@@ -74,11 +72,7 @@ class ChatHistoryResponse(BaseModel):
 class LearnerChatRequest(BaseModel):
     """Request body for learner chat message."""
 
-    message: str = Field(default="", description="Learner's message content (empty for greeting-only request)")
-    request_greeting_only: bool = Field(
-        default=False,
-        description="Story 4.2: If true, only return greeting without processing message"
-    )
+    message: str = Field(default="", description="Learner's message content (empty triggers first-visit greeting)")
     language: str = Field(
         default="en-US",
         description="UI language code (e.g., 'en-US', 'fr-FR') for AI response language"
@@ -287,12 +281,18 @@ async def get_chat_history(
                 has_more=False
             )
 
-        # Story 4.8 Task 9: Apply pagination
-        total_messages = len(messages)
+        # Filter hidden messages (first-visit intro) BEFORE pagination
+        visible_messages = [
+            msg for msg in messages
+            if not (isinstance(msg, HumanMessage) and getattr(msg, "additional_kwargs", {}).get("hidden", False))
+        ]
+
+        # Story 4.8 Task 9: Apply pagination on visible messages
+        total_messages = len(visible_messages)
         has_more = (offset + limit) < total_messages
 
         # Slice messages for pagination (offset from start, limit count)
-        paginated_messages = messages[offset:offset + limit]
+        paginated_messages = visible_messages[offset:offset + limit]
 
         logger.info(
             f"Pagination: total={total_messages}, offset={offset}, "
@@ -315,18 +315,55 @@ async def get_chat_history(
             if isinstance(msg, ToolMessage):
                 tool_call_id = getattr(msg, "tool_call_id", None)
                 if tool_call_id and tool_call_id in tool_call_buffer:
+                    pending = tool_call_buffer[tool_call_id]
                     try:
                         # content_and_artifact tools (e.g. surface_document) store the
                         # frontend-ready dict in .artifact; regular tools store JSON in .content
                         if hasattr(msg, "artifact") and msg.artifact:
                             result = msg.artifact
+                        elif pending.toolName == "surface_document":
+                            # ToolMessage.artifact may not survive checkpoint serialization.
+                            # Reconstruct from tool call args (stored on AIMessage) + DB lookup.
+                            source_id = (pending.args or {}).get("source_id")
+                            if source_id:
+                                try:
+                                    import os
+                                    from open_notebook.domain.notebook import Source
+                                    source = await Source.get(source_id)
+                                    if source:
+                                        file_type = "document"
+                                        if source.asset and source.asset.file_path:
+                                            _, ext = os.path.splitext(source.asset.file_path)
+                                            file_type = ext.lstrip('.') if ext else "file"
+                                        elif source.asset and source.asset.url:
+                                            file_type = "url"
+                                        result = {
+                                            "source_id": source_id,
+                                            "title": source.title or "Untitled Document",
+                                            "source_type": file_type,
+                                            "excerpt": (pending.args or {}).get("excerpt_text", ""),
+                                            "relevance": (pending.args or {}).get("relevance_reason", ""),
+                                            "page_number": (pending.args or {}).get("page_number"),
+                                            "timestamp_seconds": (pending.args or {}).get("timestamp_seconds"),
+                                            "asset_url": source.asset.url if source.asset else None,
+                                            "asset_file_path": source.asset.file_path if source.asset else None,
+                                        }
+                                    else:
+                                        result = {}
+                                except Exception as recon_err:
+                                    logger.warning(
+                                        "Could not reconstruct surface_document artifact for {}: {}",
+                                        source_id, str(recon_err),
+                                    )
+                                    result = {}
+                            else:
+                                result = {}
                         elif isinstance(msg.content, str) and msg.content:
                             result = json.loads(msg.content)
                         else:
                             result = {}
                     except (json.JSONDecodeError, TypeError):
                         result = {"content": str(msg.content) if msg.content else ""}
-                    pending = tool_call_buffer[tool_call_id]
                     tool_call_buffer[tool_call_id] = ToolCallData(
                         id=pending.id,
                         toolName=pending.toolName,
@@ -415,7 +452,7 @@ async def get_chat_history(
                 merged_messages[-1] = ChatHistoryMessage(
                     id=prev.id,
                     role="assistant",
-                    content=prev.content + "\n\n" + msg.content,
+                    content=(prev.content or "") + (msg.content or ""),
                     createdAt=prev.createdAt,
                     toolCalls=combined_tool_calls,
                 )
@@ -519,11 +556,9 @@ async def stream_learner_chat(
             thread_id = f"{learner.user.id}:{notebook_id}"
             logger.info(f"Using thread_id: {thread_id}")
 
-            # Story 4.2 + 4.8: Check if this is first visit or returning user
+            # Check if this is first visit (no checkpoint messages) or returning user
             is_first_visit = False
-            is_returning_user = False
             try:
-                # Get thread state from checkpoint
                 async_memory = await get_async_memory()
                 thread_state = await async_memory.aget({"configurable": {"thread_id": thread_id}})
 
@@ -542,86 +577,28 @@ async def stream_learner_chat(
                         if isinstance(checkpoint_data, dict) and "channel_values" in checkpoint_data:
                             messages = checkpoint_data["channel_values"].get("messages", [])
 
-                # Determine user status
                 if not thread_state or not messages:
                     is_first_visit = True
                     logger.info(f"First visit detected for thread {thread_id}")
                 else:
-                    is_returning_user = True
                     logger.info(f"Returning user detected for thread {thread_id} ({len(messages)} messages in history)")
             except Exception as e:
                 logger.warning("Could not check thread state, assuming first visit: {}", str(e))
                 is_first_visit = True
 
-            # Story 4.2: Generate and stream proactive greeting for FIRST visit only.
-            # Returning users already see their history loaded via /history endpoint,
-            # so a re-engagement greeting on top of that is redundant and confusing.
-            if request.request_greeting_only:
-                if is_first_visit:
-                    logger.info("Generating proactive greeting for first visit...")
-                    try:
-                        # Stream greeting tokens directly from LLM
-                        full_greeting = ""
-                        async for token in stream_proactive_greeting(
-                            notebook_id=notebook_id,
-                            learner_profile=learner_profile_dict,
-                            notebook=notebook,
-                            language=request.language,
-                        ):
-                            full_greeting += token
-                            text_event = SSETextEvent(delta=token)
-                            yield f"event: text\ndata: {text_event.model_dump_json()}\n\n"
-
-                        # Send message complete for greeting
-                        greeting_complete_event = SSEMessageCompleteEvent(
-                            messageId=f"greeting_{thread_id}",
-                            metadata={
-                                "thread_id": thread_id,
-                                "notebook_id": notebook_id,
-                                "type": "proactive_greeting",
-                                "is_returning_user": False,
-                            },
-                        )
-                        yield f"event: message_complete\ndata: {greeting_complete_event.model_dump_json()}\n\n"
-
-                        logger.info("Proactive greeting streamed successfully")
-
-                        # Persist complete greeting to checkpoint so AI sees it in
-                        # history and doesn't re-introduce itself on the first real message
-                        try:
-                            async_graph = await get_async_graph()
-                            await async_graph.aupdate_state(
-                                {"configurable": {"thread_id": thread_id}},
-                                {"messages": [AIMessage(content=full_greeting)]},
-                                as_node="agent",
-                            )
-                            logger.info("Greeting persisted to checkpoint for thread {}", thread_id)
-                        except Exception as persist_err:
-                            # Non-fatal: greeting was already streamed to user
-                            logger.warning(
-                                "Failed to persist greeting to checkpoint for thread {}: {}",
-                                thread_id, str(persist_err)
-                            )
-
-                    except Exception as e:
-                        logger.error("Failed to stream proactive greeting: {}", str(e))
-                        # Continue — frontend will show fallback empty state
-
-                elif is_returning_user:
-                    # Returning user: skip greeting generation.
-                    # History is loaded separately via /history endpoint.
-                    logger.info(f"Returning user on thread {thread_id} — skipping greeting (history loaded via /history)")
-
-                # Always return after a greeting-only request
-                logger.info("Greeting-only request completed")
+            # Determine user message for this turn.
+            # First visit + empty message: inject hidden intro to trigger natural greeting.
+            # Returning user + empty message: nothing to do (history loaded via /history).
+            # Normal turn: use request.message.
+            if is_first_visit and not request.message.strip():
+                intro_text = build_intro_message(learner_profile_dict, request.language)
+                user_message = HumanMessage(content=intro_text, additional_kwargs={"hidden": True})
+                logger.info(f"First visit: injecting hidden intro message for thread {thread_id}")
+            elif not request.message.strip():
+                logger.info(f"Returning user with empty message on thread {thread_id} — no action")
                 return
-
-            # Prepare user message (skip if empty)
-            if not request.message.strip():
-                logger.warning("Empty message received, skipping graph invocation")
-                return
-
-            user_message = HumanMessage(content=request.message)
+            else:
+                user_message = HumanMessage(content=request.message)
 
             # Story 7.4: Create LangSmith callback for tracing (or None if not configured)
             langsmith_callback = get_langsmith_callback(
@@ -770,62 +747,88 @@ async def stream_learner_chat(
                     yield ": heartbeat\n\n"
                     last_event_time = time.monotonic()
 
-            # Emit message_complete IMMEDIATELY (not blocked by examiner)
+            # Emit message_complete IMMEDIATELY so frontend can show "done" and re-enable input
             message_complete_event = SSEMessageCompleteEvent(
                 messageId=f"msg_{thread_id}_{len(request.message)}",
                 metadata={"thread_id": thread_id, "notebook_id": notebook_id},
             )
             yield f"event: message_complete\ndata: {message_complete_event.model_dump_json()}\n\n"
 
-            # Launch background examiner and relay results while SSE connection is open
+            # Run examiner and quick_replies in parallel; relay events as they complete.
+            # This avoids blocking the stream 8s on quick_replies then 15s on examiner.
+            # Skip examiner on first-visit greeting (no real user message to evaluate).
             from open_notebook.graphs.nodes.examiner import evaluate_exchange
 
             examiner_queue: asyncio.Queue = asyncio.Queue()
-            asyncio.create_task(
-                evaluate_exchange(
-                    user_message=request.message,
-                    ai_response="".join(collected_ai_text),
-                    objectives_with_status=objectives_with_status,
-                    user_id=learner.user.id,
-                    notebook_id=notebook_id,
-                    result_queue=examiner_queue,
-                )
-            )
-
-            # Generate contextual quick replies concurrently with examiner
-            # Uses cheap gemini-2.0-flash-lite; runs while examiner is in flight
-            try:
-                replies = await asyncio.wait_for(
-                    generate_quick_replies(
+            if request.message.strip():
+                asyncio.create_task(
+                    evaluate_exchange(
                         user_message=request.message,
                         ai_response="".join(collected_ai_text),
-                    ),
-                    timeout=8.0,
+                        objectives_with_status=objectives_with_status,
+                        user_id=learner.user.id,
+                        notebook_id=notebook_id,
+                        result_queue=examiner_queue,
+                    )
                 )
-                if replies:
-                    quick_replies_event = SSEQuickRepliesEvent(replies=replies)
-                    yield f"event: quick_replies\ndata: {quick_replies_event.model_dump_json()}\n\n"
-            except asyncio.TimeoutError:
-                logger.warning("Quick replies timed out for thread {}", thread_id)
-            except Exception as e:
-                logger.warning("Quick replies failed for thread {}: {}", thread_id, str(e))
-
-            # Wait for examiner results (with 15s timeout) — SSE stays alive
+            else:
+                # First-visit greeting: put sentinel synchronously so loop exits immediately
+                await examiner_queue.put(None)
+            # For greeting (empty user message), pass AI response as context for quick replies
+            ai_response_text = "".join(collected_ai_text)
+            quick_replies_task = asyncio.create_task(
+                generate_quick_replies(
+                    user_message=request.message if request.message.strip() else ai_response_text,
+                    ai_response=ai_response_text,
+                    language=request.language,
+                )
+            )
+            quick_replies_sent = False
+            examiner_done = False
+            max_poll_iterations = 30  # 30 × 1s = 30s max wait before giving up
+            poll_count = 0
             try:
-                while True:
-                    result = await asyncio.wait_for(
-                        examiner_queue.get(), timeout=15.0
-                    )
-                    if result is None:
-                        break  # Sentinel: examiner done
-                    objective_event = SSEObjectiveCheckedEvent(**result)
-                    yield f"event: objective_checked\ndata: {objective_event.model_dump_json()}\n\n"
-                    logger.info(
-                        "Emitted objective_checked event: {}/{}",
-                        result.get("total_completed"), result.get("total_objectives"),
-                    )
+                while not examiner_done and poll_count < max_poll_iterations:
+                    poll_count += 1
+                    try:
+                        result = await asyncio.wait_for(
+                            examiner_queue.get(), timeout=1.0
+                        )
+                        got_from_queue = True
+                    except asyncio.TimeoutError:
+                        got_from_queue = False
+                        result = None
+                    if got_from_queue:
+                        if result is None:
+                            examiner_done = True
+                        elif isinstance(result, dict):
+                            objective_event = SSEObjectiveCheckedEvent(**result)
+                            yield f"event: objective_checked\ndata: {objective_event.model_dump_json()}\n\n"
+                            logger.info(
+                                "Emitted objective_checked event: {}/{}",
+                                result.get("total_completed"), result.get("total_objectives"),
+                            )
+                    if not quick_replies_sent and quick_replies_task.done():
+                        quick_replies_sent = True
+                        try:
+                            replies = quick_replies_task.result()
+                            if replies:
+                                quick_replies_event = SSEQuickRepliesEvent(replies=replies)
+                                yield f"event: quick_replies\ndata: {quick_replies_event.model_dump_json()}\n\n"
+                        except Exception:
+                            pass
             except asyncio.TimeoutError:
                 logger.warning("Examiner timed out for thread {}", thread_id)
+            if poll_count >= max_poll_iterations:
+                logger.warning("Examiner polling hit max iterations ({}) for thread {}", max_poll_iterations, thread_id)
+            if not quick_replies_sent and quick_replies_task.done():
+                try:
+                    replies = quick_replies_task.result()
+                    if replies:
+                        quick_replies_event = SSEQuickRepliesEvent(replies=replies)
+                        yield f"event: quick_replies\ndata: {quick_replies_event.model_dump_json()}\n\n"
+                except Exception:
+                    pass
 
         except Exception as e:
             # Story 7.1: Stream error event to frontend

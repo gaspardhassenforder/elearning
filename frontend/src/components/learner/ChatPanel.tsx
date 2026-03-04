@@ -60,6 +60,7 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
   const {
     data: historyData,
     isLoading: isLoadingHistory,
+    isFetching: isHistoryFetching,
     error: historyError,
   } = useChatHistory(notebookId)
 
@@ -69,12 +70,13 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
   const {
     isLoading,
     isStreaming,
+    quickRepliesReady,
     error,
     sendMessage,
     messages,
     clearMessages,
     editLastMessage,
-  } = useLearnerChat(notebookId, isLoadingHistory, hasExistingHistory)
+  } = useLearnerChat(notebookId, isLoadingHistory, hasExistingHistory, isHistoryFetching)
 
   // Lesson step progress
   const { data: stepProgress } = useLessonStepsProgress(notebookId)
@@ -153,6 +155,9 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
     ? [...historyData.messages, ...messages]
     : messages
   ).map(m => ({ ...m, content: cleanMessageContent(m.content) }))
+
+  // Memoized: avoids scanning allMessages on every SSE-delta re-render
+  const hasUserMessage = useMemo(() => allMessages.some((m) => m.role === 'user'), [allMessages])
 
   // Track when history finishes loading
   useEffect(() => {
@@ -431,8 +436,7 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
                   />
                 )}
                 {/* Dynamic quick replies — shown after each AI message (or before first user message) */}
-                {!isStreaming && (allMessages.length === 0 || allMessages[allMessages.length - 1]?.role === 'assistant') && (() => {
-                  const hasUserMessage = allMessages.some((m) => m.role === 'user')
+                {!isStreaming && quickRepliesReady && (allMessages.length === 0 || allMessages[allMessages.length - 1]?.role === 'assistant') && (() => {
                   let replies: string[]
                   if (!hasUserMessage) {
                     replies = [
