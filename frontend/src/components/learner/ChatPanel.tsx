@@ -32,6 +32,34 @@ import { useVoiceInput } from '@/lib/hooks/use-voice-input'
 import { useNotebookSources } from '@/lib/hooks/use-sources'
 import { useLessonSteps, useLessonStepsProgress } from '@/lib/hooks/use-lesson-plan'
 import type { LessonStepResponse } from '@/lib/api/lesson-plan'
+import type { LearnerChatMessage } from '@/lib/api/learner-chat'
+
+const CHAT_CACHE_MAX = 50
+
+function chatCacheKey(notebookId: string) {
+  return `chat-cache-v1-${notebookId}`
+}
+
+function readChatCache(notebookId: string): LearnerChatMessage[] {
+  try {
+    const raw = localStorage.getItem(chatCacheKey(notebookId))
+    return raw ? (JSON.parse(raw) as LearnerChatMessage[]) : []
+  } catch {
+    return []
+  }
+}
+
+function writeChatCache(notebookId: string, msgs: LearnerChatMessage[]) {
+  try {
+    localStorage.setItem(chatCacheKey(notebookId), JSON.stringify(msgs.slice(-CHAT_CACHE_MAX)))
+  } catch {}
+}
+
+function deleteChatCache(notebookId: string) {
+  try {
+    localStorage.removeItem(chatCacheKey(notebookId))
+  } catch {}
+}
 
 interface ChatPanelProps {
   notebookId: string
@@ -52,6 +80,12 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
   const setActiveJob = useLearnerStore((state) => state.setActiveJob)
   const clearActiveJob = useLearnerStore((state) => state.clearActiveJob)
 
+  // Chat cache — read synchronously from localStorage at mount time.
+  // Using useState initializer (not Zustand) avoids hydration timing issues on page refresh.
+  const [cachedMessages, setCachedMessages] = useState<LearnerChatMessage[]>(() =>
+    typeof window !== 'undefined' ? readChatCache(notebookId) : []
+  )
+
   useEffect(() => {
     setMounted(true)
   }, [])
@@ -65,7 +99,8 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
   } = useChatHistory(notebookId)
 
   // Derive history state for greeting guard (must be computed before useLearnerChat)
-  const hasExistingHistory = !!(historyData?.messages?.length)
+  // Also treat a populated cache as existing history to prevent re-greeting
+  const hasExistingHistory = !!(historyData?.messages?.length) || cachedMessages.length > 0
 
   const {
     isLoading,
@@ -150,11 +185,23 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
       .join('\n\n')
   }
 
-  // Merge history with current messages
-  const allMessages = (historyLoaded && historyData?.messages
-    ? [...historyData.messages, ...messages]
-    : messages
-  ).map(m => ({ ...m, content: cleanMessageContent(m.content) }))
+  // Merge history/cache with current messages, preserving toolCalls.
+  // Cache is only written on unmount (never mid-session), so cachedMessages and messages
+  // never overlap: messages resets to [] on every mount via useLearnerChat's notebookId effect.
+  const allMessages = useMemo(() => {
+    const clean = (msgs: typeof messages) =>
+      msgs.map(m => ({ ...m, content: cleanMessageContent(m.content) }))
+
+    if (cachedMessages.length > 0) {
+      // Cache has previous-session messages (with toolCalls). Append any new session messages.
+      return clean(messages.length > 0 ? [...cachedMessages, ...messages] : cachedMessages)
+    }
+    // No cache: normal flow (first visit or after explicit reset)
+    const base = historyLoaded && historyData?.messages
+      ? [...historyData.messages, ...messages]
+      : messages
+    return clean(base)
+  }, [cachedMessages, messages, historyLoaded, historyData])
 
   // Memoized: avoids scanning allMessages on every SSE-delta re-render
   const hasUserMessage = useMemo(() => allMessages.some((m) => m.role === 'user'), [allMessages])
@@ -165,6 +212,29 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
       setHistoryLoaded(true)
     }
   }, [isLoadingHistory, historyData, historyLoaded])
+
+  // Ref to track latest allMessages without triggering effects
+  const allMessagesRef = useRef(allMessages)
+  allMessagesRef.current = allMessages
+
+  // Save to localStorage when stream completes (toolCalls fully attached at that point).
+  // This ensures the cache is written even if the user refreshes before navigating away.
+  const prevIsStreamingRef = useRef(false)
+  useEffect(() => {
+    if (prevIsStreamingRef.current && !isStreaming && allMessages.length > 0) {
+      writeChatCache(notebookId, allMessages)
+    }
+    prevIsStreamingRef.current = isStreaming
+  }, [isStreaming, notebookId, allMessages])
+
+  // Also save on unmount so navigating away captures the very latest state.
+  useEffect(() => {
+    return () => {
+      if (allMessagesRef.current.length > 0) {
+        writeChatCache(notebookId, allMessagesRef.current)
+      }
+    }
+  }, [notebookId])
 
   // Auto-scroll to bottom after history loads
   useEffect(() => {
@@ -340,6 +410,8 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
                     className="rounded-full shadow-sm h-7 w-7"
                     onClick={() => {
                       clearMessages()
+                      deleteChatCache(notebookId)
+                      setCachedMessages([])
                       setHistoryLoaded(false)
                     }}
                     aria-label={t.learner.chat.newConversation}

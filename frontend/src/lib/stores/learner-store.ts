@@ -52,6 +52,9 @@ interface LearnerState {
   // Current module (for header display)
   currentModule: CurrentModule | null
 
+  // Per-notebook expanded source tracking (persisted)
+  expandedSourceIds: Record<string, string | null>
+
   // Actions
   setSidebarOpen: (open: boolean) => void
   toggleSidebar: () => void
@@ -61,6 +64,7 @@ interface LearnerState {
   setActiveJob: (job: ActiveJob | null) => void
   clearActiveJob: () => void
   setCurrentModule: (module: CurrentModule | null) => void
+  setExpandedSourceId: (notebookId: string, sourceId: string | null) => void
 }
 
 export const useLearnerStore = create<LearnerState>()(
@@ -71,6 +75,7 @@ export const useLearnerStore = create<LearnerState>()(
       scrollToSourceId: null,
       activeJob: null,
       currentModule: null,
+      expandedSourceIds: {},
 
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
@@ -90,11 +95,16 @@ export const useLearnerStore = create<LearnerState>()(
       setActiveJob: (job) => set({ activeJob: job }),
       clearActiveJob: () => set({ activeJob: null }),
       setCurrentModule: (module) => set({ currentModule: module }),
+      setExpandedSourceId: (notebookId, sourceId) =>
+        set((state) => ({
+          expandedSourceIds: { ...state.expandedSourceIds, [notebookId]: sourceId },
+        })),
     }),
     {
       name: 'learner-ui-storage',
       partialize: (state) => ({
         sidebarOpen: state.sidebarOpen,
+        expandedSourceIds: state.expandedSourceIds,
         // activeJob and viewerSheet NOT persisted (transient)
       }),
     }
