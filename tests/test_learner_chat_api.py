@@ -145,11 +145,11 @@ class TestPromptAssembly:
 
     @pytest.mark.asyncio
     @patch("api.learner_chat_service.assemble_system_prompt")
-    async def test_prepare_chat_context_loads_learner_profile(
+    async def test_init_thread_context_loads_learner_profile(
         self, mock_assemble_prompt
     ):
         """Test that learner profile is extracted from user data."""
-        from api.learner_chat_service import prepare_chat_context
+        from api.learner_chat_service import init_thread_context
         from api.auth import LearnerContext
 
         # Mock learner with profile
@@ -168,8 +168,8 @@ class TestPromptAssembly:
 
         mock_assemble_prompt.return_value = "System prompt text"
 
-        # Call prepare_chat_context
-        system_prompt, learner_profile = await prepare_chat_context(
+        # Call init_thread_context
+        system_prompt, learner_profile, objectives, lesson_steps = await init_thread_context(
             "notebook:123", learner_context
         )
 

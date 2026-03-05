@@ -11,7 +11,6 @@ from loguru import logger
 
 from api import lesson_plan_service
 from api.auth import LearnerContext, get_current_learner, get_current_user, require_admin
-from open_notebook.domain.user import User
 from api.learner_chat_service import validate_learner_access_to_notebook
 from api.models import (
     LessonStepCreate,
@@ -19,7 +18,9 @@ from api.models import (
     LessonStepResponse,
     LessonStepReorder,
     LessonPlanGenerationResponse,
+    LessonPlanRefineRequest,
     LearnerStepProgressResponse,
+    PodcastTriggerRequest,
 )
 from open_notebook.domain.lesson_step import LessonStep
 from open_notebook.domain.learner_step_progress import LearnerStepProgress
@@ -118,6 +119,8 @@ async def update_lesson_step(step_id: str, data: LessonStepUpdate):
         update_data["source_id"] = data.source_id
     if data.discussion_prompt is not None:
         update_data["discussion_prompt"] = data.discussion_prompt
+    if data.ai_instructions is not None:
+        update_data["ai_instructions"] = data.ai_instructions
     if data.order is not None:
         update_data["order"] = data.order
     if data.required is not None:
@@ -131,7 +134,7 @@ async def update_lesson_step(step_id: str, data: LessonStepUpdate):
         if not result:
             raise HTTPException(status_code=404, detail="Lesson step not found")
 
-        step = LessonStep(**result)
+        step = LessonStep(**result[0])
         # Resolve source title if applicable
         source_title = None
         if step.source_id:
@@ -152,6 +155,9 @@ async def update_lesson_step(step_id: str, data: LessonStepUpdate):
             source_id=step.source_id,
             source_title=source_title,
             discussion_prompt=step.discussion_prompt,
+            ai_instructions=step.ai_instructions,
+            artifact_id=step.artifact_id,
+            command_id=step.command_id,
             order=step.order,
             required=step.required,
             auto_generated=step.auto_generated,
@@ -184,6 +190,74 @@ async def delete_lesson_step(step_id: str):
 
 
 @router.post(
+    "/lesson-steps/{step_id}/trigger-podcast",
+    response_model=LessonStepResponse,
+    dependencies=[Depends(require_admin)],
+)
+async def trigger_podcast_for_step(step_id: str, data: PodcastTriggerRequest):
+    """Trigger podcast generation for a podcast-type lesson step (admin only).
+
+    Args:
+        step_id: Lesson step record ID
+        data: Optional title/instructions override and source selection
+
+    Returns:
+        Updated LessonStepResponse with command_id set
+    """
+    try:
+        step = await lesson_plan_service.trigger_podcast_for_step(
+            step_id=step_id,
+            title=data.title,
+            ai_instructions=data.ai_instructions,
+            source_ids=data.source_ids if data.source_ids else None,
+        )
+
+        # Resolve source title
+        source_title = None
+        if step.source_id:
+            from open_notebook.database.repository import repo_query, ensure_record_id
+
+            title_result = await repo_query(
+                "SELECT VALUE title FROM $id",
+                {"id": ensure_record_id(step.source_id)},
+            )
+            if title_result:
+                source_title = str(title_result[0]) if title_result[0] else None
+
+        return LessonStepResponse(
+            id=str(step.id),
+            notebook_id=step.notebook_id,
+            title=step.title,
+            step_type=step.step_type,
+            source_id=step.source_id,
+            source_title=source_title,
+            discussion_prompt=step.discussion_prompt,
+            ai_instructions=step.ai_instructions,
+            artifact_id=step.artifact_id,
+            command_id=step.command_id,
+            order=step.order,
+            required=step.required,
+            auto_generated=step.auto_generated,
+            created=str(step.created) if step.created else None,
+            updated=str(step.updated) if step.updated else None,
+        )
+    except ValueError as e:
+        error_msg = str(e)
+        if "not found" in error_msg:
+            raise HTTPException(status_code=404, detail=error_msg)
+        raise HTTPException(status_code=400, detail=error_msg)
+    except Exception as e:
+        logger.error(f"Error triggering podcast for step {step_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to trigger podcast generation")
+
+
+@router.delete("/notebooks/{notebook_id}/lesson-steps")
+async def delete_all_steps(notebook_id: str, admin: User = Depends(require_admin)):
+    count = await LessonStep.delete_all_for_notebook(notebook_id)
+    return {"message": f"Deleted {count} lesson steps"}
+
+
+@router.post(
     "/notebooks/{notebook_id}/lesson-steps/reorder",
     dependencies=[Depends(require_admin)],
 )
@@ -203,6 +277,27 @@ async def reorder_lesson_steps(notebook_id: str, data: LessonStepReorder):
     except Exception as e:
         logger.error(f"Error reordering lesson steps: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to reorder lesson steps")
+
+
+@router.post(
+    "/notebooks/{notebook_id}/lesson-steps/refine",
+    dependencies=[Depends(require_admin)],
+)
+async def refine_lesson_plan_endpoint(
+    notebook_id: str,
+    request: LessonPlanRefineRequest,
+):
+    """Refine lesson plan with natural language instruction (admin only).
+
+    Args:
+        notebook_id: Notebook record ID
+        request: Contains the refinement prompt
+    """
+    logger.info(f"Admin refining lesson plan for notebook {notebook_id}")
+    result = await lesson_plan_service.refine_lesson_plan(notebook_id, request.prompt)
+    if result["status"] == "failed":
+        raise HTTPException(status_code=500, detail=result.get("error", "Refinement failed"))
+    return result
 
 
 # ============================================================
@@ -227,13 +322,20 @@ async def complete_lesson_step(
         Success response
     """
     try:
-        await LearnerStepProgress.mark_complete(
-            user_id=learner.user.id, step_id=step_id
+        # Fetch step to resolve notebook_id for objective auto-completion
+        step = await LessonStep.get(step_id)
+        if not step:
+            raise HTTPException(status_code=404, detail="Lesson step not found")
+
+        result = await lesson_plan_service.complete_step_with_objectives(
+            user_id=learner.user.id,
+            step_id=step_id,
+            notebook_id=step.notebook_id,
         )
-        logger.info(
-            f"Learner {learner.user.id} completed lesson step {step_id}"
-        )
-        return {"message": "Step marked as complete"}
+        logger.info(f"Learner {learner.user.id} completed lesson step {step_id}")
+        return result
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(
             f"Error marking step {step_id} complete for learner {learner.user.id}: {str(e)}"

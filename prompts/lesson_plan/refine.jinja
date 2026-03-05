@@ -1,0 +1,29 @@
+You are refining a lesson plan based on an admin instruction.
+
+CURRENT LESSON PLAN:
+{% for step in steps %}
+{{ loop.index }}. [{{ step.step_type | upper }}] "{{ step.title }}" (id: {{ step.id }})
+   ai_instructions: {{ step.ai_instructions or "none" }}
+   discussion_prompt: {{ step.discussion_prompt or "none" }}
+{% endfor %}
+
+INSTRUCTION: {{ refinement_prompt }}
+
+Apply the instruction across the plan. You may modify title, ai_instructions, discussion_prompt, and step_type.
+Preserve source_id, id, and order unchanged.
+Keep the overall structure unless the instruction explicitly asks to change it.
+
+Return ONLY a valid JSON array with ALL steps (including unmodified ones), no other text.
+Each step must include its original "id" field so updates can be matched.
+
+Example output format:
+[
+  {
+    "id": "lesson_step:abc123",
+    "title": "...",
+    "step_type": "watch|read|quiz|discuss|podcast",
+    "source_id": "source:xyz" or null,
+    "discussion_prompt": "..." or null,
+    "ai_instructions": "..."
+  }
+]

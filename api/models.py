@@ -828,6 +828,12 @@ class ObjectiveGenerationResponse(BaseModel):
     error: Optional[str] = Field(None, description="Error message if failed")
 
 
+class ObjectiveRefineRequest(BaseModel):
+    """Request to refine learning objectives via natural language instruction."""
+
+    refinement_prompt: str = Field(..., description="Natural language instruction for how to change the objectives")
+
+
 # System Prompt API models
 class SystemPromptResponse(BaseModel):
     content: str
@@ -1030,13 +1036,14 @@ class LessonStepCreate(BaseModel):
     """Request body for creating a manual lesson step."""
 
     title: str = Field(..., description="Step title")
-    step_type: Literal["watch", "read", "quiz", "discuss"] = Field(
+    step_type: Literal["watch", "read", "quiz", "discuss", "podcast"] = Field(
         ..., description="Type of action required"
     )
     source_id: Optional[str] = Field(None, description="Source record ID (optional)")
     discussion_prompt: Optional[str] = Field(
         None, description="Prompt for discussion-type steps"
     )
+    ai_instructions: Optional[str] = Field(None, description="AI-teacher-facing guidance for this step")
     order: int = Field(0, description="Display order")
     required: bool = Field(True, description="Whether step is mandatory")
 
@@ -1045,13 +1052,14 @@ class LessonStepUpdate(BaseModel):
     """Request body for updating a lesson step."""
 
     title: Optional[str] = Field(None, description="Updated title")
-    step_type: Optional[Literal["watch", "read", "quiz", "discuss"]] = Field(
+    step_type: Optional[Literal["watch", "read", "quiz", "discuss", "podcast"]] = Field(
         None, description="Updated step type"
     )
     source_id: Optional[str] = Field(None, description="Updated source reference")
     discussion_prompt: Optional[str] = Field(
         None, description="Updated discussion prompt"
     )
+    ai_instructions: Optional[str] = Field(None, description="Updated AI instructions")
     order: Optional[int] = Field(None, description="Updated order")
     required: Optional[bool] = Field(None, description="Updated required flag")
 
@@ -1066,6 +1074,9 @@ class LessonStepResponse(BaseModel):
     source_id: Optional[str] = None
     source_title: Optional[str] = None  # Resolved from source_id for display
     discussion_prompt: Optional[str] = None
+    ai_instructions: Optional[str] = None
+    artifact_id: Optional[str] = None
+    command_id: Optional[str] = None
     order: int
     required: bool
     auto_generated: bool
@@ -1079,6 +1090,11 @@ class LessonStepReorder(BaseModel):
     steps: List[dict] = Field(
         ..., description="List of {id, order} dicts for bulk update"
     )
+
+
+class LessonPlanRefineRequest(BaseModel):
+    """Request body for refining a lesson plan with natural language instruction."""
+    prompt: str = Field(..., description="Natural language instruction for refining the lesson plan")
 
 
 class LessonPlanGenerationResponse(BaseModel):
@@ -1097,3 +1113,11 @@ class LearnerStepProgressResponse(BaseModel):
     )
     total_steps: int = Field(0, description="Total number of steps in the lesson plan")
     completed_count: int = Field(0, description="Number of completed steps")
+
+
+class PodcastTriggerRequest(BaseModel):
+    """Request body for triggering podcast generation for a lesson step."""
+
+    title: Optional[str] = Field(None, description="Override episode title")
+    ai_instructions: Optional[str] = Field(None, description="Override topic/instructions")
+    source_ids: List[str] = Field(default_factory=list, description="Source IDs to use; empty = all sources")

@@ -444,12 +444,6 @@ class Source(ObjectModel):
             embedding = (
                 (await EMBEDDING_MODEL.aembed([content]))[0] if EMBEDDING_MODEL else []
             )
-            # Look up notebook_ids for this source (denormalized for fast filtering)
-            notebook_ids_result = await repo_query(
-                "SELECT VALUE out FROM reference WHERE in = $source_id",
-                {"source_id": ensure_record_id(self.id)},
-            )
-            notebook_ids = notebook_ids_result if notebook_ids_result else []
             return await repo_query(
                 """
                 CREATE source_insight CONTENT {
@@ -458,7 +452,7 @@ class Source(ObjectModel):
                         "content": $content,
                         "embedding": $embedding,
                         "embedding_dimension": $embedding_dimension,
-                        "notebook_ids": $notebook_ids,
+                        "notebook_ids": (SELECT VALUE out FROM reference WHERE in = $source_id),
                 };""",
                 {
                     "source_id": ensure_record_id(self.id),
@@ -466,7 +460,6 @@ class Source(ObjectModel):
                     "content": content,
                     "embedding": embedding,
                     "embedding_dimension": len(embedding) if embedding else None,
-                    "notebook_ids": notebook_ids,
                 },
             )
         except Exception as e:

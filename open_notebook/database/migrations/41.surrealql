@@ -1,0 +1,6 @@
+-- Migration 41: Enrich lesson_step with ai_instructions, artifact_id, command_id
+-- Add lesson_completion as valid completed_via value for learner_objective_progress
+
+DEFINE FIELD ai_instructions ON lesson_step TYPE option<string>;
+DEFINE FIELD artifact_id ON lesson_step TYPE option<string>;
+DEFINE FIELD command_id ON lesson_step TYPE option<string>;

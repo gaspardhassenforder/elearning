@@ -1,0 +1,24 @@
+You are helping an AI teacher prepare to run a knowledge-check quiz for a learner.
+
+MODULE SOURCES:
+{% for source in sources %}
+## {{ source.title }}
+{{ source.content }}
+
+{% endfor %}
+{% if objectives %}
+LEARNING OBJECTIVES:
+{% for obj in objectives %}
+- {{ obj }}
+{% endfor %}
+{% endif %}
+
+Based on the content above, write ai_instructions for the AI teacher to generate a quiz.
+
+The instructions MUST:
+1. Start with: "Generate a 5-10 question quiz covering:"
+2. List 4-8 specific topics/concepts extracted from the content above
+3. Reference the learning objectives if provided
+4. End with: "Focus on conceptual understanding and application, not memorization. Use the quiz to identify gaps in the learner's knowledge."
+
+Return ONLY the instruction text (no labels, no JSON, no formatting).

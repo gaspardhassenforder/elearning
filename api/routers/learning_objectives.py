@@ -22,8 +22,10 @@ from api.models import (
     LearningObjectiveResponse,
     LearningObjectiveUpdate,
     ObjectiveGenerationResponse,
+    ObjectiveRefineRequest,
     ObjectiveWithProgress,
 )
+from open_notebook.domain.learning_objective import LearningObjective
 from open_notebook.domain.user import User
 
 # Admin router for CRUD operations
@@ -203,6 +205,43 @@ async def delete_objective(
         raise HTTPException(status_code=404, detail="Objective not found")
 
     return {"message": "Objective deleted successfully"}
+
+
+@router.delete("/notebooks/{notebook_id}/learning-objectives")
+async def delete_all_objectives(notebook_id: str, admin: User = Depends(require_admin)):
+    count = await LearningObjective.delete_all_for_notebook(notebook_id)
+    return {"message": f"Deleted {count} learning objectives"}
+
+
+@router.post("/notebooks/{notebook_id}/learning-objectives/refine")
+async def refine_objectives(
+    notebook_id: str,
+    data: ObjectiveRefineRequest,
+    admin: User = Depends(require_admin),
+):
+    """Refine learning objectives via natural language instruction.
+
+    Args:
+        notebook_id: Notebook record ID
+        data: ObjectiveRefineRequest with refinement_prompt
+        admin: Authenticated admin user (injected)
+
+    Returns:
+        Success/failure status
+
+    Raises:
+        HTTPException 404: No objectives found
+        HTTPException 500: Generation error
+    """
+    result = await learning_objectives_service.refine_objectives(
+        notebook_id=notebook_id,
+        refinement_prompt=data.refinement_prompt,
+    )
+
+    if result.get("status") == "failed":
+        raise HTTPException(status_code=500, detail=result.get("error", "Refinement failed"))
+
+    return {"status": "completed"}
 
 
 @router.post("/notebooks/{notebook_id}/learning-objectives/reorder")

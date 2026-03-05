@@ -20,11 +20,13 @@ from langgraph.prebuilt import ToolNode
 
 from open_notebook.graphs.tools import (
     surface_document,
-    check_off_objective,
     surface_quiz,
     surface_podcast,
     search_knowledge_base,
     generate_artifact,
+    get_objectives,
+    get_lesson_steps,
+    complete_lesson_step,
 )
 from open_notebook.utils import clean_thinking_content
 
@@ -32,13 +34,11 @@ from open_notebook.utils import clean_thinking_content
 class ThreadState(TypedDict):
     messages: Annotated[list, add_messages]
     notebook: Optional[Notebook]
-    context: Optional[str]
-    context_config: Optional[dict]
     model_override: Optional[str]
-    system_prompt_override: Optional[str]  # Story 4.1: For learner chat with assembled prompts
-    user_id: Optional[str]  # Story 4.4: For objective progress tracking
-    lesson_steps: Optional[list]  # Structured lesson plan steps with status
-    current_step: Optional[dict]  # Active lesson step (first incomplete required step)
+    system_prompt: Optional[str]  # Stored in checkpoint on first turn; reused on subsequent turns
+    objectives: Optional[list]    # Refreshed each turn; overwritten (no reducer)
+    lesson_steps: Optional[list]  # Refreshed each turn; overwritten (no reducer)
+    user_id: Optional[str]        # For tools via config
 
 
 async def _prepare_model_and_payload(
@@ -49,28 +49,34 @@ async def _prepare_model_and_payload(
     Used by the async learner node (call_model_async). Extracted so the sync
     admin node (call_model_with_messages) can stay untouched.
     """
-    # System prompt selection (override vs template)
-    if state.get("system_prompt_override"):
-        system_prompt = state["system_prompt_override"]
+    # System prompt: stored in checkpoint on first turn; reused on subsequent turns
+    if state.get("system_prompt"):
+        system_prompt = state["system_prompt"]
     else:
         system_prompt = Prompter(prompt_template="chat/system").render(data=state)
 
     payload = [SystemMessage(content=system_prompt)] + state.get("messages", [])
-    model_id = config.get("configurable", {}).get("model_id") or state.get("model_override")
 
-    # Propagate user_id into config for tools
-    user_id = state.get("user_id") or config.get("configurable", {}).get("user_id")
-    if user_id:
-        config.get("configurable", {})["user_id"] = user_id
+    # Cache configurable once so all reads/writes hit the same dict
+    configurable = config.get("configurable") or {}
+    model_id = configurable.get("model_id") or state.get("model_override")
 
-    # Tool selection
-    tools = [surface_document, surface_quiz, surface_podcast]
+    # Propagate user_id and inject objectives/lesson_steps for tools
+    user_id = state.get("user_id") or configurable.get("user_id")
     if user_id:
-        tools.extend([search_knowledge_base, generate_artifact])
+        configurable["user_id"] = user_id
+    configurable["objectives"] = state.get("objectives") or []
+    configurable["lesson_steps"] = state.get("lesson_steps") or []
+
+    # Inject notebook_id for tools (e.g., complete_lesson_step auto-objective-completion)
+    if not configurable.get("notebook_id"):
+        notebook = state.get("notebook")
+        if notebook:
+            configurable["notebook_id"] = str(notebook.id) if notebook.id else None
 
     # Provision model (async — no ThreadPoolExecutor needed)
     model = await provision_langchain_model(str(payload), model_id, "chat", max_tokens=8192)
-    model_with_tools = model.bind_tools(tools)
+    model_with_tools = model.bind_tools(LEARNER_TOOLS)
 
     return model_with_tools, payload
 
@@ -101,10 +107,8 @@ async def call_model_async(state: ThreadState, config: RunnableConfig) -> dict:
 
 
 def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict:
-    # Story 4.1: Use system_prompt_override if provided (for learner chat)
-    # Otherwise fall back to default admin chat prompt
-    if state.get("system_prompt_override"):
-        system_prompt = state["system_prompt_override"]
+    if state.get("system_prompt"):
+        system_prompt = state["system_prompt"]
     else:
         system_prompt = Prompter(prompt_template="chat/system").render(data=state)  # type: ignore[arg-type]
 
@@ -113,7 +117,7 @@ def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict
         "model_override"
     )
 
-    # Story 4.4: Pass user_id through config for check_off_objective tool
+    # Pass user_id through config for complete_lesson_step tool
     # Extract from state if present, or from existing config
     user_id = state.get("user_id") or config.get("configurable", {}).get("user_id")
     if user_id:
@@ -220,8 +224,10 @@ LEARNER_TOOLS = [
     surface_podcast,
     search_knowledge_base,
     generate_artifact,
+    get_objectives,
+    get_lesson_steps,
+    complete_lesson_step,
 ]
-# NOTE: check_off_objective removed from learner tools — handled by background examiner
 
 tool_executor = ToolNode(tools=LEARNER_TOOLS, handle_tool_errors=True, name="tools")
 

@@ -23,19 +23,30 @@ import {
   MessageSquare,
   PlayCircle,
   HelpCircle,
+  ChevronDown,
+  ChevronUp,
+  Headphones,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import {
   useLessonSteps,
   useGenerateLessonPlan,
   useUpdateLessonStep,
   useDeleteLessonStep,
+  useDeleteAllLessonSteps,
   useReorderLessonSteps,
+  useRefineLessonPlan,
+  useTriggerPodcastGeneration,
 } from '@/lib/hooks/use-lesson-plan'
+import { useNotebookSources } from '@/lib/hooks/use-sources'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,6 +56,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
 
@@ -69,6 +81,10 @@ const STEP_TYPE_CONFIG = {
     icon: MessageSquare,
     className: 'bg-purple-500 text-white border-transparent dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800',
   },
+  podcast: {
+    icon: Headphones,
+    className: 'bg-orange-500 text-white border-transparent dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800',
+  },
 } as const
 
 export function LessonPlanEditor({ moduleId }: LessonPlanEditorProps) {
@@ -80,10 +96,89 @@ export function LessonPlanEditor({ moduleId }: LessonPlanEditorProps) {
   const updateMutation = useUpdateLessonStep(moduleId)
   const deleteMutation = useDeleteLessonStep(moduleId)
   const reorderMutation = useReorderLessonSteps(moduleId)
+  const triggerPodcastMutation = useTriggerPodcastGeneration(moduleId)
+  const { sources } = useNotebookSources(moduleId)
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingText, setEditingText] = useState('')
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [expandedAiInstructions, setExpandedAiInstructions] = useState<Set<string>>(new Set())
+  const [editingAiInstructionsId, setEditingAiInstructionsId] = useState<string | null>(null)
+  const [editingAiInstructionsText, setEditingAiInstructionsText] = useState('')
+  const [refinePrompt, setRefinePrompt] = useState('')
+  // Podcast review panel state: stepId -> {title, instructions, selectedSourceIds}
+  const [expandedPodcastReview, setExpandedPodcastReview] = useState<Set<string>>(new Set())
+  const [podcastReviewState, setPodcastReviewState] = useState<Record<string, {
+    title: string
+    instructions: string
+    selectedSourceIds: Set<string>
+  }>>({})
+
+  const deleteAllMutation = useDeleteAllLessonSteps(moduleId)
+  const refineMutation = useRefineLessonPlan(moduleId)
+
+  const openPodcastReview = (stepId: string, stepTitle: string, stepInstructions: string | null) => {
+    if (!expandedPodcastReview.has(stepId)) {
+      // Initialize state with step defaults and all sources selected
+      setPodcastReviewState(prev => ({
+        ...prev,
+        [stepId]: {
+          title: stepTitle,
+          instructions: stepInstructions || '',
+          selectedSourceIds: new Set(sources.map(s => s.id)),
+        },
+      }))
+      setExpandedPodcastReview(prev => new Set([...prev, stepId]))
+    } else {
+      setExpandedPodcastReview(prev => {
+        const next = new Set(prev)
+        next.delete(stepId)
+        return next
+      })
+    }
+  }
+
+  const updatePodcastReviewState = (stepId: string, field: 'title' | 'instructions', value: string) => {
+    setPodcastReviewState(prev => ({
+      ...prev,
+      [stepId]: { ...prev[stepId], [field]: value },
+    }))
+  }
+
+  const togglePodcastSource = (stepId: string, sourceId: string) => {
+    setPodcastReviewState(prev => {
+      const current = prev[stepId]
+      if (!current) return prev
+      const next = new Set(current.selectedSourceIds)
+      if (next.has(sourceId)) next.delete(sourceId)
+      else next.add(sourceId)
+      return { ...prev, [stepId]: { ...current, selectedSourceIds: next } }
+    })
+  }
+
+  const handleTriggerPodcast = (stepId: string) => {
+    const state = podcastReviewState[stepId]
+    if (!state) return
+    triggerPodcastMutation.mutate(
+      {
+        stepId,
+        data: {
+          title: state.title || undefined,
+          ai_instructions: state.instructions || undefined,
+          source_ids: state.selectedSourceIds.size > 0 ? [...state.selectedSourceIds] : [],
+        },
+      },
+      {
+        onSuccess: () => {
+          setExpandedPodcastReview(prev => {
+            const next = new Set(prev)
+            next.delete(stepId)
+            return next
+          })
+        },
+      }
+    )
+  }
 
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return
@@ -115,6 +210,45 @@ export function LessonPlanEditor({ moduleId }: LessonPlanEditorProps) {
 
   const handleDelete = (id: string) => {
     deleteMutation.mutate(id, { onSuccess: () => setDeleteConfirmId(null) })
+  }
+
+  const toggleAiInstructions = (id: string) => {
+    const isExpanded = expandedAiInstructions.has(id)
+    setExpandedAiInstructions(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+    if (isExpanded && editingAiInstructionsId === id) {
+      setEditingAiInstructionsId(null)
+    }
+  }
+
+  const handleAiInstructionsEditStart = (id: string, text: string) => {
+    setEditingAiInstructionsId(id)
+    setEditingAiInstructionsText(text || '')
+  }
+
+  const handleAiInstructionsSave = (id: string) => {
+    const original = steps.find((s) => s.id === id)
+    if (editingAiInstructionsText !== (original?.ai_instructions || '')) {
+      updateMutation.mutate({
+        stepId: id,
+        data: { ai_instructions: editingAiInstructionsText || null }
+      })
+    }
+    setEditingAiInstructionsId(null)
+  }
+
+  const handleRefineApply = () => {
+    if (!refinePrompt.trim()) return
+    refineMutation.mutate(refinePrompt, {
+      onSuccess: () => {
+        toast.success(lessonPlanT.refineSuccess)
+        setRefinePrompt('')
+      }
+    })
   }
 
   if (isLoading) {
@@ -177,24 +311,56 @@ export function LessonPlanEditor({ moduleId }: LessonPlanEditorProps) {
             <p className="text-sm text-muted-foreground">
               {lessonPlanT.stepsCount.replace('{count}', String(steps.length))}
             </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => generateMutation.mutate()}
-              disabled={generateMutation.isPending}
-            >
-              {generateMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                  {lessonPlanT.generating}
-                </>
-              ) : (
-                <>
-                  <Sparkles className="mr-2 h-3 w-3" />
-                  {lessonPlanT.regenerate}
-                </>
-              )}
-            </Button>
+            <div className="flex items-center gap-2">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={deleteAllMutation.isPending}
+                  >
+                    {deleteAllMutation.isPending ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3 w-3" />
+                    )}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>{lessonPlanT.deleteAllTitle}</AlertDialogTitle>
+                    <AlertDialogDescription>{lessonPlanT.deleteAllConfirm}</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => deleteAllMutation.mutate()}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      {lessonPlanT.deleteAll}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => generateMutation.mutate()}
+                disabled={generateMutation.isPending}
+              >
+                {generateMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                    {lessonPlanT.generating}
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-3 w-3" />
+                    {lessonPlanT.regenerate}
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
 
           <DragDropContext onDragEnd={handleDragEnd}>
@@ -239,13 +405,23 @@ export function LessonPlanEditor({ moduleId }: LessonPlanEditorProps) {
                                 </div>
 
                                 {/* Step type badge */}
-                                <Badge
-                                  variant="outline"
-                                  className={cn('flex-shrink-0 gap-1 text-xs', config.className)}
-                                >
-                                  <Icon className="h-3 w-3" />
-                                  {lessonPlanT.stepTypes[step.step_type] || step.step_type}
-                                </Badge>
+                                {step.step_type === 'podcast' && !step.command_id ? (
+                                  <Badge
+                                    variant="outline"
+                                    className="flex-shrink-0 gap-1 text-xs bg-yellow-500 text-white border-transparent dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800"
+                                  >
+                                    <Headphones className="h-3 w-3" />
+                                    {lessonPlanT.podcastReviewRequired}
+                                  </Badge>
+                                ) : (
+                                  <Badge
+                                    variant="outline"
+                                    className={cn('flex-shrink-0 gap-1 text-xs', config.className)}
+                                  >
+                                    <Icon className="h-3 w-3" />
+                                    {lessonPlanT.stepTypes[step.step_type] || step.step_type}
+                                  </Badge>
+                                )}
 
                                 {/* Editable title + source info */}
                                 <div className="flex-1 min-w-0">
@@ -278,6 +454,18 @@ export function LessonPlanEditor({ moduleId }: LessonPlanEditorProps) {
                                   )}
                                 </div>
 
+                                {/* Podcast Review & Generate button */}
+                                {step.step_type === 'podcast' && !step.command_id && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openPodcastReview(step.id, step.title, step.ai_instructions)}
+                                    className="flex-shrink-0 text-xs border-yellow-500 text-yellow-700 hover:bg-yellow-50 dark:text-yellow-400 dark:hover:bg-yellow-900/20"
+                                  >
+                                    {lessonPlanT.podcastGenerateButton}
+                                  </Button>
+                                )}
+
                                 {/* AI generated badge */}
                                 {step.auto_generated && (
                                   <Badge variant="secondary" className="text-xs flex-shrink-0">
@@ -297,6 +485,118 @@ export function LessonPlanEditor({ moduleId }: LessonPlanEditorProps) {
                                   <Trash2 className="h-4 w-4 text-destructive" />
                                 </Button>
                               </div>
+
+                              {/* AI Instructions expandable */}
+                              <div className="mt-2">
+                                <button
+                                  onClick={() => toggleAiInstructions(step.id)}
+                                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                >
+                                  {expandedAiInstructions.has(step.id) ? (
+                                    <ChevronUp className="h-3 w-3" />
+                                  ) : (
+                                    <ChevronDown className="h-3 w-3" />
+                                  )}
+                                  {lessonPlanT.aiInstructionsToggle}
+                                  {step.ai_instructions && (
+                                    <span className="ml-1 text-primary">&bull;</span>
+                                  )}
+                                </button>
+                                {expandedAiInstructions.has(step.id) && (
+                                  <div className="mt-1 ml-4">
+                                    {editingAiInstructionsId === step.id ? (
+                                      <Textarea
+                                        value={editingAiInstructionsText}
+                                        onChange={(e) => setEditingAiInstructionsText(e.target.value)}
+                                        onBlur={() => handleAiInstructionsSave(step.id)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Escape') setEditingAiInstructionsId(null)
+                                        }}
+                                        autoFocus
+                                        className="text-xs min-h-[80px]"
+                                        placeholder={lessonPlanT.aiInstructions}
+                                      />
+                                    ) : (
+                                      <button
+                                        onClick={() => handleAiInstructionsEditStart(step.id, step.ai_instructions || '')}
+                                        className="text-left w-full text-xs text-muted-foreground hover:text-foreground transition-colors border border-dashed border-muted rounded p-2 min-h-[40px]"
+                                      >
+                                        {step.ai_instructions || (
+                                          <span className="italic opacity-50">{lessonPlanT.aiInstructions}...</span>
+                                        )}
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Podcast Review Panel */}
+                              {step.step_type === 'podcast' && !step.command_id && expandedPodcastReview.has(step.id) && (
+                                <div className="mt-3 border border-yellow-300 dark:border-yellow-800 rounded-md p-3 space-y-3 bg-yellow-50/50 dark:bg-yellow-900/10">
+                                  {/* Episode Title */}
+                                  <div className="space-y-1">
+                                    <Label className="text-xs font-medium">{lessonPlanT.podcastTitleLabel}</Label>
+                                    <Input
+                                      value={podcastReviewState[step.id]?.title ?? step.title}
+                                      onChange={(e) => updatePodcastReviewState(step.id, 'title', e.target.value)}
+                                      className="h-8 text-xs"
+                                    />
+                                  </div>
+                                  {/* Topic / Instructions */}
+                                  <div className="space-y-1">
+                                    <Label className="text-xs font-medium">{lessonPlanT.podcastTopicLabel}</Label>
+                                    <Textarea
+                                      value={podcastReviewState[step.id]?.instructions ?? step.ai_instructions ?? ''}
+                                      onChange={(e) => updatePodcastReviewState(step.id, 'instructions', e.target.value)}
+                                      className="text-xs min-h-[60px]"
+                                    />
+                                  </div>
+                                  {/* Source selection */}
+                                  {sources.length > 0 && (
+                                    <div className="space-y-1">
+                                      <Label className="text-xs font-medium">{lessonPlanT.podcastSourceSelection}</Label>
+                                      <div className="space-y-1 max-h-[120px] overflow-y-auto">
+                                        {sources.map(source => (
+                                          <div key={source.id} className="flex items-center gap-2">
+                                            <Checkbox
+                                              id={`podcast-src-${step.id}-${source.id}`}
+                                              checked={podcastReviewState[step.id]?.selectedSourceIds?.has(source.id) ?? true}
+                                              onCheckedChange={() => togglePodcastSource(step.id, source.id)}
+                                            />
+                                            <Label
+                                              htmlFor={`podcast-src-${step.id}-${source.id}`}
+                                              className="text-xs font-normal cursor-pointer truncate"
+                                            >
+                                              {source.title || source.id}
+                                            </Label>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {/* Generate button */}
+                                  <div className="flex justify-end">
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleTriggerPodcast(step.id)}
+                                      disabled={triggerPodcastMutation.isPending}
+                                      className="text-xs"
+                                    >
+                                      {triggerPodcastMutation.isPending ? (
+                                        <>
+                                          <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                                          {lessonPlanT.podcastGenerating}
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Headphones className="mr-2 h-3 w-3" />
+                                          {lessonPlanT.podcastGenerateButton}
+                                        </>
+                                      )}
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
                             </CardContent>
                           </Card>
                         )}
@@ -309,6 +609,43 @@ export function LessonPlanEditor({ moduleId }: LessonPlanEditorProps) {
             </Droppable>
           </DragDropContext>
         </>
+      )}
+
+      {/* Refinement section */}
+      {steps.length > 0 && (
+        <Card className="mt-4">
+          <CardContent className="pt-4 pb-4">
+            <div className="space-y-2">
+              <p className="text-sm font-medium flex items-center gap-1">
+                <Sparkles className="h-4 w-4" />
+                {lessonPlanT.refineLabel}
+              </p>
+              <Textarea
+                value={refinePrompt}
+                onChange={(e) => setRefinePrompt(e.target.value)}
+                placeholder={lessonPlanT.refinePlaceholder}
+                className="text-sm min-h-[60px]"
+                rows={2}
+              />
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  onClick={handleRefineApply}
+                  disabled={refineMutation.isPending || !refinePrompt.trim()}
+                >
+                  {refineMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                      {lessonPlanT.generating}
+                    </>
+                  ) : (
+                    lessonPlanT.refineApply
+                  )}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Delete confirmation */}

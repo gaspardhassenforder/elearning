@@ -20,7 +20,9 @@ import {
   createLearningObjective,
   updateLearningObjective,
   deleteLearningObjective,
+  deleteAllLearningObjectives,
   reorderLearningObjectives,
+  refineLearningObjectives,
   getLearnerObjectivesProgress,
 } from '@/lib/api/learning-objectives'
 import { QUERY_KEYS } from '@/lib/api/query-client'
@@ -154,6 +156,18 @@ export function useDeleteLearningObjective(notebookId: string) {
 }
 
 /**
+ * Mutation hook: Delete all learning objectives
+ */
+export function useDeleteAllLearningObjectives(notebookId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => deleteAllLearningObjectives(notebookId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: learningObjectivesKeys.list(notebookId) }),
+    onError: (e: Error) => toast.error(`Failed to delete objectives: ${e.message}`),
+  })
+}
+
+/**
  * Mutation hook: Reorder learning objectives with optimistic updates
  * Provides instant feedback during drag-and-drop, with rollback on error
  */
@@ -211,6 +225,26 @@ export function useReorderLearningObjectives(notebookId: string) {
       queryClient.invalidateQueries({
         queryKey: learningObjectivesKeys.list(notebookId),
       })
+    },
+  })
+}
+
+/**
+ * Mutation hook: Refine learning objectives via natural language prompt
+ */
+export function useRefineLearningObjectives(notebookId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (refinementPrompt: string) =>
+      refineLearningObjectives(notebookId, refinementPrompt),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: learningObjectivesKeys.list(notebookId),
+      })
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to refine objectives: ${error.message}`)
     },
   })
 }

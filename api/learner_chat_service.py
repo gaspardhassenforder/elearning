@@ -6,6 +6,7 @@ Story: 4.1 - Learner Chat Interface & SSE Streaming
 Story: 4.2 - Two-Layer Prompt System & Proactive AI Teacher
 """
 
+import asyncio
 import json as _json
 import re as _re
 from typing import Optional, Tuple
@@ -263,6 +264,8 @@ async def get_lesson_steps_with_status(
                     "step_type": step.step_type,
                     "source_id": step.source_id,
                     "discussion_prompt": step.discussion_prompt,
+                    "ai_instructions": step.ai_instructions,
+                    "artifact_id": step.artifact_id,
                     "status": "current",
                 }
             else:
@@ -274,6 +277,8 @@ async def get_lesson_steps_with_status(
                 "step_type": step.step_type,
                 "source_id": step.source_id,
                 "discussion_prompt": step.discussion_prompt,
+                "ai_instructions": step.ai_instructions,
+                "artifact_id": step.artifact_id,
                 "order": step.order,
                 "required": step.required,
                 "status": status,
@@ -621,32 +626,16 @@ async def validate_learner_access_to_notebook(
     return notebook
 
 
-async def prepare_chat_context(
-    notebook_id: str, learner: LearnerContext, language: Optional[str] = None
-) -> Tuple[str, dict, list]:
-    """Prepare context for learner chat.
-
-    Assembles:
-    1. Learner profile (role, AI familiarity, job description)
-    2. Learning objectives with completion status
-    3. Lightweight source context (~5K tokens instead of 50K)
-    4. System prompt (global + per-module via Story 3.4 assemble_system_prompt)
+def extract_learner_profile(learner: LearnerContext) -> dict:
+    """Extract learner profile dict from LearnerContext.
 
     Args:
-        notebook_id: Notebook/module record ID
         learner: Authenticated learner context
-        language: UI language code
 
     Returns:
-        Tuple of (system_prompt, learner_profile_dict, objectives_with_status)
-
-    Raises:
-        Exception: If prompt assembly fails
+        Dict with 'name', 'role', 'ai_familiarity', 'job_description'
     """
-    logger.info(f"Preparing chat context for notebook {notebook_id}")
-
-    # 1. Load learner profile from User.profile field (Story 1.4 questionnaire)
-    learner_profile = {
+    return {
         "name": learner.user.profile.get("name", learner.user.username)
         if learner.user.profile
         else learner.user.username,
@@ -661,39 +650,65 @@ async def prepare_chat_context(
         else "",
     }
 
+
+async def init_thread_context(
+    notebook_id: str, learner: LearnerContext, language: Optional[str] = None
+) -> Tuple[str, dict, list, list]:
+    """Full context load for new thread initialization only.
+
+    Assembles all context needed for a new conversation thread (11 queries).
+    Called only once per thread lifetime; subsequent turns use lightweight reconciliation.
+
+    Args:
+        notebook_id: Notebook/module record ID
+        learner: Authenticated learner context
+        language: UI language code
+
+    Returns:
+        Tuple of (system_prompt, learner_profile_dict, objectives_with_status, lesson_steps)
+
+    Raises:
+        HTTPException: If prompt assembly fails
+    """
+    logger.info(f"Initializing new thread context for notebook {notebook_id}")
+
+    # 1. Load learner profile from User.profile field
+    learner_profile = extract_learner_profile(learner)
     logger.debug(f"Learner profile: {learner_profile}")
 
-    # 2. Load learning objectives with completion status (Story 4.4)
-    # Load actual progress from LearnerObjectiveProgress table
-    try:
-        objectives_with_status = await get_learner_objectives_with_status(
-            notebook_id=notebook_id,
-            user_id=learner.user.id
-        )
-        logger.debug(f"Loaded {len(objectives_with_status)} learning objectives with progress")
-    except Exception as e:
-        logger.warning("Failed to load learning objectives for notebook {}: {}", notebook_id, str(e))
-        objectives_with_status = []
+    # 2-4. Load objectives, source context, and lesson steps in parallel
+    async def _safe_get_objectives():
+        try:
+            result = await get_learner_objectives_with_status(notebook_id=notebook_id, user_id=learner.user.id)
+            logger.debug(f"Loaded {len(result)} learning objectives with progress")
+            return result
+        except Exception as e:
+            logger.warning("Failed to load learning objectives for notebook {}: {}", notebook_id, str(e))
+            return []
 
-    # 3. Build lightweight source context (~5K tokens) for ReAct chat
-    try:
-        source_context = await build_lightweight_context(notebook_id)
-    except Exception as e:
-        logger.warning("Failed to build source context for notebook {}: {}", notebook_id, str(e))
-        source_context = None
+    async def _safe_get_context():
+        try:
+            return await build_lightweight_context(notebook_id)
+        except Exception as e:
+            logger.warning("Failed to build source context for notebook {}: {}", notebook_id, str(e))
+            return None
 
-    # 4. Load lesson steps with completion status (if notebook has a lesson plan)
-    try:
-        lesson_steps, current_step = await get_lesson_steps_with_status(
-            notebook_id=notebook_id,
-            user_id=learner.user.id,
-        )
-        logger.debug(f"Loaded {len(lesson_steps)} lesson steps for notebook {notebook_id}")
-    except Exception as e:
-        logger.warning("Failed to load lesson steps for notebook {}: {}", notebook_id, str(e))
-        lesson_steps, current_step = [], None
+    async def _safe_get_steps():
+        try:
+            steps, current = await get_lesson_steps_with_status(notebook_id=notebook_id, user_id=learner.user.id)
+            logger.debug(f"Loaded {len(steps)} lesson steps for notebook {notebook_id}")
+            return steps, current
+        except Exception as e:
+            logger.warning("Failed to load lesson steps for notebook {}: {}", notebook_id, str(e))
+            return [], None
 
-    # 5. Assemble system prompt (global + per-module from Story 3.4)
+    objectives_with_status, source_context, (lesson_steps, current_step) = await asyncio.gather(
+        _safe_get_objectives(),
+        _safe_get_context(),
+        _safe_get_steps(),
+    )
+
+    # 5. Assemble system prompt (global + per-module)
     try:
         system_prompt = await assemble_system_prompt(
             notebook_id=notebook_id,
@@ -709,10 +724,9 @@ async def prepare_chat_context(
         )
     except Exception as e:
         logger.error("Failed to assemble system prompt for notebook {}: {}", notebook_id, str(e))
-        # Generic error message - don't leak internal details
         raise HTTPException(
             status_code=500,
             detail="Internal server error. Please try again later."
         )
 
-    return system_prompt, learner_profile, objectives_with_status
+    return system_prompt, learner_profile, objectives_with_status, lesson_steps

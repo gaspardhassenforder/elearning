@@ -30,6 +30,7 @@ class CompletedVia(str, Enum):
 
     CONVERSATION = "conversation"  # AI assessed via chat
     QUIZ = "quiz"  # Assessed via quiz
+    LESSON_COMPLETION = "lesson_completion"  # All required lesson steps completed
 
 
 class LearnerObjectiveProgress(ObjectModel):

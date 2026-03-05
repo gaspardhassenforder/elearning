@@ -18,6 +18,7 @@ import { Loader2, CheckCircle2 } from 'lucide-react'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { useNotebook } from '@/lib/hooks/use-notebooks'
 import { usePublishModule } from '@/lib/hooks/use-notebooks'
+import { useLessonSteps } from '@/lib/hooks/use-lesson-plan'
 import { ModuleSummaryCard } from './ModuleSummaryCard'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -37,12 +38,19 @@ export function ModulePublishFlow({ notebookId, isEditMode = false, onSuccess, o
   // Fetch notebook data to get validation status
   const { data: notebook, isLoading: isLoadingNotebook } = useNotebook(notebookId)
 
+  // Fetch lesson steps to check for pending podcast steps
+  const { data: steps = [] } = useLessonSteps(notebookId)
+
   // Publish mutation
   const publishMutation = usePublishModule(notebookId)
 
+  // Check for podcast steps awaiting review
+  const pendingPodcasts = steps.filter(s => s.step_type === 'podcast' && !s.command_id)
+  const hasPendingPodcasts = pendingPodcasts.length > 0
+
   // Compute validation status from notebook data
   const validation = {
-    isValid: (notebook?.source_count ?? 0) >= 1 && (notebook?.objectives_count ?? 0) >= 1,
+    isValid: (notebook?.source_count ?? 0) >= 1 && (notebook?.objectives_count ?? 0) >= 1 && !hasPendingPodcasts,
     sourceCount: notebook?.source_count ?? 0,
     objectiveCount: notebook?.objectives_count ?? 0,
     artifactCount: notebook?.note_count ?? 0,
@@ -51,19 +59,23 @@ export function ModulePublishFlow({ notebookId, isEditMode = false, onSuccess, o
   }
 
   // Build error list if validation fails
-  if (!validation.isValid) {
-    if (validation.sourceCount < 1) {
-      validation.errors.push({
-        field: 'sources',
-        message: t.modules.publish.errorNoDocuments,
-      })
-    }
-    if (validation.objectiveCount < 1) {
-      validation.errors.push({
-        field: 'objectives',
-        message: t.modules.publish.errorNoObjectives,
-      })
-    }
+  if ((notebook?.source_count ?? 0) < 1) {
+    validation.errors.push({
+      field: 'sources',
+      message: t.modules.publish.errorNoDocuments,
+    })
+  }
+  if ((notebook?.objectives_count ?? 0) < 1) {
+    validation.errors.push({
+      field: 'objectives',
+      message: t.modules.publish.errorNoObjectives,
+    })
+  }
+  if (hasPendingPodcasts) {
+    validation.errors.push({
+      field: 'podcast_steps',
+      message: t.lessonPlan.podcastPendingPublishWarning,
+    })
   }
 
   const canPublish = validation.isValid && !publishMutation.isPending && !publishSuccess

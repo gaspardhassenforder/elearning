@@ -10,10 +10,13 @@ export interface LessonStepResponse {
   id: string
   notebook_id: string
   title: string
-  step_type: 'watch' | 'read' | 'quiz' | 'discuss'
+  step_type: 'watch' | 'read' | 'quiz' | 'discuss' | 'podcast'
   source_id: string | null
   source_title: string | null
   discussion_prompt: string | null
+  ai_instructions: string | null
+  artifact_id: string | null
+  command_id: string | null
   order: number
   required: boolean
   auto_generated: boolean
@@ -23,9 +26,10 @@ export interface LessonStepResponse {
 
 export interface LessonStepUpdate {
   title?: string
-  step_type?: 'watch' | 'read' | 'quiz' | 'discuss'
+  step_type?: 'watch' | 'read' | 'quiz' | 'discuss' | 'podcast'
   source_id?: string | null
   discussion_prompt?: string | null
+  ai_instructions?: string | null
   order?: number
   required?: boolean
 }
@@ -40,6 +44,12 @@ export interface LearnerStepProgressResponse {
   completed_step_ids: string[]
   total_steps: number
   completed_count: number
+}
+
+export interface PodcastTriggerRequest {
+  title?: string
+  ai_instructions?: string
+  source_ids?: string[]
 }
 
 /**
@@ -115,6 +125,41 @@ export async function getLessonStepsProgress(
 ): Promise<LearnerStepProgressResponse> {
   const response = await apiClient.get<LearnerStepProgressResponse>(
     `/notebooks/${notebookId}/lesson-steps/progress`
+  )
+  return response.data
+}
+
+/**
+ * Delete all lesson steps for a notebook (admin only)
+ */
+export async function deleteAllLessonSteps(notebookId: string): Promise<void> {
+  await apiClient.delete(`/notebooks/${notebookId}/lesson-steps`)
+}
+
+/**
+ * Trigger podcast generation for a podcast-type lesson step (admin only)
+ */
+export async function triggerPodcastGeneration(
+  stepId: string,
+  data: PodcastTriggerRequest
+): Promise<LessonStepResponse> {
+  const response = await apiClient.post<LessonStepResponse>(
+    `/lesson-steps/${stepId}/trigger-podcast`,
+    data
+  )
+  return response.data
+}
+
+/**
+ * Refine lesson plan with natural language instruction (admin only)
+ */
+export async function refineLessonPlan(
+  notebookId: string,
+  prompt: string
+): Promise<{ status: string }> {
+  const response = await apiClient.post<{ status: string }>(
+    `/notebooks/${notebookId}/lesson-steps/refine`,
+    { prompt }
   )
   return response.data
 }

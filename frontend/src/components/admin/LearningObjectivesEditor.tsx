@@ -13,18 +13,20 @@
 
 import { useState } from 'react'
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'
-import { GripVertical, Trash2, Plus, Sparkles, Loader2, Info } from 'lucide-react'
+import { GripVertical, Trash2, Sparkles, Loader2, Info, Wand2 } from 'lucide-react'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import {
   useLearningObjectives,
   useGenerateLearningObjectives,
-  useCreateLearningObjective,
   useUpdateLearningObjective,
   useDeleteLearningObjective,
+  useDeleteAllLearningObjectives,
   useReorderLearningObjectives,
+  useRefineLearningObjectives,
 } from '@/lib/hooks/use-learning-objectives'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -37,6 +39,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import {
   Tooltip,
@@ -57,16 +60,19 @@ export function LearningObjectivesEditor({ moduleId, isEditMode = false }: Learn
   // Query and mutations
   const { data: objectives = [], isLoading, error } = useLearningObjectives(moduleId)
   const generateMutation = useGenerateLearningObjectives(moduleId)
-  const createMutation = useCreateLearningObjective(moduleId)
   const updateMutation = useUpdateLearningObjective(moduleId)
   const deleteMutation = useDeleteLearningObjective(moduleId)
   const reorderMutation = useReorderLearningObjectives(moduleId)
 
+
+  const deleteAllMutation = useDeleteAllLearningObjectives(moduleId)
+  const refineMutation = useRefineLearningObjectives(moduleId)
+
   // Local state
-  const [newObjectiveText, setNewObjectiveText] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingText, setEditingText] = useState('')
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [refinePrompt, setRefinePrompt] = useState('')
 
   // Auto-save when text editing is complete
   const handleAutoSave = (objectiveId: string, text: string) => {
@@ -102,20 +108,6 @@ export function LearningObjectivesEditor({ moduleId, isEditMode = false }: Learn
   // Handle generate objectives
   const handleGenerate = () => {
     generateMutation.mutate()
-  }
-
-  // Handle add manual objective
-  const handleAddObjective = () => {
-    if (!newObjectiveText.trim()) return
-
-    createMutation.mutate(
-      { text: newObjectiveText.trim() },
-      {
-        onSuccess: () => {
-          setNewObjectiveText('')
-        },
-      }
-    )
   }
 
   // Handle edit start
@@ -255,24 +247,56 @@ export function LearningObjectivesEditor({ moduleId, isEditMode = false }: Learn
               )}
             </div>
             {objectives.length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleGenerate}
-                disabled={generateMutation.isPending}
-              >
-                {generateMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                    {t.learningObjectives.regenerating}
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-3 w-3" />
-                    {t.learningObjectives.regenerateButton}
-                  </>
-                )}
-              </Button>
+              <div className="flex items-center gap-2">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={deleteAllMutation.isPending}
+                    >
+                      {deleteAllMutation.isPending ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3 w-3" />
+                      )}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>{t.learningObjectives.deleteAllTitle}</AlertDialogTitle>
+                      <AlertDialogDescription>{t.learningObjectives.deleteAllConfirm}</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => deleteAllMutation.mutate()}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        {t.learningObjectives.deleteAll}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGenerate}
+                  disabled={generateMutation.isPending}
+                >
+                  {generateMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                      {t.learningObjectives.regenerating}
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="mr-2 h-3 w-3" />
+                      {t.learningObjectives.regenerateButton}
+                    </>
+                  )}
+                </Button>
+              </div>
             )}
           </div>
 
@@ -379,37 +403,47 @@ export function LearningObjectivesEditor({ moduleId, isEditMode = false }: Learn
         </>
       )}
 
-      {/* Add new objective */}
-      <Card>
-        <CardContent className="py-4">
-          <div className="flex gap-2">
-            <Input
-              placeholder={t.learningObjectives.addPlaceholder}
-              value={newObjectiveText}
-              onChange={(e) => setNewObjectiveText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleAddObjective()
-                }
-              }}
-              disabled={createMutation.isPending}
-            />
-            <Button
-              onClick={handleAddObjective}
-              disabled={!newObjectiveText.trim() || createMutation.isPending}
-            >
-              {createMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <>
-                  <Plus className="mr-2 h-4 w-4" />
-                  {t.common.add}
-                </>
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Refine objectives */}
+      {objectives.length > 0 && (
+        <Card>
+          <CardContent className="pt-4 pb-4">
+            <div className="space-y-2">
+              <p className="text-sm font-medium flex items-center gap-1">
+                <Wand2 className="h-4 w-4" />
+                {t.learningObjectives.refineLabel}
+              </p>
+              <Textarea
+                value={refinePrompt}
+                onChange={(e) => setRefinePrompt(e.target.value)}
+                placeholder={t.learningObjectives.refinePlaceholder}
+                className="text-sm min-h-[60px]"
+                rows={2}
+              />
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (!refinePrompt.trim()) return
+                    refineMutation.mutate(refinePrompt, {
+                      onSuccess: () => setRefinePrompt(''),
+                    })
+                  }}
+                  disabled={refineMutation.isPending || !refinePrompt.trim()}
+                >
+                  {refineMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                      {t.learningObjectives.refining}
+                    </>
+                  ) : (
+                    t.learningObjectives.refineApply
+                  )}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Delete confirmation dialog */}
       <AlertDialog

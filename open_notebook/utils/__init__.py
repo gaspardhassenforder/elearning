@@ -7,7 +7,9 @@ To avoid circular imports, import functions directly:
 """
 
 from .text_utils import (
+    build_dual_key_lookup,
     clean_thinking_content,
+    extract_json_array,
     extract_text_from_response,
     parse_thinking_content,
     remove_non_ascii,
@@ -22,6 +24,8 @@ from .version_utils import (
 )
 
 __all__ = [
+    "build_dual_key_lookup",
+    "extract_json_array",
     "split_text",
     "remove_non_ascii",
     "remove_non_printable",

@@ -788,6 +788,17 @@ async def publish_notebook(
                 "message": "At least 1 learning objective is required to publish"
             })
 
+        # Check for podcast steps awaiting review
+        pending_podcasts = await repo_query(
+            "SELECT count() as cnt FROM lesson_step WHERE notebook_id = $id AND step_type = 'podcast' AND command_id IS NONE GROUP ALL",
+            {"id": ensure_record_id(notebook_id)},
+        )
+        if pending_podcasts and pending_podcasts[0].get("cnt", 0) > 0:
+            errors.append({
+                "field": "podcast_steps",
+                "message": "All podcast steps must have generation triggered before publishing",
+            })
+
         if errors:
             logger.error(f"Publish validation failed for notebook {notebook_id}: {errors}")
             raise HTTPException(

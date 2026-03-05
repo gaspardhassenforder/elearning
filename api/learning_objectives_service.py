@@ -4,15 +4,24 @@ Story 3.3: Learning Objectives Configuration
 Business logic for managing learning objectives and auto-generation workflow.
 """
 
+import json
 from typing import Dict, List, Optional
 
+from ai_prompter import Prompter
 from fastapi import HTTPException
 from loguru import logger
 
+from open_notebook.ai.provision import provision_langchain_model
 from open_notebook.domain.learning_objective import LearningObjective
 from open_notebook.domain.notebook import Notebook
 from open_notebook.graphs.learning_objectives_generation import objectives_generation_graph
 from open_notebook.observability.langsmith_handler import get_langsmith_callback
+from open_notebook.utils import (
+    build_dual_key_lookup,
+    clean_thinking_content,
+    extract_json_array,
+    extract_text_from_response,
+)
 
 
 async def list_objectives(notebook_id: str) -> List[LearningObjective]:
@@ -52,14 +61,11 @@ async def generate_objectives(notebook_id: str) -> Dict:
                 "error": f"Notebook {notebook_id} not found",
             }
 
-        # Check if objectives already exist
+        # Auto-delete existing objectives before regenerating
         existing = await LearningObjective.get_for_notebook(notebook_id)
         if existing:
-            logger.warning(f"Objectives already exist for notebook {notebook_id}")
-            return {
-                "status": "failed",
-                "error": f"Learning objectives already exist for this notebook. Delete existing objectives before generating new ones.",
-            }
+            deleted = await LearningObjective.delete_all_for_notebook(notebook_id)
+            logger.info(f"Deleted {deleted} existing objectives before regeneration")
 
         # Check notebook has sources
         sources = await notebook.get_sources()
@@ -228,6 +234,71 @@ async def delete_objective(objective_id: str) -> bool:
         logger.error("Error deleting objective {}: {}", objective_id, str(e))
         logger.exception(e)
         return False
+
+
+async def refine_objectives(notebook_id: str, refinement_prompt: str) -> dict:
+    """Refine existing learning objectives based on admin's natural language instruction.
+
+    Args:
+        notebook_id: Notebook record ID
+        refinement_prompt: Natural language instruction for how to change the objectives
+
+    Returns:
+        Dict with status field
+    """
+    logger.info(f"Refining learning objectives for notebook {notebook_id}: {refinement_prompt[:50]}")
+
+    try:
+        objectives = await LearningObjective.get_for_notebook(notebook_id, ordered=True)
+        if not objectives:
+            return {"status": "failed", "error": "No learning objectives found to refine"}
+
+        objectives_data = [
+            {
+                "id": str(obj.id),
+                "text": obj.text,
+                "order": obj.order,
+            }
+            for obj in objectives
+        ]
+
+        prompt = Prompter(prompt_template="learning_objectives/refine").render(
+            data={"objectives": objectives_data, "refinement_prompt": refinement_prompt}
+        )
+
+        model = await provision_langchain_model(prompt, None, "chat", max_tokens=2000)
+        response = await model.ainvoke(prompt)
+        content = clean_thinking_content(extract_text_from_response(response.content)).strip()
+
+        try:
+            revised_objectives = extract_json_array(content)
+        except ValueError:
+            logger.error(f"No JSON array found in refine response: {content[:200]}")
+            return {"status": "failed", "error": "AI returned unexpected format"}
+
+        # Build lookup by ID (full or bare)
+        existing_by_id = build_dual_key_lookup(objectives)
+
+        for i, obj_data in enumerate(revised_objectives):
+            obj_id = obj_data.get("id")
+            if not obj_id or obj_id not in existing_by_id:
+                continue
+            obj = existing_by_id[obj_id]
+            new_text = obj_data.get("text", "").strip()
+            if new_text:
+                obj.text = new_text
+            obj.order = i
+            await obj.save()
+
+        logger.info(f"Refined {len(revised_objectives)} objectives for notebook {notebook_id}")
+        return {"status": "completed"}
+
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON parse error in objectives refinement: {str(e)}")
+        return {"status": "failed", "error": "Failed to parse AI response"}
+    except Exception as e:
+        logger.error(f"Error refining objectives for notebook {notebook_id}: {str(e)}")
+        return {"status": "failed", "error": str(e)}
 
 
 async def reorder_objectives(objective_updates: List[Dict[str, int]]) -> bool:

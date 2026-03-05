@@ -95,6 +95,27 @@ export async function reorderLearningObjectives(
 }
 
 /**
+ * Delete all learning objectives for a notebook (admin only)
+ */
+export async function deleteAllLearningObjectives(notebookId: string): Promise<void> {
+  await apiClient.delete(`/notebooks/${notebookId}/learning-objectives`)
+}
+
+/**
+ * Refine learning objectives via natural language instruction
+ */
+export async function refineLearningObjectives(
+  notebookId: string,
+  refinementPrompt: string
+): Promise<{ status: string }> {
+  const response = await apiClient.post<{ status: string }>(
+    `/notebooks/${notebookId}/learning-objectives/refine`,
+    { refinement_prompt: refinementPrompt }
+  )
+  return response.data
+}
+
+/**
  * Get learning objectives with learner progress (Story 4.4)
  * Returns objectives with completion status for the authenticated learner
  */

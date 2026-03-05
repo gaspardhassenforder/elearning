@@ -170,6 +170,56 @@ def parse_thinking_content(content: str) -> Tuple[str, str]:
     return "", content
 
 
+def extract_json_array(content: str) -> list:
+    """Extract a JSON array from LLM response text.
+
+    Finds the first '[' and last ']' in the content and parses the substring
+    as JSON. Useful for extracting structured data from LLM responses that
+    may contain surrounding text.
+
+    Args:
+        content: Raw LLM response text potentially containing a JSON array
+
+    Returns:
+        Parsed list from the JSON array
+
+    Raises:
+        ValueError: If no valid JSON array is found in the content
+    """
+    json_start = content.find("[")
+    json_end = content.rfind("]") + 1
+    if json_start == -1 or json_end == 0:
+        raise ValueError(f"No JSON array found in content: {content[:200]}")
+
+    import json
+    result = json.loads(content[json_start:json_end])
+    if not isinstance(result, list):
+        raise ValueError("Parsed JSON is not an array")
+    return result
+
+
+def build_dual_key_lookup(items, id_attr: str = "id") -> dict:
+    """Build a dict keyed by both 'table:id' and bare 'id'.
+
+    LLMs may return IDs with or without the SurrealDB table prefix.
+    This builds a lookup that matches either form.
+
+    Args:
+        items: Iterable of objects with an id attribute
+        id_attr: Name of the attribute to use as key (default: "id")
+
+    Returns:
+        Dict mapping both full IDs and bare IDs to the original items
+    """
+    lookup = {}
+    for item in items:
+        full_id = str(getattr(item, id_attr))
+        lookup[full_id] = item
+        if ":" in full_id:
+            lookup[full_id.split(":", 1)[1]] = item
+    return lookup
+
+
 def clean_thinking_content(content: str) -> str:
     """
     Remove thinking content from AI responses, returning only the cleaned content.

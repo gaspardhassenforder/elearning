@@ -1,0 +1,4 @@
+-- Migration 41 down: Remove enrichment fields from lesson_step
+REMOVE FIELD ai_instructions ON lesson_step;
+REMOVE FIELD artifact_id ON lesson_step;
+REMOVE FIELD command_id ON lesson_step;

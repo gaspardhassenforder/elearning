@@ -125,11 +125,38 @@ class LearningObjective(ObjectModel):
             True if deleted successfully
         """
         try:
-            await repo_query("DELETE $id", {"id": objective_id})
+            await repo_query("DELETE $id", {"id": ensure_record_id(objective_id)})
             logger.info(f"Deleted learning objective {objective_id}")
             return True
         except Exception as e:
             logger.error(f"Error deleting objective {objective_id}: {str(e)}")
+            raise DatabaseOperationError(e)
+
+    @classmethod
+    async def delete_all_for_notebook(cls, notebook_id: str) -> int:
+        """Delete all learning objectives for a notebook.
+
+        Used before re-generating objectives.
+
+        Args:
+            notebook_id: Notebook record ID
+
+        Returns:
+            Number of deleted objectives
+        """
+        if not notebook_id.startswith("notebook:"):
+            notebook_id = f"notebook:{notebook_id}"
+
+        try:
+            result = await repo_query(
+                "DELETE learning_objective WHERE notebook_id = $notebook_id RETURN BEFORE",
+                {"notebook_id": ensure_record_id(notebook_id)},
+            )
+            count = len(result) if result else 0
+            logger.info(f"Deleted {count} learning objectives for notebook {notebook_id}")
+            return count
+        except Exception as e:
+            logger.error(f"Error deleting objectives for notebook {notebook_id}: {str(e)}")
             raise DatabaseOperationError(e)
 
     @classmethod

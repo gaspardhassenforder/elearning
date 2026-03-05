@@ -706,6 +706,94 @@ async def search_knowledge_base(
 
 
 @tool
+async def get_objectives(config: RunnableConfig) -> list:
+    """Return the current list of learning objectives with completion status.
+    Call this when you need to know which objectives the learner has completed
+    and which still need to be addressed.
+
+    Returns:
+        List of objective dicts with 'id', 'text', 'status' (not_started/completed), 'order'
+    """
+    return config.get("configurable", {}).get("objectives", [])
+
+
+@tool
+async def get_lesson_steps(config: RunnableConfig) -> list:
+    """Return the current lesson plan steps with completion status.
+    Call this to see where the learner is in the structured lesson plan.
+
+    Returns:
+        List of step dicts with 'id', 'title', 'step_type', 'status' (completed/current/upcoming)
+    """
+    return config.get("configurable", {}).get("lesson_steps", [])
+
+
+@tool
+async def complete_lesson_step(step_id: str, config: RunnableConfig) -> dict:
+    """Mark a lesson step as completed.
+
+    Use this for 'discuss' type steps when the learner has engaged meaningfully
+    with the topic. For 'read' steps, they are marked complete by the frontend
+    when the learner opens the document.
+
+    Args:
+        step_id: The record ID of the lesson step (e.g., "lesson_step:abc123")
+
+    Returns:
+        dict with step_id, step_title, and a confirmation message
+    """
+    from open_notebook.domain.learner_step_progress import LearnerStepProgress
+
+    logger.info(f"complete_lesson_step tool called for step_id: {step_id}")
+
+    configurable = config.get("configurable", {}) if config else {}
+    user_id = configurable.get("user_id")
+
+    if not user_id:
+        logger.warning("complete_lesson_step called without user_id in config")
+        return {
+            "error": "I couldn't record your progress right now",
+            "error_type": "service_error",
+            "recoverable": False,
+        }
+
+    # Resolve step title from preloaded lesson_steps (avoids extra DB query)
+    lesson_steps = configurable.get("lesson_steps", [])
+    step_title = next(
+        (s.get("title", step_id) for s in lesson_steps if s.get("id") == step_id),
+        step_id,
+    )
+
+    try:
+        # Delegate step completion + objective auto-completion to service
+        notebook_id = configurable.get("notebook_id")
+        all_objectives_completed = False
+        if notebook_id:
+            from api.lesson_plan_service import complete_step_with_objectives
+            result = await complete_step_with_objectives(user_id, step_id, notebook_id)
+            all_objectives_completed = result.get("all_objectives_completed", False)
+        else:
+            await LearnerStepProgress.mark_complete(user_id=user_id, step_id=step_id)
+
+        logger.info(f"Marked step {step_id} complete for user {user_id}")
+
+        return {
+            "step_id": step_id,
+            "step_title": step_title,
+            "message": "Step marked complete",
+            "all_objectives_completed": all_objectives_completed,
+        }
+
+    except Exception as e:
+        logger.error("Error in complete_lesson_step for step {}: {}", step_id, str(e), exc_info=True)
+        return {
+            "error": "I had trouble recording your progress",
+            "error_type": "service_error",
+            "recoverable": False,
+        }
+
+
+@tool
 async def generate_artifact(
     artifact_type: str,
     topic: str,

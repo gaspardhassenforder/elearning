@@ -55,8 +55,10 @@ export function SourcesPanel({ notebookId }: SourcesPanelProps) {
   const scrollToSourceId = useLearnerStore((state) => state.scrollToSourceId)
   const setScrollToSourceId = useLearnerStore((state) => state.setScrollToSourceId)
 
-  // Story 5.1: Track expanded document (accordion behavior) - local state (store properties removed)
-  const [expandedSourceId, setExpandedSourceId] = useState<string | null>(null)
+  // Story 5.1: Track expanded document (accordion behavior) - persisted in store per notebook
+  const expandedSourceIds = useLearnerStore((state) => state.expandedSourceIds)
+  const setExpandedSourceIdInStore = useLearnerStore((state) => state.setExpandedSourceId)
+  const expandedSourceId = expandedSourceIds[notebookId] ?? null
 
   const {
     sources,
@@ -143,8 +145,9 @@ export function SourcesPanel({ notebookId }: SourcesPanelProps) {
     // Accordion pattern: only one document expanded at a time
     // If clicking the already expanded card, collapse it (set to null)
     // Otherwise, expand this card (automatically collapses any other expanded card)
-    setExpandedSourceId(expandedSourceId === sourceId ? null : sourceId)
-  }, [expandedSourceId, setExpandedSourceId])
+    const next = expandedSourceId === sourceId ? null : sourceId
+    setExpandedSourceIdInStore(notebookId, next)
+  }, [expandedSourceId, notebookId, setExpandedSourceIdInStore])
 
   return (
     <Card className="h-full flex flex-col">

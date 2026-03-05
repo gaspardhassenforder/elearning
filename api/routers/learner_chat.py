@@ -20,9 +20,12 @@ from typing import Optional
 
 from api.auth import LearnerContext, get_current_learner
 from api.learner_chat_service import (
+    extract_learner_profile,
     build_intro_message,
     generate_quick_replies,
-    prepare_chat_context,
+    get_learner_objectives_with_status,
+    get_lesson_steps_with_status,
+    init_thread_context,
     validate_learner_access_to_notebook,
 )
 from open_notebook.graphs.chat import get_async_graph, get_async_memory
@@ -532,14 +535,57 @@ async def stream_learner_chat(
             status_code=500, detail="Failed to validate notebook access"
         )
 
-    # 2. Prepare chat context (system prompt, learner profile, objectives)
+    # 2. Thread-aware context init:
+    #    - New thread: run full init (11 queries), build system_prompt once
+    #    - Existing thread: run lightweight reconciliation (4 queries), reuse checkpointed system_prompt
+    thread_id = f"{learner.user.id}:{notebook_id}"
+
     try:
-        system_prompt, learner_profile_dict, objectives_with_status = await prepare_chat_context(
-            notebook_id=notebook_id, learner=learner, language=request.language
-        )
-        logger.debug(
-            f"System prompt prepared ({len(system_prompt)} chars) for notebook {notebook_id}"
-        )
+        async_memory = await get_async_memory()
+        thread_state = await async_memory.aget({"configurable": {"thread_id": thread_id}})
+
+        # Extract channel_values from checkpoint (SqliteSaver returns dict)
+        channel_values = {}
+        if thread_state:
+            if isinstance(thread_state, dict):
+                channel_values = thread_state.get("channel_values", {})
+            elif hasattr(thread_state, "checkpoint"):
+                checkpoint_data = thread_state.checkpoint
+                if isinstance(checkpoint_data, dict):
+                    channel_values = checkpoint_data.get("channel_values", {})
+
+        is_new_thread = not channel_values or not channel_values.get("system_prompt")
+        existing_messages = channel_values.get("messages", [])
+        is_first_visit = not existing_messages
+
+    except Exception as e:
+        logger.warning("Could not read thread checkpoint, treating as new thread: {}", str(e))
+        is_new_thread = True
+        is_first_visit = True
+
+    try:
+        if is_new_thread:
+            # Full init — build system prompt once (runs all context queries)
+            system_prompt, learner_profile_dict, objectives, lesson_steps = await init_thread_context(
+                notebook_id=notebook_id, learner=learner, language=request.language
+            )
+            logger.info(
+                f"New thread: system prompt built ({len(system_prompt)} chars) for notebook {notebook_id}"
+            )
+        else:
+            # Lightweight reconciliation — refresh progress status only (4 queries)
+            # system_prompt lives in checkpoint and will be reused by the graph
+            system_prompt = None
+            learner_profile_dict = extract_learner_profile(learner)
+            objectives, (lesson_steps, _) = await asyncio.gather(
+                get_learner_objectives_with_status(notebook_id, learner.user.id),
+                get_lesson_steps_with_status(notebook_id, learner.user.id),
+            )
+            logger.info(
+                f"Existing thread: reconciled {len(objectives)} objectives, {len(lesson_steps)} steps for notebook {notebook_id}"
+            )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Error preparing chat context for notebook {}: {}", notebook_id, str(e))
         raise HTTPException(status_code=500, detail="Failed to prepare chat context")
@@ -549,42 +595,10 @@ async def stream_learner_chat(
         """Generate SSE events from LangGraph streaming output.
 
         Translates LangGraph events to assistant-ui SSE protocol format.
-        Story 4.2: Includes first-visit proactive greeting detection and generation.
+        Includes first-visit proactive greeting detection and generation.
         """
         try:
-            # Thread ID pattern: user:{user_id}:notebook:{notebook_id}
-            thread_id = f"{learner.user.id}:{notebook_id}"
             logger.info(f"Using thread_id: {thread_id}")
-
-            # Check if this is first visit (no checkpoint messages) or returning user
-            is_first_visit = False
-            try:
-                async_memory = await get_async_memory()
-                thread_state = await async_memory.aget({"configurable": {"thread_id": thread_id}})
-
-                # Extract messages from checkpoint (handle dict structure from SqliteSaver)
-                messages = []
-                if thread_state:
-                    if isinstance(thread_state, dict):
-                        # SqliteSaver returns dict
-                        if "channel_values" in thread_state and "messages" in thread_state["channel_values"]:
-                            messages = thread_state["channel_values"]["messages"]
-                        elif "messages" in thread_state:
-                            messages = thread_state["messages"]
-                    elif hasattr(thread_state, "checkpoint"):
-                        # CheckpointTuple object
-                        checkpoint_data = thread_state.checkpoint
-                        if isinstance(checkpoint_data, dict) and "channel_values" in checkpoint_data:
-                            messages = checkpoint_data["channel_values"].get("messages", [])
-
-                if not thread_state or not messages:
-                    is_first_visit = True
-                    logger.info(f"First visit detected for thread {thread_id}")
-                else:
-                    logger.info(f"Returning user detected for thread {thread_id} ({len(messages)} messages in history)")
-            except Exception as e:
-                logger.warning("Could not check thread state, assuming first visit: {}", str(e))
-                is_first_visit = True
 
             # Determine user message for this turn.
             # First visit + empty message: inject hidden intro to trigger natural greeting.
@@ -600,7 +614,7 @@ async def stream_learner_chat(
             else:
                 user_message = HumanMessage(content=request.message)
 
-            # Story 7.4: Create LangSmith callback for tracing (or None if not configured)
+            # Create LangSmith callback for tracing (or None if not configured)
             langsmith_callback = get_langsmith_callback(
                 user_id=learner.user.id,
                 company_id=learner.company_id,
@@ -609,10 +623,10 @@ async def stream_learner_chat(
                 run_name=f"chat:{thread_id}",
             )
 
-            # Story 7.2: Add context logging callback for error diagnostics
+            # Add context logging callback for error diagnostics
             context_callback = ContextLoggingCallback()
 
-            # Story 7.7: Add token tracking callback for usage monitoring
+            # Add token tracking callback for usage monitoring
             token_callback = TokenTrackingCallback(
                 user_id=learner.user.id,
                 company_id=learner.company_id,
@@ -620,7 +634,6 @@ async def stream_learner_chat(
                 operation_type="chat",
             )
 
-            # Build callbacks list (Story 7.2 + Story 7.4 + Story 7.7)
             callbacks = [context_callback, token_callback]
             if langsmith_callback:
                 callbacks.append(langsmith_callback)
@@ -634,33 +647,36 @@ async def stream_learner_chat(
                 "generate_artifact": "Generating content...",
             }
 
-            # Collect AI response text for background examiner
+            # Collect AI response text for quick_replies generation
             collected_ai_text: list[str] = []
 
             # Heartbeat: track time of last SSE event to prevent proxy timeouts
             last_event_time = time.monotonic()
 
-            # Stream events from chat graph with assembled system prompt
+            # Build initial state — pass system_prompt only for new threads
+            # (existing threads reuse the system_prompt stored in the checkpoint)
+            initial_state = {
+                "messages": [user_message],
+                "objectives": objectives,
+                "lesson_steps": lesson_steps,
+                "user_id": learner.user.id,
+            }
+            if is_new_thread and system_prompt:
+                initial_state["system_prompt"] = system_prompt
+
+            # Stream events from chat graph
             # ReAct loop: agent -> tools -> agent -> ... (up to MAX_TOOL_ITERATIONS)
             async_graph = await get_async_graph()
             async for event in async_graph.astream_events(
-                {
-                    "messages": [user_message],
-                    "notebook": None,  # Will be loaded by graph if needed
-                    "context": None,  # RAG context built by graph
-                    "context_config": None,
-                    "model_override": None,  # Use default model
-                    "system_prompt_override": system_prompt,  # Story 4.1: Use assembled prompt
-                    "user_id": learner.user.id,  # For tools via config
-                },
+                initial_state,
                 config={
                     "configurable": {
                         "thread_id": thread_id,
-                        "user_id": learner.user.id,  # Pass to tools
-                        "notebook_id": notebook_id,  # For search_knowledge_base + generate_artifact
-                        "company_id": learner.company_id,  # For search_available_modules tool
+                        "user_id": learner.user.id,
+                        "notebook_id": notebook_id,
+                        "company_id": learner.company_id,
                     },
-                    "callbacks": callbacks,  # Story 7.4: LangSmith tracing
+                    "callbacks": callbacks,
                 },
                 version="v2",
             ):
@@ -681,7 +697,7 @@ async def stream_learner_chat(
                 # Tool call start — emit tool_call + tool_status events
                 elif event_type == "on_tool_start":
                     tool_data = event.get("data", {})
-                    tool_name = event.get("name", "unknown")  # name is at event root, not inside data
+                    tool_name = event.get("name", "unknown")
                     tool_input = tool_data.get("input", {})
                     tool_run_id = event.get("run_id", f"call_{event.get('name', 'unknown')}")
 
@@ -690,7 +706,6 @@ async def stream_learner_chat(
                     )
                     yield f"event: tool_call\ndata: {tool_call_event.model_dump_json()}\n\n"
 
-                    # Emit human-readable status for frontend progress indicator
                     status_text = _TOOL_STATUS_MAP.get(tool_name)
                     if status_text:
                         status_event = SSEToolStatusEvent(
@@ -705,13 +720,10 @@ async def stream_learner_chat(
                     tool_run_id = event.get("run_id", "call_result")
                     tool_name = event.get("name", "")
 
-                    # For content_and_artifact tools (surface_document), extract
-                    # artifact for frontend. ToolMessage.artifact holds the UI dict.
+                    # For content_and_artifact tools (surface_document), extract artifact for frontend
                     if hasattr(tool_output, "artifact") and tool_output.artifact:
                         result_for_frontend = tool_output.artifact
                     elif hasattr(tool_output, "content"):
-                        # ToolMessage from ToolNode (quiz, podcast, generate_artifact):
-                        # parse JSON content back to dict for frontend
                         try:
                             result_for_frontend = json.loads(tool_output.content) if isinstance(tool_output.content, str) else tool_output.content
                         except (json.JSONDecodeError, TypeError):
@@ -721,7 +733,6 @@ async def stream_learner_chat(
                     else:
                         result_for_frontend = {"content": str(tool_output) if tool_output else ""}
 
-                    # Ensure result is always a dict (search tools return lists)
                     if isinstance(result_for_frontend, list):
                         result_for_frontend = {"items": result_for_frontend}
 
@@ -747,34 +758,14 @@ async def stream_learner_chat(
                     yield ": heartbeat\n\n"
                     last_event_time = time.monotonic()
 
-            # Emit message_complete IMMEDIATELY so frontend can show "done" and re-enable input
+            # Emit message_complete so frontend can re-enable input
             message_complete_event = SSEMessageCompleteEvent(
                 messageId=f"msg_{thread_id}_{len(request.message)}",
                 metadata={"thread_id": thread_id, "notebook_id": notebook_id},
             )
             yield f"event: message_complete\ndata: {message_complete_event.model_dump_json()}\n\n"
 
-            # Run examiner and quick_replies in parallel; relay events as they complete.
-            # This avoids blocking the stream 8s on quick_replies then 15s on examiner.
-            # Skip examiner on first-visit greeting (no real user message to evaluate).
-            from open_notebook.graphs.nodes.examiner import evaluate_exchange
-
-            examiner_queue: asyncio.Queue = asyncio.Queue()
-            if request.message.strip():
-                asyncio.create_task(
-                    evaluate_exchange(
-                        user_message=request.message,
-                        ai_response="".join(collected_ai_text),
-                        objectives_with_status=objectives_with_status,
-                        user_id=learner.user.id,
-                        notebook_id=notebook_id,
-                        result_queue=examiner_queue,
-                    )
-                )
-            else:
-                # First-visit greeting: put sentinel synchronously so loop exits immediately
-                await examiner_queue.put(None)
-            # For greeting (empty user message), pass AI response as context for quick replies
+            # Generate quick replies in background and emit when ready
             ai_response_text = "".join(collected_ai_text)
             quick_replies_task = asyncio.create_task(
                 generate_quick_replies(
@@ -783,56 +774,20 @@ async def stream_learner_chat(
                     language=request.language,
                 )
             )
-            quick_replies_sent = False
-            examiner_done = False
-            max_poll_iterations = 30  # 30 × 1s = 30s max wait before giving up
-            poll_count = 0
+            # Wait briefly for quick replies (up to 15s)
             try:
-                while not examiner_done and poll_count < max_poll_iterations:
-                    poll_count += 1
-                    try:
-                        result = await asyncio.wait_for(
-                            examiner_queue.get(), timeout=1.0
-                        )
-                        got_from_queue = True
-                    except asyncio.TimeoutError:
-                        got_from_queue = False
-                        result = None
-                    if got_from_queue:
-                        if result is None:
-                            examiner_done = True
-                        elif isinstance(result, dict):
-                            objective_event = SSEObjectiveCheckedEvent(**result)
-                            yield f"event: objective_checked\ndata: {objective_event.model_dump_json()}\n\n"
-                            logger.info(
-                                "Emitted objective_checked event: {}/{}",
-                                result.get("total_completed"), result.get("total_objectives"),
-                            )
-                    if not quick_replies_sent and quick_replies_task.done():
-                        quick_replies_sent = True
-                        try:
-                            replies = quick_replies_task.result()
-                            if replies:
-                                quick_replies_event = SSEQuickRepliesEvent(replies=replies)
-                                yield f"event: quick_replies\ndata: {quick_replies_event.model_dump_json()}\n\n"
-                        except Exception:
-                            pass
+                replies = await asyncio.wait_for(quick_replies_task, timeout=15.0)
+                if replies:
+                    quick_replies_event = SSEQuickRepliesEvent(replies=replies)
+                    yield f"event: quick_replies\ndata: {quick_replies_event.model_dump_json()}\n\n"
             except asyncio.TimeoutError:
-                logger.warning("Examiner timed out for thread {}", thread_id)
-            if poll_count >= max_poll_iterations:
-                logger.warning("Examiner polling hit max iterations ({}) for thread {}", max_poll_iterations, thread_id)
-            if not quick_replies_sent and quick_replies_task.done():
-                try:
-                    replies = quick_replies_task.result()
-                    if replies:
-                        quick_replies_event = SSEQuickRepliesEvent(replies=replies)
-                        yield f"event: quick_replies\ndata: {quick_replies_event.model_dump_json()}\n\n"
-                except Exception:
-                    pass
+                quick_replies_task.cancel()
+                logger.warning("Quick replies timed out for thread {}", thread_id)
+            except Exception as e:
+                logger.warning("Quick replies failed for thread {}: {}", thread_id, str(e))
 
         except Exception as e:
-            # Story 7.1: Stream error event to frontend
-            # Log full error details but don't leak technical info to client
+            # Stream error event to frontend
             logger.error("Error during SSE streaming for notebook {}: {}", notebook_id, str(e), exc_info=True)
             error_event = {
                 "error": "I had trouble processing that",

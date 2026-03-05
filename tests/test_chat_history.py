@@ -114,10 +114,8 @@ class TestCheckpointPersistence:
                 {
                     "messages": [user_message],
                     "notebook": None,
-                    "context": None,
-                    "context_config": None,
                     "model_override": None,
-                    "system_prompt_override": "You are a test assistant.",
+                    "system_prompt": "You are a test assistant.",
                     "user_id": "user:test",
                 },
                 config=config
@@ -161,10 +159,8 @@ class TestCheckpointPersistence:
                 {
                     "messages": [HumanMessage(content="First message")],
                     "notebook": None,
-                    "context": None,
-                    "context_config": None,
                     "model_override": None,
-                    "system_prompt_override": "You are a test assistant.",
+                    "system_prompt": "You are a test assistant.",
                     "user_id": "user:test2",
                 },
                 config=config
@@ -176,10 +172,8 @@ class TestCheckpointPersistence:
                 {
                     "messages": [HumanMessage(content="Second message")],
                     "notebook": None,
-                    "context": None,
-                    "context_config": None,
                     "model_override": None,
-                    "system_prompt_override": "You are a test assistant.",
+                    "system_prompt": "You are a test assistant.",
                     "user_id": "user:test2",
                 },
                 config=config
@@ -242,10 +236,8 @@ class TestThreadIsolationIntegration:
                 {
                     "messages": [HumanMessage(content="Alice's message")],
                     "notebook": None,
-                    "context": None,
-                    "context_config": None,
                     "model_override": None,
-                    "system_prompt_override": "You are a test assistant.",
+                    "system_prompt": "You are a test assistant.",
                     "user_id": "user:alice",
                 },
                 config=alice_config
@@ -257,10 +249,8 @@ class TestThreadIsolationIntegration:
                 {
                     "messages": [HumanMessage(content="Bob's message")],
                     "notebook": None,
-                    "context": None,
-                    "context_config": None,
                     "model_override": None,
-                    "system_prompt_override": "You are a test assistant.",
+                    "system_prompt": "You are a test assistant.",
                     "user_id": "user:bob",
                 },
                 config=bob_config
@@ -311,10 +301,8 @@ class TestThreadIsolationIntegration:
                 {
                     "messages": [HumanMessage(content="Message in notebook A")],
                     "notebook": None,
-                    "context": None,
-                    "context_config": None,
                     "model_override": None,
-                    "system_prompt_override": "You are a test assistant.",
+                    "system_prompt": "You are a test assistant.",
                     "user_id": user_id,
                 },
                 config=config_a
@@ -326,10 +314,8 @@ class TestThreadIsolationIntegration:
                 {
                     "messages": [HumanMessage(content="Message in notebook B")],
                     "notebook": None,
-                    "context": None,
-                    "context_config": None,
                     "model_override": None,
-                    "system_prompt_override": "You are a test assistant.",
+                    "system_prompt": "You are a test assistant.",
                     "user_id": user_id,
                 },
                 config=config_b
@@ -401,10 +387,8 @@ class TestCheckpointStorageLifecycle:
                 {
                     "messages": [HumanMessage(content="Message before restart")],
                     "notebook": None,
-                    "context": None,
-                    "context_config": None,
                     "model_override": None,
-                    "system_prompt_override": "You are a test assistant.",
+                    "system_prompt": "You are a test assistant.",
                     "user_id": "user:restart-test",
                 },
                 config=config

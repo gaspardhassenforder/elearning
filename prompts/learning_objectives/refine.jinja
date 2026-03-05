@@ -1,0 +1,32 @@
+You are refining a set of learning objectives based on an admin instruction.
+
+CURRENT LEARNING OBJECTIVES:
+{% for obj in objectives %}
+{{ loop.index }}. "{{ obj.text }}" (id: {{ obj.id }})
+{% endfor %}
+
+INSTRUCTION: {{ refinement_prompt }}
+
+Apply the instruction to improve, rewrite, add, remove, or reorder the objectives.
+Keep objectives measurable and action-verb based (e.g., "Explain", "Apply", "Analyze").
+Preserve the original id field for each objective you keep or modify.
+
+Return ONLY a valid JSON array with ALL objectives (including unmodified ones), no other text.
+Each item must include its original "id" field so updates can be matched.
+
+Example output format:
+[
+  {
+    "id": "learning_objective:abc123",
+    "text": "Explain the core concepts of machine learning and their real-world applications"
+  },
+  {
+    "id": "learning_objective:def456",
+    "text": "Apply supervised learning techniques to classify structured datasets"
+  }
+]
+
+IMPORTANT:
+- Keep all objectives you don't explicitly want to remove
+- Return ONLY the JSON array, nothing else
+- Preserve the "id" field exactly as given

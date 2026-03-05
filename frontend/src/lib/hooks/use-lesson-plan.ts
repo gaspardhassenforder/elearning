@@ -11,10 +11,14 @@ import {
   generateLessonPlan,
   updateLessonStep,
   deleteLessonStep,
+  deleteAllLessonSteps,
   reorderLessonSteps,
   getLessonStepsProgress,
+  refineLessonPlan,
+  triggerPodcastGeneration,
   type LessonStepResponse,
   type LessonStepUpdate,
+  type PodcastTriggerRequest,
 } from '@/lib/api/lesson-plan'
 import { QUERY_KEYS } from '@/lib/api/query-client'
 
@@ -94,6 +98,18 @@ export function useDeleteLessonStep(notebookId: string) {
 }
 
 /**
+ * Mutation hook: Delete all lesson steps
+ */
+export function useDeleteAllLessonSteps(moduleId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => deleteAllLessonSteps(moduleId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.lessonSteps(moduleId) }),
+    onError: (e: Error) => toast.error(`Failed to delete lesson plan: ${e.message}`),
+  })
+}
+
+/**
  * Mutation hook: Reorder lesson steps with optimistic updates
  */
 export function useReorderLessonSteps(notebookId: string) {
@@ -152,5 +168,45 @@ export function useLessonStepsProgress(notebookId: string) {
     enabled: !!notebookId,
     staleTime: 30 * 1000, // 30 seconds — refresh after step completion
     refetchOnWindowFocus: true,
+  })
+}
+
+/**
+ * Mutation hook: Trigger podcast generation for a lesson step (admin only)
+ */
+export function useTriggerPodcastGeneration(notebookId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ stepId, data }: { stepId: string; data: PodcastTriggerRequest }) =>
+      triggerPodcastGeneration(stepId, data),
+    onSuccess: () => {
+      toast.success('Podcast generation triggered')
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.lessonSteps(notebookId),
+      })
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to trigger podcast: ${error.message}`)
+    },
+  })
+}
+
+/**
+ * Mutation hook: Refine lesson plan with natural language instruction
+ */
+export function useRefineLessonPlan(notebookId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (prompt: string) => refineLessonPlan(notebookId, prompt),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.lessonSteps(notebookId),
+      })
+    },
+    onError: (error: Error) => {
+      toast.error(`Refinement failed: ${error.message}`)
+    },
   })
 }
