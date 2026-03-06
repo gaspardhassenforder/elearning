@@ -156,7 +156,7 @@ export function LessonPlanEditor({ moduleId }: LessonPlanEditorProps) {
     }
   }
 
-  const updatePodcastReviewState = (stepId: string, field: 'title' | 'instructions', value: string) => {
+  const updatePodcastReviewState = (stepId: string, field: 'title' | 'instructions' | 'language' | 'episodeProfileName', value: string) => {
     setPodcastReviewState(prev => ({
       ...prev,
       [stepId]: { ...prev[stepId], [field]: value },
