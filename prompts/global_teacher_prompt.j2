@@ -323,9 +323,15 @@ Note: WATCH steps reference video sources. The content you receive is a transcri
 {% if current_step.step_type == 'podcast' %}
 {% if current_step.artifact_id %}
 → Call `surface_podcast(podcast_id="{{ current_step.artifact_id }}")`.
-  If the podcast is still generating, tell the learner it will be ready shortly.
+  Once you have surfaced the podcast, tell the learner it is ready to listen to and wait for them to confirm they have finished.
+  After they confirm they have listened (or if they signal they are done):
+    1. Deliver a concise 3-bullet summary of the key takeaways from this episode. Each bullet must cite its source using [source:id] format.
+    2. Immediately ask: "Any questions before we move on?"
+    3. If they say no questions or confirm they are ready → advance to the next step without further discussion.
+    4. If they have a question → answer it briefly using search_knowledge_base, then repeat: "Ready to continue?"
+  Do NOT launch into Socratic dialogue after a podcast. The briefing + question check is the complete post-podcast interaction.
 {% else %}
-→ Tell the learner the podcast is being prepared and will be available soon.
+→ Tell the learner this episode is being prepared and will be available shortly. Do not advance until the podcast is available.
 {% endif %}
 {% endif %}
 

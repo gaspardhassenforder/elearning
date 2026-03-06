@@ -1,0 +1,6 @@
+-- Migration 42: Add missing source_ids and podcast_topic fields to lesson_step
+-- These fields were used by the lesson plan generator but never defined in schema,
+-- causing SurrealDB (SCHEMAFULL table) to silently drop them on every save.
+
+DEFINE FIELD source_ids ON lesson_step TYPE option<array<string>>;
+DEFINE FIELD podcast_topic ON lesson_step TYPE option<string>;

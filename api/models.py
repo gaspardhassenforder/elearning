@@ -1040,6 +1040,8 @@ class LessonStepCreate(BaseModel):
         ..., description="Type of action required"
     )
     source_id: Optional[str] = Field(None, description="Source record ID (optional)")
+    source_ids: Optional[List[str]] = Field(None, description="Source IDs to use for this podcast")
+    podcast_topic: Optional[str] = Field(None, description="Topic/briefing for podcast generation")
     discussion_prompt: Optional[str] = Field(
         None, description="Prompt for discussion-type steps"
     )
@@ -1056,6 +1058,8 @@ class LessonStepUpdate(BaseModel):
         None, description="Updated step type"
     )
     source_id: Optional[str] = Field(None, description="Updated source reference")
+    source_ids: Optional[List[str]] = Field(None, description="Updated source IDs for podcast")
+    podcast_topic: Optional[str] = Field(None, description="Updated podcast topic/briefing")
     discussion_prompt: Optional[str] = Field(
         None, description="Updated discussion prompt"
     )
@@ -1073,6 +1077,8 @@ class LessonStepResponse(BaseModel):
     step_type: str
     source_id: Optional[str] = None
     source_title: Optional[str] = None  # Resolved from source_id for display
+    source_ids: Optional[List[str]] = None
+    podcast_topic: Optional[str] = None
     discussion_prompt: Optional[str] = None
     ai_instructions: Optional[str] = None
     artifact_id: Optional[str] = None

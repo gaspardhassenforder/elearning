@@ -406,6 +406,37 @@ async def check_off_objective(
         }
 
 
+async def _resolve_artifact_id(
+    content_id: str, expected_type: str
+) -> tuple[str | None, object | None, dict | None]:
+    """Resolve an artifact:xxx tracker ID to the actual content ID.
+
+    Returns (resolved_id, artifact, error_dict).
+    - If content_id is not an artifact ID, returns (content_id, None, None).
+    - If resolved successfully, returns (actual_id, artifact_object, None).
+    - On error, returns (None, None, error_dict).
+    """
+    if not content_id.startswith("artifact:"):
+        return content_id, None, None
+
+    from open_notebook.domain.artifact import Artifact
+
+    artifact = await Artifact.get(content_id)
+    if not artifact or artifact.artifact_type != expected_type:
+        return None, None, {
+            "error": f"I couldn't find that {expected_type}",
+            "error_type": "not_found",
+            "recoverable": True,
+        }
+    if artifact._is_job_id():
+        return None, None, {
+            "error": f"That {expected_type} is still being generated",
+            "error_type": "not_ready",
+            "recoverable": True,
+        }
+    return artifact.artifact_id, artifact, None
+
+
 @tool
 async def surface_quiz(quiz_id: str, config: RunnableConfig) -> dict:
     """Surface a quiz in the chat conversation.
@@ -414,7 +445,7 @@ async def surface_quiz(quiz_id: str, config: RunnableConfig) -> dict:
     The quiz will display inline in the chat with the first question, allowing immediate interaction.
 
     Args:
-        quiz_id: The record ID of the quiz (e.g., "quiz:abc123")
+        quiz_id: The record ID of the quiz (e.g., "quiz:abc123") or artifact tracker (e.g., "artifact:xyz")
         config: RunnableConfig containing user_id and notebook_id (injected by chat graph)
 
     Returns:
@@ -432,6 +463,10 @@ async def surface_quiz(quiz_id: str, config: RunnableConfig) -> dict:
     logger.info(f"surface_quiz tool called for quiz_id: {quiz_id}")
 
     try:
+        quiz_id, _, error = await _resolve_artifact_id(quiz_id, "quiz")
+        if error:
+            return error
+
         # Load quiz
         try:
             quiz = await Quiz.get(quiz_id)
@@ -524,7 +559,7 @@ async def surface_podcast(podcast_id: str, config: RunnableConfig) -> dict:
     The podcast will display inline in the chat with playback controls.
 
     Args:
-        podcast_id: The record ID of the podcast (e.g., "podcast:xyz789")
+        podcast_id: The record ID of the podcast (e.g., "podcast:xyz789") or artifact tracker (e.g., "artifact:xyz")
         config: RunnableConfig containing user_id and notebook_id (injected by chat graph)
 
     Returns:
@@ -542,24 +577,79 @@ async def surface_podcast(podcast_id: str, config: RunnableConfig) -> dict:
     logger.info(f"surface_podcast tool called for podcast_id: {podcast_id}")
 
     try:
-        # Load podcast
-        try:
-            podcast = await Podcast.get(podcast_id)
-        except NotFoundError:
-            logger.warning(f"Podcast not found: {podcast_id}")
-            return {
-                "error": "I couldn't find that podcast",
-                "error_type": "not_found",
-                "recoverable": True,
-            }
+        # Resolve artifact:xxx tracker to actual content ID.
+        # Keep artifact reference for notebook_id (used in company scoping for episodes).
+        podcast_id, artifact, error = await _resolve_artifact_id(podcast_id, "podcast")
+        if error:
+            return error
 
-        if not podcast:
-            logger.warning(f"Podcast not found: {podcast_id}")
-            return {
-                "error": "I couldn't find that podcast",
-                "error_type": "not_found",
-                "recoverable": True,
-            }
+        # Load the podcast — two possible models depending on which generation system was used:
+        #   podcast:xxx  → Podcast (domain/podcast.py) — older system
+        #   episode:xxx  → PodcastEpisode (podcasts/models.py) — podcast-creator library
+        notebook_id_for_scoping = None
+        title = None
+        audio_url = None
+        transcript_url = None
+        status = "unknown"
+        duration_minutes = 0
+
+        if podcast_id.startswith("episode:"):
+            from open_notebook.podcasts.models import PodcastEpisode
+            try:
+                episode = await PodcastEpisode.get(podcast_id)
+            except NotFoundError:
+                episode = None
+            if not episode:
+                logger.warning(f"PodcastEpisode not found: {podcast_id}")
+                return {
+                    "error": "I couldn't find that podcast",
+                    "error_type": "not_found",
+                    "recoverable": True,
+                }
+            if not episode.audio_file:
+                job_status = await episode.get_job_status()
+                logger.info(f"Episode {podcast_id} not ready yet (job status: {job_status})")
+                return {
+                    "error": "That podcast is still being generated",
+                    "error_type": "not_ready",
+                    "recoverable": True,
+                }
+            title = episode.name
+            audio_url = f"/api/podcasts/episodes/{podcast_id}/audio"
+            transcript_url = f"/api/podcasts/episodes/{podcast_id}/transcript"
+            status = "completed"
+            # notebook_id lives on the artifact tracker, not on the episode
+            notebook_id_for_scoping = artifact.notebook_id if artifact else None
+            # Derive duration from episode_profile if available
+            ep = episode.episode_profile or {}
+            num_segments = ep.get("num_segments", 5)
+            duration_minutes = max(1, num_segments * 2)
+        else:
+            # podcast:xxx — original Podcast model
+            try:
+                podcast = await Podcast.get(podcast_id)
+            except NotFoundError:
+                podcast = None
+            if not podcast:
+                logger.warning(f"Podcast not found: {podcast_id}")
+                return {
+                    "error": "I couldn't find that podcast",
+                    "error_type": "not_found",
+                    "recoverable": True,
+                }
+            if not podcast.is_ready:
+                logger.info(f"Podcast {podcast_id} is not ready yet (status: {podcast.status})")
+                return {
+                    "error": "That podcast is still being generated",
+                    "error_type": "not_ready",
+                    "recoverable": True,
+                }
+            title = podcast.title
+            audio_url = f"/api/podcasts/{podcast_id}/audio"
+            transcript_url = f"/api/podcasts/{podcast_id}/transcript"
+            status = podcast.status
+            duration_minutes = podcast.duration_minutes
+            notebook_id_for_scoping = podcast.notebook_id
 
         # Extract user_id from config for company scoping validation
         user_id = None
@@ -567,11 +657,9 @@ async def surface_podcast(podcast_id: str, config: RunnableConfig) -> dict:
             configurable = config.get("configurable", {})
             user_id = configurable.get("user_id")
 
-        if user_id:
-            # Validate company scoping: podcast.notebook_id must belong to learner's company
+        if user_id and notebook_id_for_scoping:
             user = await User.get(user_id)
             if user and user.company_id:
-                # Check if podcast's notebook is assigned to learner's company
                 query = """
                     SELECT VALUE true
                     FROM module_assignment
@@ -581,9 +669,8 @@ async def surface_podcast(podcast_id: str, config: RunnableConfig) -> dict:
                 """
                 results = await repo_query(
                     query,
-                    {"notebook_id": ensure_record_id(podcast.notebook_id), "company_id": ensure_record_id(user.company_id)},
+                    {"notebook_id": ensure_record_id(notebook_id_for_scoping), "company_id": ensure_record_id(user.company_id)},
                 )
-
                 if not results:
                     logger.warning(
                         f"Company scoping violation: Podcast {podcast_id} not accessible to user {user_id}"
@@ -594,27 +681,17 @@ async def surface_podcast(podcast_id: str, config: RunnableConfig) -> dict:
                         "recoverable": True,
                     }
 
-        # Check if podcast is ready
-        if not podcast.is_ready:
-            logger.info(f"Podcast {podcast_id} is not ready yet (status: {podcast.status})")
-            return {
-                "error": "That podcast is still being generated",
-                "error_type": "not_ready",
-                "recoverable": True,
-            }
-
-        # Return structured data for frontend rendering
         result = {
             "artifact_type": "podcast",
             "podcast_id": podcast_id,
-            "title": podcast.title,
-            "audio_url": f"/api/podcasts/{podcast_id}/audio",
-            "duration_minutes": podcast.duration_minutes,
-            "transcript_url": f"/api/podcasts/{podcast_id}/transcript",
-            "status": podcast.status,
+            "title": title,
+            "audio_url": audio_url,
+            "duration_minutes": duration_minutes,
+            "transcript_url": transcript_url,
+            "status": status,
         }
 
-        logger.info(f"Successfully surfaced podcast: {podcast.title} ({podcast.duration_minutes} min)")
+        logger.info(f"Successfully surfaced podcast: {title} ({duration_minutes} min)")
         return result
 
     except Exception as e:

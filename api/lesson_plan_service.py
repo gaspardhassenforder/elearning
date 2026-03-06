@@ -40,15 +40,123 @@ def _is_video_source(source) -> bool:
     return False
 
 
+async def _fetch_sources_with_insights(notebook_id: str) -> list[dict]:
+    """Fetch all sources for a notebook enriched with their pre-generated insights."""
+    notebook = await Notebook.get(notebook_id)
+    if not notebook:
+        return []
+    sources = await notebook.get_sources()
+    if not sources:
+        return []
+
+    async def _enrich(source) -> dict:
+        source_id = str(source.id) if source.id else ""
+        entry = {
+            "id": source_id,
+            "title": getattr(source, "title", None) or "Untitled",
+            "source_type": "video" if _is_video_source(source) else "document",
+            "insights": [],
+        }
+        try:
+            insights = await source.get_insights()
+            entry["insights"] = [
+                {"insight_type": i.insight_type, "content": i.content}
+                for i in insights
+                if i.content and i.content.strip()
+            ]
+        except Exception as e:
+            logger.warning("Failed to fetch insights for {}: {}", source_id, e)
+        return entry
+
+    return await asyncio.gather(*[_enrich(s) for s in sources])
+
+
+async def _generate_outline(sources_with_insights: list[dict]) -> list[dict]:
+    """Phase 1: LLM groups sources into thematic podcast episodes."""
+    prompt = Prompter(prompt_template="lesson_plan/outline").render(
+        data={"sources": sources_with_insights}
+    )
+    model = await provision_langchain_model(
+        prompt, model_id=None, default_type="chat", max_tokens=8000
+    )
+    response = await model.ainvoke(prompt)
+    content = clean_thinking_content(
+        extract_text_from_response(response.content)
+    ).strip()
+
+    outline = extract_json_array(content)
+
+    def _clean_str(v) -> str:
+        """Collapse multi-line LLM strings to a single line to avoid JSON escaping issues."""
+        return " ".join(str(v or "").split())
+
+    valid_ids = {s["id"] for s in sources_with_insights}
+    sanitized = []
+    for ep in outline:
+        if not isinstance(ep, dict):
+            continue
+        valid_ep_ids = [sid for sid in ep.get("source_ids", []) if sid in valid_ids]
+        if not valid_ep_ids:
+            logger.warning("Episode '{}' has no valid source IDs — skipping", ep.get("episode_title", "?"))
+            continue
+
+        sanitized.append({
+            "episode_title": _clean_str(ep.get("episode_title", "Untitled Episode")),
+            "source_ids": valid_ep_ids,
+            "podcast_topic": _clean_str(ep.get("podcast_topic", "")),
+            "key_concepts": ep.get("key_concepts", []),
+            "ai_summary": _clean_str(ep.get("ai_summary", "")),
+        })
+
+    if not sanitized:
+        raise ValueError("Outline phase produced no valid episodes.")
+
+    logger.info("Outline phase: {} episodes from {} sources", len(sanitized), len(sources_with_insights))
+    return sanitized
+
+
+async def _generate_step_instructions(ep: dict, sources_with_insights: list[dict]) -> str:
+    """Generate ai_instructions for a single episode via a focused LLM call.
+
+    The LLM only produces teacher-guidance text — structured fields (source_ids,
+    podcast_topic) are set by the caller from the outline, never from LLM output.
+    """
+    ep_source_ids = set(ep["source_ids"])
+    relevant_insights = []
+    for source in sources_with_insights:
+        if source["id"] in ep_source_ids:
+            for insight in source.get("insights", []):
+                content = (insight.get("content") or "").strip()
+                if content:
+                    relevant_insights.append({
+                        "source_id": source["id"],
+                        "content": content[:600],
+                    })
+
+    prompt = Prompter(prompt_template="lesson_plan/step").render(
+        data={
+            "episode_title": ep["episode_title"],
+            "podcast_topic": ep["podcast_topic"],
+            "key_concepts": ep["key_concepts"],
+            "ai_summary": ep["ai_summary"],
+            "source_ids": ep["source_ids"],
+            "source_insights": relevant_insights,
+        }
+    )
+    model = await provision_langchain_model(
+        prompt, model_id=None, default_type="chat", max_tokens=600
+    )
+    response = await model.ainvoke(prompt)
+    return clean_thinking_content(extract_text_from_response(response.content)).strip()
+
+
 async def generate_lesson_plan(notebook_id: str) -> Dict:
     """Generate a structured lesson plan for a notebook using AI.
 
-    1. Load all sources for the notebook (id, title, source_type)
-    2. Call LLM with sources list + generation prompt
-    3. Parse JSON response into ordered lesson steps
-    4. Delete existing auto-generated steps for notebook
-    5. Create new LessonStep records
-    6. Return result dict
+    Two-phase approach:
+    1. Phase 1 (outline): fetch sources + insights → LLM groups them into thematic episodes
+    2. Phase 2 (steps): N parallel LLM calls (one per episode) generate ai_instructions text only;
+       source_ids and podcast_topic are always set from the outline in Python, never from LLM output
 
     Args:
         notebook_id: Notebook record ID
@@ -59,87 +167,47 @@ async def generate_lesson_plan(notebook_id: str) -> Dict:
     logger.info(f"Generating lesson plan for notebook {notebook_id}")
 
     try:
-        # Check notebook exists
-        notebook = await Notebook.get(notebook_id)
-        if not notebook:
-            return {"status": "failed", "error": f"Notebook {notebook_id} not found"}
-
-        # Load all sources
-        sources = await notebook.get_sources()
-        if not sources:
+        # Phase 1: fetch sources with insights → thematic outline
+        sources_with_insights = await _fetch_sources_with_insights(notebook_id)
+        if not sources_with_insights:
             return {
                 "status": "failed",
                 "error": "No sources found in this notebook. Please add sources before generating a lesson plan.",
             }
 
-        # Build sources list for the prompt
-        sources_data = []
-        for source in sources:
-            source_id = str(source.id) if source.id else ""
-            sources_data.append(
-                {
-                    "id": source_id,
-                    "title": getattr(source, "title", "Untitled") or "Untitled",
-                    "source_type": "video" if _is_video_source(source) else "document",
-                }
+        no_insight_count = sum(1 for s in sources_with_insights if not s["insights"])
+        if no_insight_count:
+            logger.warning(
+                "{}/{} sources have no insights — outline quality may be reduced",
+                no_insight_count, len(sources_with_insights),
             )
 
-        logger.debug(f"Building lesson plan prompt for {len(sources_data)} sources")
+        outline = await _generate_outline(sources_with_insights)
 
-        # Render the generation prompt
-        prompt = Prompter(prompt_template="lesson_plan/generate").render(
-            data={"sources": sources_data}
-        )
+        # Phase 2: generate ai_instructions per episode in parallel (one LLM call each)
+        # source_ids and podcast_topic are set from outline in Python — never from LLM output
+        logger.debug(f"Generating step instructions for {len(outline)} episodes in parallel")
+        step_instructions = await asyncio.gather(*[
+            _generate_step_instructions(ep, sources_with_insights)
+            for ep in outline
+        ])
 
-        # Call LLM
-        model = await provision_langchain_model(
-            prompt, model_id=None, default_type="chat", max_tokens=4096
-        )
-        response = await model.ainvoke(prompt)
-        content = clean_thinking_content(extract_text_from_response(response.content)).strip()
-
-        # Extract JSON array from response (may have trailing text)
-        try:
-            steps_data = extract_json_array(content)
-        except ValueError:
-            logger.error(f"No JSON array found in LLM response: {content[:200]}")
-            return {
-                "status": "failed",
-                "error": "AI returned unexpected format. Please try again.",
-            }
-
-        # Delete existing auto-generated steps
         deleted = await LessonStep.delete_auto_generated_for_notebook(notebook_id)
         logger.info(f"Deleted {deleted} existing auto-generated steps")
 
-        # Create new steps
         step_ids = []
-        created_steps = []
-        for i, step_data in enumerate(steps_data):
-            # Validate step type
-            step_type = step_data.get("step_type", "read")
-            if step_type not in ("watch", "read", "quiz", "discuss", "podcast"):
-                logger.warning(f"Invalid step_type '{step_type}', defaulting to 'read'")
-                step_type = "read"
 
-            # Resolve source_id - validate it actually exists in our sources
-            source_id = step_data.get("source_id")
-            if source_id:
-                # Validate it's in the sources list
-                valid_source_ids = {s["id"] for s in sources_data}
-                if source_id not in valid_source_ids:
-                    logger.warning(
-                        f"Step {i} references unknown source_id '{source_id}', clearing"
-                    )
-                    source_id = None
+        for i, (ep, ai_instructions) in enumerate(zip(outline, step_instructions)):
 
             step = LessonStep(
                 notebook_id=notebook_id,
-                title=step_data.get("title", f"Step {i + 1}"),
-                step_type=step_type,
-                source_id=source_id,
-                discussion_prompt=step_data.get("discussion_prompt") or None,
-                ai_instructions=step_data.get("ai_instructions") or None,
+                title=ep["episode_title"],
+                step_type="podcast",
+                source_id=None,
+                source_ids=ep["source_ids"] if ep["source_ids"] else None,
+                podcast_topic=ep["podcast_topic"] if ep["podcast_topic"] else None,
+                ai_instructions=ai_instructions,
+                discussion_prompt=None,
                 order=i,
                 required=True,
                 auto_generated=True,
@@ -147,82 +215,32 @@ async def generate_lesson_plan(notebook_id: str) -> Dict:
             await step.save()
             if step.id:
                 step_ids.append(str(step.id))
-                created_steps.append(step)
 
-        # Parallel ai_instructions enrichment — makes instructions content-specific
-        all_objectives = await LearningObjective.get_for_notebook(notebook_id)
-
-        async def _enrich_step(step: LessonStep):
-            if step.step_type in ("read", "watch") and step.source_id:
-                try:
-                    from open_notebook.domain.notebook import Source
-                    full_source = await Source.get(step.source_id)
-                    text = (full_source.full_text or "")[:3000]
-                    if not text:
-                        return
-                    related_objectives = [
-                        obj.text for obj in all_objectives
-                        if step.source_id in (obj.source_refs or [])
-                    ]
-                    prompt = Prompter(prompt_template="lesson_plan/enrich_instructions").render(
-                        data={
-                            "title": step.title,
-                            "step_type": step.step_type,
-                            "source_title": full_source.title or "Untitled",
-                            "content": text,
-                            "objectives": related_objectives,
-                        }
-                    )
-                    model = await provision_langchain_model(prompt, None, "chat", max_tokens=1000)
-                    response = await model.ainvoke(prompt)
-                    enriched = clean_thinking_content(extract_text_from_response(response.content)).strip()
-                    if enriched:
-                        step.ai_instructions = enriched
-                        await step.save()
-                except Exception as e:
-                    logger.warning("Failed to enrich ai_instructions for step {}: {}", step.id, str(e))
-
-            elif step.step_type == "quiz":
-                try:
-                    sources_context = []
-                    for source_entry in sources_data:
-                        from open_notebook.domain.notebook import Source
-                        try:
-                            full_source = await Source.get(source_entry["id"])
-                            text = (full_source.full_text or "")[:1500]
-                            if text:
-                                sources_context.append({
-                                    "title": full_source.title or source_entry["title"],
-                                    "content": text,
-                                })
-                        except Exception:
-                            pass
-                    if not sources_context:
-                        return
-                    prompt = Prompter(prompt_template="lesson_plan/enrich_quiz_instructions").render(
-                        data={
-                            "sources": sources_context,
-                            "objectives": [obj.text for obj in all_objectives],
-                        }
-                    )
-                    model = await provision_langchain_model(prompt, None, "chat", max_tokens=1000)
-                    response = await model.ainvoke(prompt)
-                    enriched = clean_thinking_content(extract_text_from_response(response.content)).strip()
-                    if enriched:
-                        step.ai_instructions = enriched
-                        await step.save()
-                except Exception as e:
-                    logger.warning("Failed to enrich quiz ai_instructions for step {}: {}", step.id, str(e))
-
-        await asyncio.gather(*[_enrich_step(s) for s in created_steps])
-
-        logger.info(
-            f"Generated {len(step_ids)} lesson steps for notebook {notebook_id}"
+        # Add quiz step at the end covering all key concepts
+        all_concepts = ", ".join(c for ep in outline for c in ep["key_concepts"])
+        quiz_count = len(outline) * 2
+        quiz_step = LessonStep(
+            notebook_id=notebook_id,
+            title="Module Knowledge Check",
+            step_type="quiz",
+            source_id=None,
+            source_ids=None,
+            podcast_topic=None,
+            ai_instructions=f"Generate a {quiz_count}-question quiz covering: {all_concepts}. Test understanding and application, not just recall.",
+            discussion_prompt=None,
+            order=len(outline),
+            required=True,
+            auto_generated=True,
         )
+        await quiz_step.save()
+        if quiz_step.id:
+            step_ids.append(str(quiz_step.id))
+
+        logger.info(f"Generated {len(step_ids)} lesson steps for notebook {notebook_id}")
         return {"status": "completed", "step_ids": step_ids}
 
     except json.JSONDecodeError as e:
-        logger.error(f"JSON parse error in lesson plan generation: {str(e)}")
+        logger.error(f"Unexpected JSON parse error in lesson plan generation: {str(e)}")
         return {
             "status": "failed",
             "error": "Failed to parse AI response. Please try again.",
@@ -276,6 +294,8 @@ async def list_steps_with_source_titles(notebook_id: str) -> List[dict]:
                 "step_type": s.step_type,
                 "source_id": s.source_id,
                 "source_title": source_title_map.get(s.source_id, "") if s.source_id else None,
+                "source_ids": s.source_ids,
+                "podcast_topic": s.podcast_topic,
                 "discussion_prompt": s.discussion_prompt,
                 "ai_instructions": s.ai_instructions,
                 "artifact_id": s.artifact_id,
@@ -427,11 +447,25 @@ async def trigger_podcast_for_step(
         raise ValueError(f"Notebook {step.notebook_id} not found")
     all_sources = await notebook.get_sources()
 
-    # Filter to requested sources if provided
-    if source_ids:
-        selected = [s for s in all_sources if str(s.id) in source_ids]
+    # Source selection: caller override → step.source_ids → parsed from ai_instructions → all sources
+    # Fallback parsing handles cases where source_ids field wasn't persisted to DB
+    effective_source_ids = source_ids or step.source_ids or []
+    if not effective_source_ids and step.ai_instructions:
+        parsed = re.findall(r'\[([a-z_]+:[a-zA-Z0-9]+)\]', step.ai_instructions)
+        if parsed:
+            effective_source_ids = parsed
+            logger.info("Parsed {} source IDs from ai_instructions (source_ids field was null)", len(parsed))
+
+    if effective_source_ids:
+        effective_source_id_strs = {str(sid) for sid in effective_source_ids}
+        selected = [s for s in all_sources if str(s.id) in effective_source_id_strs]
+        if not selected:
+            logger.warning("source_ids filter matched no sources — falling back to all sources")
+            selected = all_sources
     else:
         selected = all_sources
+
+    logger.info("Podcast for step {}: using {}/{} sources", step_id, len(selected), len(all_sources))
 
     # Build content from up to 5 sources
     texts = []
@@ -451,7 +485,9 @@ async def trigger_podcast_for_step(
     episode_profile_name = episode_profiles[0]["name"]
     speaker_profile_name = speaker_profiles[0]["name"]
 
-    briefing = step.ai_instructions or step.title
+    # Briefing: caller override → step.podcast_topic → step.title
+    # Never use the full ai_instructions as briefing (it's for AI teacher post-summary, not the podcast generator)
+    briefing = ai_instructions or step.podcast_topic or step.title
 
     job_id, artifact_ids = await PodcastService.submit_generation_job(
         episode_profile_name=episode_profile_name,

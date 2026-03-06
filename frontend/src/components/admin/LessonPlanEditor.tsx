@@ -117,15 +117,18 @@ export function LessonPlanEditor({ moduleId }: LessonPlanEditorProps) {
   const deleteAllMutation = useDeleteAllLessonSteps(moduleId)
   const refineMutation = useRefineLessonPlan(moduleId)
 
-  const openPodcastReview = (stepId: string, stepTitle: string, stepInstructions: string | null) => {
+  const openPodcastReview = (stepId: string, stepTitle: string, podcastTopic: string | null, stepSourceIds?: string[] | null) => {
     if (!expandedPodcastReview.has(stepId)) {
-      // Initialize state with step defaults and all sources selected
+      // Pre-select step's source_ids if available, otherwise all sources
+      const initialSources = stepSourceIds?.length
+        ? new Set(stepSourceIds)
+        : new Set(sources.map(s => s.id))
       setPodcastReviewState(prev => ({
         ...prev,
         [stepId]: {
           title: stepTitle,
-          instructions: stepInstructions || '',
-          selectedSourceIds: new Set(sources.map(s => s.id)),
+          instructions: podcastTopic || '',
+          selectedSourceIds: initialSources,
         },
       }))
       setExpandedPodcastReview(prev => new Set([...prev, stepId]))
@@ -459,7 +462,7 @@ export function LessonPlanEditor({ moduleId }: LessonPlanEditorProps) {
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => openPodcastReview(step.id, step.title, step.ai_instructions)}
+                                    onClick={() => openPodcastReview(step.id, step.title, step.podcast_topic, step.source_ids)}
                                     className="flex-shrink-0 text-xs border-yellow-500 text-yellow-700 hover:bg-yellow-50 dark:text-yellow-400 dark:hover:bg-yellow-900/20"
                                   >
                                     {lessonPlanT.podcastGenerateButton}
@@ -546,7 +549,7 @@ export function LessonPlanEditor({ moduleId }: LessonPlanEditorProps) {
                                   <div className="space-y-1">
                                     <Label className="text-xs font-medium">{lessonPlanT.podcastTopicLabel}</Label>
                                     <Textarea
-                                      value={podcastReviewState[step.id]?.instructions ?? step.ai_instructions ?? ''}
+                                      value={podcastReviewState[step.id]?.instructions ?? step.podcast_topic ?? ''}
                                       onChange={(e) => updatePodcastReviewState(step.id, 'instructions', e.target.value)}
                                       className="text-xs min-h-[60px]"
                                     />

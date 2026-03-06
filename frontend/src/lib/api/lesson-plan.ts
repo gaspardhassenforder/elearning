@@ -13,6 +13,8 @@ export interface LessonStepResponse {
   step_type: 'watch' | 'read' | 'quiz' | 'discuss' | 'podcast'
   source_id: string | null
   source_title: string | null
+  source_ids: string[] | null
+  podcast_topic: string | null
   discussion_prompt: string | null
   ai_instructions: string | null
   artifact_id: string | null

@@ -6,13 +6,13 @@ Per-source/per-artifact architecture:
 3. save_objectives: Persist to database with source_refs
 """
 
-from typing import Literal, Optional, TypedDict
+from typing import Any, Literal, Optional, TypedDict
 
 from ai_prompter import Prompter
 from langchain_core.output_parsers.pydantic import PydanticOutputParser
 from langgraph.graph import END, StateGraph
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from open_notebook.ai.provision import provision_langchain_model
 from open_notebook.database.repository import repo_query
@@ -50,6 +50,17 @@ class AggregatedObjectives(BaseModel):
     objectives: list[AggregatedObjective] = Field(
         description="Synthesized learning objectives with provenance"
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def filter_empty_objectives(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "objectives" in data:
+            data["objectives"] = [
+                obj
+                for obj in data["objectives"]
+                if isinstance(obj, dict) and obj.get("text") and obj.get("source_refs")
+            ]
+        return data
 
 
 # --- State ---

@@ -10,20 +10,21 @@ CURRENT LESSON PLAN:
 INSTRUCTION: {{ refinement_prompt }}
 
 Apply the instruction across the plan. You may modify title, ai_instructions, discussion_prompt, and step_type.
-Preserve source_id, id, and order unchanged.
+Preserve id, source_ids, and podcast_topic unchanged — do NOT include or modify them.
 Keep the overall structure unless the instruction explicitly asks to change it.
 
 Return ONLY a valid JSON array with ALL steps (including unmodified ones), no other text.
 Each step must include its original "id" field so updates can be matched.
+
+Lesson plans use only two step types: `podcast` and `quiz`. Do not introduce watch, read, or discuss steps.
 
 Example output format:
 [
   {
     "id": "lesson_step:abc123",
     "title": "...",
-    "step_type": "watch|read|quiz|discuss|podcast",
-    "source_id": "source:xyz" or null,
-    "discussion_prompt": "..." or null,
+    "step_type": "podcast|quiz",
+    "discussion_prompt": null,
     "ai_instructions": "..."
   }
 ]

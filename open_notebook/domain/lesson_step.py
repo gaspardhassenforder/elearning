@@ -36,12 +36,18 @@ class LessonStep(ObjectModel):
 
     table_name: ClassVar[str] = "lesson_step"
     record_id_fields: ClassVar[set[str]] = {"notebook_id", "source_id"}
-    nullable_fields: ClassVar[set[str]] = {"source_id", "discussion_prompt", "ai_instructions", "artifact_id", "command_id"}
+    nullable_fields: ClassVar[set[str]] = {
+        "source_id", "discussion_prompt", "ai_instructions",
+        "artifact_id", "command_id",
+        "podcast_topic", "source_ids",
+    }
 
     notebook_id: str
     title: str
     step_type: Literal["watch", "read", "quiz", "discuss", "podcast"]
     source_id: Optional[str] = None
+    source_ids: Optional[list[str]] = None   # Sources to use for this podcast (plural)
+    podcast_topic: Optional[str] = None      # Topic/briefing for podcast generator
     discussion_prompt: Optional[str] = None
     ai_instructions: Optional[str] = None   # AI-teacher-facing guidance for this step
     artifact_id: Optional[str] = None       # Linked artifact (quiz/podcast) once created
