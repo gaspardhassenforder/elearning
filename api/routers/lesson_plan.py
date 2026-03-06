@@ -210,6 +210,8 @@ async def trigger_podcast_for_step(step_id: str, data: PodcastTriggerRequest):
             title=data.title,
             ai_instructions=data.ai_instructions,
             source_ids=data.source_ids if data.source_ids else None,
+            episode_profile_name=data.episode_profile_name,
+            language=data.language,
         )
 
         # Resolve source title
@@ -384,6 +386,33 @@ async def get_lesson_steps_progress(
         total_steps=progress["total_steps"],
         completed_count=progress["completed_count"],
     )
+
+
+@learner_router.delete(
+    "/notebooks/{notebook_id}/lesson-steps/progress",
+    status_code=204,
+)
+async def reset_lesson_steps_progress(
+    notebook_id: str,
+    learner: LearnerContext = Depends(get_current_learner),
+):
+    """Reset all lesson step progress for the authenticated learner in a notebook."""
+    try:
+        await validate_learner_access_to_notebook(
+            notebook_id=notebook_id, learner_context=learner
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error validating learner access to notebook {notebook_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to validate notebook access")
+
+    try:
+        from open_notebook.domain.learner_step_progress import LearnerStepProgress
+        await LearnerStepProgress.reset_progress(user_id=learner.user.id, notebook_id=notebook_id)
+    except Exception as e:
+        logger.error(f"Error resetting lesson progress for notebook {notebook_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to reset lesson progress")
 
 
 @learner_router.get(

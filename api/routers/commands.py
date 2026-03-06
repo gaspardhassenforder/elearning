@@ -82,9 +82,20 @@ async def get_command_job_status(job_id: str):
         logger.debug(f"Getting command job status for job_id: {job_id}")
         # Remove command: prefix if present (for compatibility)
         clean_job_id = job_id.replace("command:", "") if job_id.startswith("command:") else job_id
+
+        # Quiz jobs are tracked in-memory (not via surreal-commands)
+        from api.quiz_job_tracker import is_quiz_job, get_quiz_job
+        if is_quiz_job(clean_job_id):
+            job = get_quiz_job(clean_job_id)
+            if not job:
+                raise HTTPException(status_code=404, detail="Quiz job not found")
+            return CommandJobStatusResponse(job_id=clean_job_id, **job)
+
         status_data = await CommandService.get_command_status(clean_job_id)
         return CommandJobStatusResponse(**status_data)
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error fetching job status for {job_id}: {str(e)}")
         logger.exception(e)

@@ -512,10 +512,16 @@ async def get_podcast_transcript(podcast_id: str, user: User = Depends(get_curre
     if _is_command_placeholder(podcast_id):
         raise HTTPException(
             status_code=404,
-            detail="Podcast is still being generated",
+            detail="Transcript not yet available",
         )
 
     try:
+        logger.debug(
+            "Transcript request: podcast_id={}, prefix={}",
+            podcast_id,
+            podcast_id.split(":")[0] if ":" in podcast_id else "no-prefix",
+        )
+
         # Detect model type from ID prefix
         is_episode = podcast_id.startswith("episode:")
 
@@ -530,7 +536,8 @@ async def get_podcast_transcript(podcast_id: str, user: User = Depends(get_curre
                 raise HTTPException(status_code=404, detail="Episode not found")
 
             if not episode.transcript:
-                raise HTTPException(status_code=404, detail="Episode has no transcript")
+                logger.info("Episode {} exists but transcript is None", podcast_id)
+                raise HTTPException(status_code=404, detail="Transcript not yet available")
 
             return {
                 "podcast_id": str(episode.id),
@@ -572,7 +579,8 @@ async def get_podcast_transcript(podcast_id: str, user: User = Depends(get_curre
                 raise HTTPException(status_code=403, detail="Podcast not accessible")
 
         if not podcast.transcript:
-            raise HTTPException(status_code=404, detail="Podcast has no transcript")
+            logger.info("Podcast {} exists but transcript is None", podcast_id)
+            raise HTTPException(status_code=404, detail="Transcript not yet available")
 
         return {
             "podcast_id": podcast.id,

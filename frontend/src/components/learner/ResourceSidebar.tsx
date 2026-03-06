@@ -21,7 +21,7 @@ import { useTranslation } from '@/lib/hooks/use-translation'
 import { useNotebookSources } from '@/lib/hooks/use-sources'
 import { useNotebookArtifacts } from '@/lib/hooks/use-artifacts'
 import { useLearnerStore } from '@/lib/stores/learner-store'
-import { ObjectiveProgressList } from './ObjectiveProgressList'
+import { LessonPlanProgress } from './LessonPlanProgress'
 
 interface ResourceSidebarProps {
   notebookId: string
@@ -210,7 +210,7 @@ export function ResourceSidebar({ notebookId }: ResourceSidebarProps) {
         />
         {progressOpen && (
           <div className="mt-1 overflow-hidden px-2">
-            <ObjectiveProgressList notebookId={notebookId} />
+            <LessonPlanProgress notebookId={notebookId} />
           </div>
         )}
       </div>

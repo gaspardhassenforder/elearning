@@ -1126,6 +1126,10 @@ export const frFR = {
     podcastLanguage: "Langue",
     podcastLanguageEn: "English",
     podcastLanguageFr: "Français",
+    podcastStyle: "Style",
+    podcastStyleTech: "Discussion technique",
+    podcastStyleSolo: "Expert solo",
+    podcastStyleBusiness: "Analyse business",
   },
   users: {
     title: "Utilisateurs",
@@ -1620,16 +1624,16 @@ export const frFR = {
     progress: {
       comingSoon: "Suivi des progrès à venir",
       comingSoonDesc: "Vos progrès d'apprentissage et objectifs seront suivis ici.",
-      // Story 4.4: Suivi de la progression des objectifs d'apprentissage
-      title: "Objectifs d'apprentissage",
+      // Story 4.4: Suivi de la progression du plan de cours
+      title: "Plan de cours",
       complete: "terminé",
       completedAt: "Terminé le {date}",
       evidence: "Preuve",
       loadError: "Échec du chargement de la progression",
-      loadErrorDesc: "Impossible de charger vos objectifs d'apprentissage. Veuillez réessayer.",
-      noObjectives: "Aucun objectif d'apprentissage",
-      noObjectivesDesc: "Les objectifs d'apprentissage apparaîtront ici une fois configurés par votre instructeur.",
-      allComplete: "Félicitations ! Vous avez terminé tous les objectifs d'apprentissage !",
+      loadErrorDesc: "Impossible de charger votre plan de cours. Veuillez réessayer.",
+      noObjectives: "Aucun plan de cours",
+      noObjectivesDesc: "Un plan de cours apparaîtra ici une fois configuré par votre instructeur.",
+      allComplete: "Félicitations ! Vous avez terminé toutes les étapes du plan de cours !",
       // Story 4.4: Notifications toast
       objectiveCompleted: "Objectif terminé",
       allObjectivesCompleted: "Tous les objectifs sont terminés !",
@@ -1662,6 +1666,8 @@ export const frFR = {
       viewTranscript: "Transcription",
       generating: "Le podcast est en cours de génération. Veuillez revenir plus tard.",
       playbackError: "Impossible de lire l'audio. Cliquez pour réessayer.",
+      listenedButton: "J'ai fini d'écouter le podcast",
+      listenedMessage: "J'ai écouté le podcast",
     },
     // Barre latérale et visionneuse
     sidebar: {

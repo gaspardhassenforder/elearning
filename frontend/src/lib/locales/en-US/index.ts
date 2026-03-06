@@ -1126,6 +1126,10 @@ export const enUS = {
     podcastLanguage: "Language",
     podcastLanguageEn: "English",
     podcastLanguageFr: "Français",
+    podcastStyle: "Style",
+    podcastStyleTech: "Technical Discussion",
+    podcastStyleSolo: "Solo Expert",
+    podcastStyleBusiness: "Business Analysis",
   },
   users: {
     title: "Users",
@@ -1621,15 +1625,15 @@ export const enUS = {
       comingSoon: "Progress Tracking Coming Soon",
       comingSoonDesc: "Your learning progress and objectives will be tracked here.",
       // Story 4.4: Learning Objectives Progress
-      title: "Learning Objectives",
+      title: "Lesson Plan",
       complete: "complete",
       completedAt: "Completed on {date}",
       evidence: "Evidence",
       loadError: "Failed to load progress",
-      loadErrorDesc: "Unable to load your learning objectives. Please try again.",
-      noObjectives: "No Learning Objectives",
-      noObjectivesDesc: "Learning objectives will appear here once configured by your instructor.",
-      allComplete: "Congratulations! You've completed all learning objectives!",
+      loadErrorDesc: "Unable to load your lesson plan. Please try again.",
+      noObjectives: "No Lesson Plan",
+      noObjectivesDesc: "A lesson plan will appear here once configured by your instructor.",
+      allComplete: "Congratulations! You've completed all lesson plan steps!",
       // Story 4.4: Toast notifications
       objectiveCompleted: "Objective completed",
       allObjectivesCompleted: "All objectives complete!",
@@ -1662,6 +1666,8 @@ export const enUS = {
       viewTranscript: "Transcript",
       generating: "Podcast is currently being generated. Please check back later.",
       playbackError: "Unable to play audio. Click retry.",
+      listenedButton: "I've finished listening to the podcast",
+      listenedMessage: "I've listened to the podcast",
     },
     // Sidebar & Sheet viewer
     sidebar: {

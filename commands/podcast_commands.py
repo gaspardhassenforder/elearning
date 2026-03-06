@@ -881,6 +881,7 @@ async def generate_podcast_command(
             audio_file=None,
             transcript=None,
             outline=None,
+            language=input_data.language or "en",
         )
         await episode.save()
 

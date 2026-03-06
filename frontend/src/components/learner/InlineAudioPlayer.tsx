@@ -67,6 +67,7 @@ export function InlineAudioPlayer({
   const fallbackAttemptedRef = useRef(false)
   const [transcript, setTranscript] = useState<string | null>(null)
   const [transcriptLoading, setTranscriptLoading] = useState(false)
+  const [transcriptUnavailable, setTranscriptUnavailable] = useState(false)
 
   const isReady = status === 'completed'
 
@@ -232,9 +233,15 @@ export function InlineAudioPlayer({
       try {
         const response = await fetch(effectiveTranscriptUrl, { credentials: 'include' })
         if (!response.ok || cancelled) {
-          if (!response.ok) console.warn('[InlineAudioPlayer] Transcript fetch failed:', response.status)
+          if (!response.ok) {
+            console.warn('[InlineAudioPlayer] Transcript fetch failed:', response.status)
+            if (response.status === 404 && !cancelled) {
+              setTranscriptUnavailable(true)
+            }
+          }
           return
         }
+        if (!cancelled) setTranscriptUnavailable(false)
         const data = await response.json()
         if (cancelled) return
 
@@ -409,6 +416,10 @@ export function InlineAudioPlayer({
                     <div className="text-xs leading-relaxed prose prose-sm dark:prose-invert max-w-none">
                       <ReactMarkdown>{transcript}</ReactMarkdown>
                     </div>
+                  ) : transcriptUnavailable ? (
+                    <p className="text-xs text-muted-foreground italic">
+                      {t.podcasts?.noTranscript || 'Transcript not yet available. It may still be generating.'}
+                    </p>
                   ) : (
                     <p className="text-xs text-muted-foreground">{t.learner.artifacts.noContent}</p>
                   )}
@@ -422,12 +433,12 @@ export function InlineAudioPlayer({
             <Button
               onClick={() => {
                 setConfirmed(true)
-                onConfirm("I've listened to the podcast")
+                onConfirm(t.learner.podcast.listenedMessage)
               }}
               className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white animate-pulse"
             >
               <CheckCircle2 className="h-4 w-4" />
-              I&apos;ve listened to this
+              {t.learner.podcast.listenedButton}
             </Button>
           )}
         </div>

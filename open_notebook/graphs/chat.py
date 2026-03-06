@@ -55,6 +55,21 @@ async def _prepare_model_and_payload(
     else:
         system_prompt = Prompter(prompt_template="chat/system").render(data=state)
 
+    # Inject fresh current step on every turn to override the stale step in the cached prompt.
+    # lesson_steps are refreshed from DB on each API call (see learner_chat.py).
+    fresh_steps = state.get("lesson_steps") or []
+    if fresh_steps:
+        fresh_current = next((s for s in fresh_steps if s.get("status") == "current"), None)
+        if fresh_current:
+            system_prompt += (
+                f"\n\n## CURRENT STEP (LIVE)\n"
+                f"You are on: [{fresh_current.get('step_type', '').upper()}] \"{fresh_current.get('title', '')}\"\n"
+                f"step_id: `{fresh_current.get('id', '')}`\n"
+                f"→ When learner confirms done: call `complete_lesson_step(step_id=\"{fresh_current.get('id', '')}\")`"
+            )
+        elif all(s.get("status") == "completed" for s in fresh_steps if s.get("required")):
+            system_prompt += "\n\n## CURRENT STEP (LIVE)\nAll required steps are completed. Celebrate the learner's achievement."
+
     payload = [SystemMessage(content=system_prompt)] + state.get("messages", [])
 
     # Cache configurable once so all reads/writes hit the same dict

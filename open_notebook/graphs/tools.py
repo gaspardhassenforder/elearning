@@ -616,7 +616,7 @@ async def surface_podcast(podcast_id: str, config: RunnableConfig) -> dict:
                 }
             title = episode.name
             audio_url = f"/api/podcasts/episodes/{podcast_id}/audio"
-            transcript_url = f"/api/podcasts/episodes/{podcast_id}/transcript"
+            transcript_url = f"/api/podcasts/{podcast_id}/transcript"
             status = "completed"
             # notebook_id lives on the artifact tracker, not on the episode
             notebook_id_for_scoping = artifact.notebook_id if artifact else None
@@ -800,9 +800,34 @@ async def get_lesson_steps(config: RunnableConfig) -> list:
     Call this to see where the learner is in the structured lesson plan.
 
     Returns:
-        List of step dicts with 'id', 'title', 'step_type', 'status' (completed/current/upcoming)
+        List of step dicts with 'id', 'title', 'step_type', 'status' (completed/current/upcoming).
+        Future steps (after current) only show title and step_type to prevent skipping ahead.
     """
-    return config.get("configurable", {}).get("lesson_steps", [])
+    steps = config.get("configurable", {}).get("lesson_steps", [])
+    if not steps:
+        return steps
+
+    # Find the current step (first non-completed); mask details for future steps
+    current_found = False
+    result = []
+    for step in steps:
+        status = step.get("status", "upcoming")
+        if status == "completed" or (status == "current" and not current_found):
+            # Completed and current steps: return full details
+            if status == "current":
+                current_found = True
+            result.append(step)
+        else:
+            # Future steps: only show title and step_type to prevent skipping
+            result.append({
+                "id": step.get("id"),
+                "title": step.get("title"),
+                "step_type": step.get("step_type"),
+                "status": step.get("status", "upcoming"),
+                "order": step.get("order"),
+                "required": step.get("required"),
+            })
+    return result
 
 
 @tool
@@ -950,44 +975,74 @@ async def generate_artifact(
             message = f"Podcast generation started. You'll be notified when it's ready."
 
         elif artifact_type == "quiz":
-            # Import here to avoid circular dependencies
+            import asyncio
+            from api.quiz_job_tracker import create_quiz_job, complete_quiz_job, fail_quiz_job
             from api.quiz_service import generate_quiz
 
-            logger.info(f"Submitting quiz generation job: topic={topic}, notebook={notebook_id}")
+            logger.info(f"Submitting quiz generation job (async): topic={topic}, notebook={notebook_id}")
 
-            # Generate quiz (currently synchronous, but we'll track as if async)
-            # TODO Story 4.7: Make quiz generation truly async via surreal-commands
-            result = await generate_quiz(
-                notebook_id=notebook_id,
-                topic=topic,
-                num_questions=num_questions,
-            )
+            # Create a trackable job before launching background task
+            quiz_job_id = create_quiz_job()
 
-            # Check if quiz generation succeeded
-            if "quiz_id" in result:
-                quiz_id = result["quiz_id"]
+            # Capture variables for the background task
+            _notebook_id = notebook_id
+            _topic = topic
+            _num_questions = num_questions
+            _quiz_job_id = quiz_job_id
 
-                # Create artifact tracker with quiz_id
-                artifact = await Artifact.create_for_artifact(
-                    notebook_id=notebook_id,
-                    artifact_type="quiz",
-                    artifact_id=quiz_id,
-                    title=f"Quiz: {topic}",
-                )
+            async def _run_quiz_generation():
+                try:
+                    result = await generate_quiz(
+                        notebook_id=_notebook_id,
+                        topic=_topic,
+                        num_questions=_num_questions,
+                    )
+                    if "quiz_id" in result:
+                        quiz_id = result["quiz_id"]
+                        await Artifact.create_for_artifact(
+                            notebook_id=_notebook_id,
+                            artifact_type="quiz",
+                            artifact_id=quiz_id,
+                            title=f"Quiz: {_topic}",
+                        )
+                        # Build surface data so frontend can render quiz inline
+                        surface_data = {
+                            "artifact_type": "quiz",
+                            "quiz_id": quiz_id,
+                            "title": f"Quiz: {_topic}",
+                            "description": None,
+                            "questions": [],
+                            "total_questions": 0,
+                            "quiz_url": f"/quizzes/{quiz_id}",
+                        }
+                        try:
+                            from open_notebook.domain.quiz import Quiz
+                            quiz = await Quiz.get(quiz_id)
+                            if quiz:
+                                surface_data["title"] = quiz.title
+                                surface_data["description"] = quiz.description
+                                surface_data["total_questions"] = len(quiz.questions)
+                                surface_data["questions"] = [
+                                    {"text": q.question, "options": q.options}
+                                    for q in quiz.questions
+                                ]
+                        except Exception as load_err:
+                            logger.warning("Could not load quiz for surface data: {}", str(load_err))
+                        complete_quiz_job(_quiz_job_id, quiz_id, surface_data)
+                        logger.info(f"Background quiz generation complete: {quiz_id}")
+                    else:
+                        error_msg = result.get("error", "Unknown error")
+                        fail_quiz_job(_quiz_job_id, error_msg)
+                        logger.error(f"Background quiz generation failed: {error_msg}")
+                except Exception as e:
+                    fail_quiz_job(_quiz_job_id, str(e))
+                    logger.error("Background quiz generation error: {}", str(e), exc_info=True)
 
-                # For quiz, return completed status (since it's currently synchronous)
-                job_id = quiz_id  # Use quiz_id as job_id for now
-                artifact_ids = [str(artifact.id)]
-                message = f"Quiz '{topic}' has been generated and is ready."
-            else:
-                # Quiz generation failed
-                error_msg = result.get("error", "Unknown error")
-                logger.error(f"Quiz generation failed: {error_msg}")
-                return {
-                    "error": "I had trouble generating that quiz",
-                    "error_type": "service_error",
-                    "recoverable": False,
-                }
+            asyncio.create_task(_run_quiz_generation())
+
+            job_id = quiz_job_id
+            artifact_ids = []
+            message = f"Quiz '{topic}' generation started. It will appear in your artifacts panel shortly."
 
         elif artifact_type == "transformation":
             # Import here to avoid circular dependencies
@@ -1064,7 +1119,7 @@ async def generate_artifact(
             "job_id": job_id,
             "artifact_ids": artifact_ids,
             "artifact_type": artifact_type,
-            "status": "submitted" if artifact_type == "podcast" else "completed",
+            "status": "completed" if artifact_type == "transformation" else "submitted",
             "message": message,
             "topic": topic
         }

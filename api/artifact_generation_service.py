@@ -194,7 +194,7 @@ async def generate_summary_artifact(notebook_id: str) -> Tuple[str, Optional[str
         return ("error", None, str(e))
 
 
-async def generate_podcast_artifact(notebook_id: str, source_ids: Optional[List[str]] = None, language: str = "en") -> Tuple[str, Optional[str], List[str], Optional[str]]:
+async def generate_podcast_artifact(notebook_id: str, source_ids: Optional[List[str]] = None, language: str = "en", podcast_style: str = "tech_discussion") -> Tuple[str, Optional[str], List[str], Optional[str]]:
     """
     Submit async podcast generation job for notebook.
 
@@ -202,7 +202,7 @@ async def generate_podcast_artifact(notebook_id: str, source_ids: Optional[List[
         Tuple of (status, command_id, artifact_ids, error_message)
     """
     try:
-        logger.info(f"Submitting podcast generation for notebook {notebook_id}")
+        logger.info(f"Submitting podcast generation for notebook {notebook_id} with style={podcast_style}")
 
         # Get notebook for title
         notebook = await Notebook.get(notebook_id)
@@ -212,14 +212,15 @@ async def generate_podcast_artifact(notebook_id: str, source_ids: Optional[List[
         # Check that required podcast profiles exist before attempting generation
         from open_notebook.podcasts.models import EpisodeProfile, SpeakerProfile
 
-        episode_profile = await EpisodeProfile.get_by_name("overview")
+        episode_profile = await EpisodeProfile.get_by_name(podcast_style)
         if not episode_profile:
-            logger.info("Podcast skipped: no 'overview' episode profile configured")
+            logger.info(f"Podcast skipped: no '{podcast_style}' episode profile configured")
             return ("skipped", None, [], None)
 
-        speaker_profile = await SpeakerProfile.get_by_name("alex_sarah")
+        speaker_profile_name = episode_profile.speaker_config
+        speaker_profile = await SpeakerProfile.get_by_name(speaker_profile_name)
         if not speaker_profile:
-            logger.info("Podcast skipped: no 'alex_sarah' speaker profile configured")
+            logger.info(f"Podcast skipped: no '{speaker_profile_name}' speaker profile configured")
             return ("skipped", None, [], None)
 
         # Build content from specific sources if provided
@@ -244,12 +245,12 @@ async def generate_podcast_artifact(notebook_id: str, source_ids: Optional[List[
             if content_parts:
                 content = "\n\n---\n\n".join(content_parts)
 
-        # Submit podcast generation job with default profiles
-        episode_name = f"{notebook.name} - Overview"
+        # Submit podcast generation job with selected profiles
+        episode_name = f"{notebook.name} - {episode_profile.description or podcast_style}"
 
         command_id, artifact_ids = await PodcastService.submit_generation_job(
-            episode_profile_name="overview",
-            speaker_profile_name="alex_sarah",
+            episode_profile_name=podcast_style,
+            speaker_profile_name=speaker_profile_name,
             episode_name=episode_name,
             notebook_id=notebook_id,
             content=content,
@@ -293,7 +294,7 @@ async def get_or_create_summary_transformation() -> Optional[Transformation]:
         return None
 
 
-async def generate_all_artifacts(notebook_id: str, quiz_source_ids: Optional[List[str]] = None, podcast_source_ids: Optional[List[str]] = None, podcast_language: str = "en") -> BatchGenerationStatus:
+async def generate_all_artifacts(notebook_id: str, quiz_source_ids: Optional[List[str]] = None, podcast_source_ids: Optional[List[str]] = None, podcast_language: str = "en", podcast_style: str = "tech_discussion") -> BatchGenerationStatus:
     """
     Orchestrate parallel artifact generation for a notebook.
 
@@ -360,6 +361,7 @@ async def generate_all_artifacts(notebook_id: str, quiz_source_ids: Optional[Lis
             notebook_id,
             source_ids=podcast_source_ids,
             language=podcast_language,
+            podcast_style=podcast_style,
         )
         status.podcast_status = podcast_status
         status.podcast_command_id = command_id

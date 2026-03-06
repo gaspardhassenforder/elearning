@@ -45,7 +45,7 @@ export function ModulePublishFlow({ notebookId, isEditMode = false, onSuccess, o
   const publishMutation = usePublishModule(notebookId)
 
   // Check for podcast steps awaiting review
-  const pendingPodcasts = steps.filter(s => s.step_type === 'podcast' && !s.command_id)
+  const pendingPodcasts = steps.filter(s => s.step_type === 'podcast' && !s.command_id && !s.artifact_id)
   const hasPendingPodcasts = pendingPodcasts.length > 0
 
   // Compute validation status from notebook data

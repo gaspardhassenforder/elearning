@@ -118,6 +118,7 @@ export const artifactsApi = {
     quiz_source_ids?: string[]
     podcast_source_ids?: string[]
     podcast_language?: string
+    podcast_style?: string
   }): Promise<BatchGenerationResponse> => {
     const response = await apiClient.post<BatchGenerationResponse>(
       `/notebooks/${notebookId}/generate-artifacts`,

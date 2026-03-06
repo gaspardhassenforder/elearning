@@ -111,6 +111,7 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
     messages,
     clearMessages,
     editLastMessage,
+    injectSurfaceQuiz,
   } = useLearnerChat(notebookId, isLoadingHistory, hasExistingHistory, isHistoryFetching)
 
   // Lesson step progress
@@ -322,11 +323,15 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
     activeJob?.jobId || null,
     {
       notebookId,
-      onComplete: () => {
+      onComplete: (result) => {
         toast({
           title: t.asyncStatus.artifactReady.replace('{type}', activeJob?.artifactType || 'artifact'),
           description: t.asyncStatus.artifactReadyDescription,
         })
+        // Inject quiz inline when quiz generation completes
+        if (activeJob?.artifactType === 'quiz' && result?.quiz_id) {
+          injectSurfaceQuiz(result as Record<string, unknown>)
+        }
       },
       onError: (errorMsg) => {
         learnerToast.error(

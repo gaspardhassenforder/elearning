@@ -26,6 +26,8 @@ import {
   ChevronDown,
   ChevronUp,
   Headphones,
+  Languages,
+  Palette,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useTranslation } from '@/lib/hooks/use-translation'
@@ -40,6 +42,7 @@ import {
   useTriggerPodcastGeneration,
 } from '@/lib/hooks/use-lesson-plan'
 import { useNotebookSources } from '@/lib/hooks/use-sources'
+import { useEpisodeProfiles } from '@/lib/hooks/use-podcasts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -58,6 +61,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 
 interface LessonPlanEditorProps {
@@ -112,10 +122,13 @@ export function LessonPlanEditor({ moduleId }: LessonPlanEditorProps) {
     title: string
     instructions: string
     selectedSourceIds: Set<string>
+    language: string
+    episodeProfileName: string
   }>>({})
 
   const deleteAllMutation = useDeleteAllLessonSteps(moduleId)
   const refineMutation = useRefineLessonPlan(moduleId)
+  const { episodeProfiles } = useEpisodeProfiles()
 
   const openPodcastReview = (stepId: string, stepTitle: string, podcastTopic: string | null, stepSourceIds?: string[] | null) => {
     if (!expandedPodcastReview.has(stepId)) {
@@ -129,6 +142,8 @@ export function LessonPlanEditor({ moduleId }: LessonPlanEditorProps) {
           title: stepTitle,
           instructions: podcastTopic || '',
           selectedSourceIds: initialSources,
+          language: prev[stepId]?.language ?? 'en',
+          episodeProfileName: prev[stepId]?.episodeProfileName ?? (episodeProfiles[0]?.name ?? ''),
         },
       }))
       setExpandedPodcastReview(prev => new Set([...prev, stepId]))
@@ -169,6 +184,8 @@ export function LessonPlanEditor({ moduleId }: LessonPlanEditorProps) {
           title: state.title || undefined,
           ai_instructions: state.instructions || undefined,
           source_ids: state.selectedSourceIds.size > 0 ? [...state.selectedSourceIds] : [],
+          episode_profile_name: state.episodeProfileName || undefined,
+          language: state.language || 'en',
         },
       },
       {
@@ -408,7 +425,7 @@ export function LessonPlanEditor({ moduleId }: LessonPlanEditorProps) {
                                 </div>
 
                                 {/* Step type badge */}
-                                {step.step_type === 'podcast' && !step.command_id ? (
+                                {step.step_type === 'podcast' && !step.command_id && !step.artifact_id ? (
                                   <Badge
                                     variant="outline"
                                     className="flex-shrink-0 gap-1 text-xs bg-yellow-500 text-white border-transparent dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800"
@@ -458,7 +475,7 @@ export function LessonPlanEditor({ moduleId }: LessonPlanEditorProps) {
                                 </div>
 
                                 {/* Podcast Review & Generate button */}
-                                {step.step_type === 'podcast' && !step.command_id && (
+                                {step.step_type === 'podcast' && !step.command_id && !step.artifact_id && (
                                   <Button
                                     variant="outline"
                                     size="sm"
@@ -534,7 +551,7 @@ export function LessonPlanEditor({ moduleId }: LessonPlanEditorProps) {
                               </div>
 
                               {/* Podcast Review Panel */}
-                              {step.step_type === 'podcast' && !step.command_id && expandedPodcastReview.has(step.id) && (
+                              {step.step_type === 'podcast' && !step.command_id && !step.artifact_id && expandedPodcastReview.has(step.id) && (
                                 <div className="mt-3 border border-yellow-300 dark:border-yellow-800 rounded-md p-3 space-y-3 bg-yellow-50/50 dark:bg-yellow-900/10">
                                   {/* Episode Title */}
                                   <div className="space-y-1">
@@ -553,6 +570,46 @@ export function LessonPlanEditor({ moduleId }: LessonPlanEditorProps) {
                                       onChange={(e) => updatePodcastReviewState(step.id, 'instructions', e.target.value)}
                                       className="text-xs min-h-[60px]"
                                     />
+                                  </div>
+                                  {/* Language + Profile */}
+                                  <div className="flex flex-wrap gap-3">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <Languages className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                                      <Label className="text-xs font-medium flex-shrink-0">Language:</Label>
+                                      <Select
+                                        value={podcastReviewState[step.id]?.language ?? 'en'}
+                                        onValueChange={(v) => updatePodcastReviewState(step.id, 'language', v)}
+                                      >
+                                        <SelectTrigger className="h-7 w-28 text-xs">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="en">English</SelectItem>
+                                          <SelectItem value="fr">Français</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    {episodeProfiles.length > 0 && (
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <Palette className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                                        <Label className="text-xs font-medium flex-shrink-0">Profile:</Label>
+                                        <Select
+                                          value={podcastReviewState[step.id]?.episodeProfileName ?? episodeProfiles[0]?.name ?? ''}
+                                          onValueChange={(v) => updatePodcastReviewState(step.id, 'episodeProfileName', v)}
+                                        >
+                                          <SelectTrigger className="h-7 w-44 text-xs">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {episodeProfiles.map(ep => (
+                                              <SelectItem key={ep.id} value={ep.name}>
+                                                {ep.name}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                    )}
                                   </div>
                                   {/* Source selection */}
                                   {sources.length > 0 && (

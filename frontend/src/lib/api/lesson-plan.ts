@@ -52,6 +52,8 @@ export interface PodcastTriggerRequest {
   title?: string
   ai_instructions?: string
   source_ids?: string[]
+  episode_profile_name?: string
+  language?: string
 }
 
 /**

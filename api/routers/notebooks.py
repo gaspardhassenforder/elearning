@@ -688,6 +688,7 @@ async def generate_artifacts(
             quiz_source_ids=request.quiz_source_ids if request else None,
             podcast_source_ids=request.podcast_source_ids if request else None,
             podcast_language=request.podcast_language if request else "en",
+            podcast_style=request.podcast_style if request else "tech_discussion",
         )
 
         # Convert to response model
@@ -790,7 +791,7 @@ async def publish_notebook(
 
         # Check for podcast steps awaiting review
         pending_podcasts = await repo_query(
-            "SELECT count() as cnt FROM lesson_step WHERE notebook_id = $id AND step_type = 'podcast' AND command_id IS NONE GROUP ALL",
+            "SELECT count() as cnt FROM lesson_step WHERE notebook_id = $id AND step_type = 'podcast' AND command_id IS NONE AND artifact_id IS NONE GROUP ALL",
             {"id": ensure_record_id(notebook_id)},
         )
         if pending_podcasts and pending_podcasts[0].get("cnt", 0) > 0:

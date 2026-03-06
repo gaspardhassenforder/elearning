@@ -1,30 +1,69 @@
-You are refining a lesson plan based on an admin instruction.
+You are editing a lesson plan. You have full control: modify, reorder, add, and remove steps.
+
+AVAILABLE SOURCES:
+{% for s in sources %}
+- id: {{ s.id }} | type: {{ s.source_type }} | title: "{{ s.title }}"
+{% endfor %}
+
+{% if podcasts %}
+AVAILABLE PODCASTS (already generated — each has audio ready to play):
+{% for p in podcasts %}
+[{{ p.ref }}] "{{ p.title }}"
+{% endfor %}
+
+PODCAST LINKING RULES:
+- To ADD an existing podcast as a new step: create a step with step_type "podcast" AND set podcast_ref to the number above (e.g. podcast_ref: 1). This links the audio.
+- To LINK an existing podcast to an already-existing step: modify that step and set podcast_ref.
+- ALWAYS set podcast_ref when the step corresponds to an AVAILABLE PODCAST. A step with podcast_ref: null has no audio and will require a new generation.
+{% endif %}
 
 CURRENT LESSON PLAN:
 {% for step in steps %}
 {{ loop.index }}. [{{ step.step_type | upper }}] "{{ step.title }}" (id: {{ step.id }})
+   source_ids: {{ step.source_ids or [] }}
+   podcast_topic: {{ step.podcast_topic or "none" }}
    ai_instructions: {{ step.ai_instructions or "none" }}
    discussion_prompt: {{ step.discussion_prompt or "none" }}
+   podcast_ref: {{ step.podcast_ref if step.podcast_ref is not none else "none" }}
 {% endfor %}
 
 INSTRUCTION: {{ refinement_prompt }}
 
-Apply the instruction across the plan. You may modify title, ai_instructions, discussion_prompt, and step_type.
-Preserve id, source_ids, and podcast_topic unchanged — do NOT include or modify them.
-Keep the overall structure unless the instruction explicitly asks to change it.
+RULES:
+- To MODIFY a step: include its "id" with updated fields
+- To ADD a new step: omit "id" (or set to null)
+- To REMOVE a step: omit it entirely from the response
+- To REORDER: change the position in the array
+- Return ALL steps you want to keep (including unmodified ones)
 
-Return ONLY a valid JSON array with ALL steps (including unmodified ones), no other text.
-Each step must include its original "id" field so updates can be matched.
+STEP TYPES: watch | read | quiz | discuss | podcast
+- podcast: set source_ids (list of source IDs from AVAILABLE SOURCES) and podcast_topic (briefing text)
+  - if this step corresponds to an AVAILABLE PODCAST, set podcast_ref to its number
+- quiz: set ai_instructions describing what to quiz on
+- read/watch: set source_ids (the source to read/watch)
+- discuss: set discussion_prompt
 
-Lesson plans use only two step types: `podcast` and `quiz`. Do not introduce watch, read, or discuss steps.
+Return ONLY a valid JSON array, no other text.
 
-Example output format:
 [
   {
-    "id": "lesson_step:abc123",
-    "title": "...",
-    "step_type": "podcast|quiz",
+    "id": null,
+    "title": "Podcast: Le changement de paradigme",
+    "step_type": "podcast",
+    "source_ids": ["source:xxx"],
+    "podcast_topic": "...",
+    "ai_instructions": null,
     "discussion_prompt": null,
-    "ai_instructions": "..."
+    "podcast_ref": 1
+  },
+  {
+    "id": "lesson_step:abc123",
+    "title": "Quiz Final",
+    "step_type": "quiz",
+    "source_ids": [],
+    "podcast_topic": null,
+    "ai_instructions": "Quiz covering ...",
+    "discussion_prompt": null,
+    "podcast_ref": null
   }
 ]

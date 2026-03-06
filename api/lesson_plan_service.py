@@ -13,6 +13,7 @@ from ai_prompter import Prompter
 from loguru import logger
 
 from open_notebook.ai.provision import provision_langchain_model
+from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.learning_objective import LearningObjective
 from open_notebook.domain.lesson_step import LessonStep
 from open_notebook.domain.learner_step_progress import LearnerStepProgress
@@ -411,6 +412,8 @@ async def trigger_podcast_for_step(
     title: Optional[str] = None,
     ai_instructions: Optional[str] = None,
     source_ids: Optional[List[str]] = None,
+    episode_profile_name: Optional[str] = None,
+    language: Optional[str] = "en",
 ) -> "LessonStep":
     """Trigger podcast generation for a podcast-type lesson step.
 
@@ -475,15 +478,28 @@ async def trigger_podcast_for_step(
             texts.append(text)
     content = "\n\n---\n\n".join(texts) if texts else ""
 
-    # Fetch profiles
-    episode_profiles = await repo_query("SELECT * FROM episode_profile LIMIT 1", {})
-    speaker_profiles = await repo_query("SELECT * FROM speaker_profile LIMIT 1", {})
+    # Fetch profiles — use caller-specified profile or fall back to first available
+    if episode_profile_name:
+        episode_profiles = await repo_query(
+            "SELECT * FROM episode_profile WHERE name = $name LIMIT 1",
+            {"name": episode_profile_name},
+        )
+        if not episode_profiles:
+            raise ValueError(f"Episode profile '{episode_profile_name}' not found")
+    else:
+        episode_profiles = await repo_query("SELECT * FROM episode_profile LIMIT 1", {})
 
-    if not episode_profiles or not speaker_profiles:
+    if not episode_profiles:
         raise ValueError("No podcast profiles configured. Please configure episode and speaker profiles first.")
 
     episode_profile_name = episode_profiles[0]["name"]
-    speaker_profile_name = speaker_profiles[0]["name"]
+    speaker_profile_name = episode_profiles[0].get("speaker_config", "")
+
+    if not speaker_profile_name:
+        speaker_profiles = await repo_query("SELECT * FROM speaker_profile LIMIT 1", {})
+        if not speaker_profiles:
+            raise ValueError("No speaker profiles configured.")
+        speaker_profile_name = speaker_profiles[0]["name"]
 
     # Briefing: caller override → step.podcast_topic → step.title
     # Never use the full ai_instructions as briefing (it's for AI teacher post-summary, not the podcast generator)
@@ -497,6 +513,7 @@ async def trigger_podcast_for_step(
         briefing_suffix=briefing,
         created_by="admin",
         content=content if content else None,
+        language=language or "en",
     )
 
     step.command_id = job_id
@@ -509,6 +526,9 @@ async def trigger_podcast_for_step(
 
 async def refine_lesson_plan(notebook_id: str, refinement_prompt: str) -> dict:
     """Refine existing lesson plan based on admin's natural language instruction.
+
+    Supports full structural editing: modify, add, remove, and reorder steps.
+    New steps (id=null) are created; steps omitted from AI response are deleted.
 
     Args:
         notebook_id: Notebook record ID
@@ -524,24 +544,63 @@ async def refine_lesson_plan(notebook_id: str, refinement_prompt: str) -> dict:
         if not steps:
             return {"status": "failed", "error": "No lesson steps found to refine"}
 
+        # steps[0].notebook_id is guaranteed normalized by the field_validator
+        nb_record_id = ensure_record_id(steps[0].notebook_id)
+
+        # Fetch sources and existing podcast artifacts in parallel
+        notebook, raw_podcasts = await asyncio.gather(
+            Notebook.get(notebook_id),
+            repo_query(
+                "SELECT id, title FROM artifact WHERE notebook_id = $nb_id AND artifact_type = 'podcast'",
+                {"nb_id": nb_record_id},
+            ),
+        )
+        all_sources = await notebook.get_sources() if notebook else []
+        valid_source_ids = {str(s.id) for s in all_sources}
+        sources_data = [
+            {
+                "id": str(s.id),
+                "title": getattr(s, "title", None) or "Untitled",
+                "source_type": "video" if _is_video_source(s) else "document",
+            }
+            for s in all_sources
+        ]
+
+        # Build podcast list with 1-based integer refs so the AI never has to echo raw IDs.
+        # step.artifact_id stores the artifact tracker id (artifact:xxx).
+        artifact_ref_map: dict[int, str] = {}  # ref → artifact tracker id
+        artifact_id_to_ref: dict[str, int] = {}  # tracker id → ref (for existing step display)
+        podcasts_data = []
+        for row in raw_podcasts:
+            if not row.get("id"):
+                continue
+            tracker_id = str(row["id"])
+            ref = len(podcasts_data) + 1
+            artifact_ref_map[ref] = tracker_id
+            artifact_id_to_ref[tracker_id] = ref
+            podcasts_data.append({"ref": ref, "title": row.get("title") or "Untitled"})
+
         steps_data = [
             {
                 "id": str(s.id),
                 "title": s.title,
                 "step_type": s.step_type,
-                "source_id": s.source_id,
+                "source_ids": s.source_ids or [],
+                "podcast_topic": s.podcast_topic,
                 "discussion_prompt": s.discussion_prompt,
                 "ai_instructions": s.ai_instructions,
+                # Show the podcast ref number rather than the raw tracker ID
+                "podcast_ref": artifact_id_to_ref.get(s.artifact_id) if s.artifact_id else None,
                 "order": s.order,
             }
             for s in steps
         ]
 
         prompt = Prompter(prompt_template="lesson_plan/refine").render(
-            data={"steps": steps_data, "refinement_prompt": refinement_prompt}
+            data={"steps": steps_data, "sources": sources_data, "podcasts": podcasts_data, "refinement_prompt": refinement_prompt}
         )
 
-        model = await provision_langchain_model(prompt, None, "chat", max_tokens=4096)
+        model = await provision_langchain_model(prompt, None, "chat", max_tokens=8192)
         response = await model.ainvoke(prompt)
         content = clean_thinking_content(extract_text_from_response(response.content)).strip()
 
@@ -551,28 +610,91 @@ async def refine_lesson_plan(notebook_id: str, refinement_prompt: str) -> dict:
             logger.error(f"No JSON array found in refine response: {content[:200]}")
             return {"status": "failed", "error": "AI returned unexpected format"}
 
+        logger.debug("AI revised_steps: {}", revised_steps)
+
         # Build lookup accepting both "lesson_step:abc" and bare "abc" from LLM
         existing_by_id = build_dual_key_lookup(steps)
-
         valid_step_types = {"watch", "read", "quiz", "discuss", "podcast"}
 
-        async def _save_revised(i: int, step_data: dict):
+        # Pre-scan: mutate objects in-memory, collect save coroutines, and populate returned_ids.
+        # Sequential categorization ensures returned_ids is complete before the deletion pass.
+        returned_ids: set[str] = set()
+        save_coros = []
+
+        for i, step_data in enumerate(revised_steps):
             step_id = step_data.get("id")
-            if not step_id or step_id not in existing_by_id:
-                return
-            step = existing_by_id[step_id]
-            step.title = step_data.get("title") or step.title
-            step.discussion_prompt = step_data.get("discussion_prompt") or None
-            step.ai_instructions = step_data.get("ai_instructions") or step.ai_instructions
-            new_type = step_data.get("step_type")
-            if new_type and new_type in valid_step_types:
-                step.step_type = new_type
-            step.order = i
-            await step.save()
+            step_type = step_data.get("step_type", "read")
+            if step_type not in valid_step_types:
+                step_type = "read"
 
-        await asyncio.gather(*[_save_revised(i, sd) for i, sd in enumerate(revised_steps)])
+            # Filter source_ids to only valid notebook sources.
+            # Empty list from AI means "clear"; non-empty but all-invalid means "keep old".
+            raw_source_ids = step_data.get("source_ids") or []
+            filtered_source_ids = [sid for sid in raw_source_ids if sid in valid_source_ids]
 
-        logger.info(f"Refined {len(revised_steps)} lesson steps for notebook {notebook_id}")
+            # Resolve podcast_ref (integer) → artifact tracker id; ignore invalid/missing refs
+            podcast_ref = step_data.get("podcast_ref")
+            try:
+                artifact_id = artifact_ref_map.get(int(podcast_ref)) if podcast_ref else None
+            except (TypeError, ValueError):
+                artifact_id = None
+
+            if step_id and step_id in existing_by_id:
+                # UPDATE existing step
+                returned_ids.add(step_id)
+                step = existing_by_id[step_id]
+                step.title = step_data.get("title") or step.title
+                step.step_type = step_type
+                step.discussion_prompt = step_data.get("discussion_prompt") or None
+                step.ai_instructions = step_data.get("ai_instructions") or step.ai_instructions
+                # Respect intentional empty list (clear); fall back only when AI hallucinated IDs
+                step.source_ids = [] if not raw_source_ids else (filtered_source_ids or step.source_ids)
+                step.podcast_topic = step_data.get("podcast_topic") or step.podcast_topic
+                if artifact_id is not None:
+                    step.artifact_id = artifact_id
+                step.order = i
+                save_coros.append(step.save())
+            else:
+                # CREATE new step (id is null/missing/unknown)
+                title = (step_data.get("title") or "").strip()
+                if not title:
+                    logger.warning("Skipping new step with empty title at position {}", i)
+                    continue
+                new_step = LessonStep(
+                    notebook_id=notebook_id,
+                    title=title,
+                    step_type=step_type,
+                    source_id=None,
+                    source_ids=filtered_source_ids or None,
+                    podcast_topic=step_data.get("podcast_topic") or None,
+                    ai_instructions=step_data.get("ai_instructions") or None,
+                    discussion_prompt=step_data.get("discussion_prompt") or None,
+                    artifact_id=artifact_id,
+                    order=i,
+                    required=True,
+                    auto_generated=True,
+                )
+                logger.info("Creating new lesson step '{}' (type: {}) at position {}", title, step_type, i)
+                save_coros.append(new_step.save())
+
+        # Persist all updates and creates in parallel
+        await asyncio.gather(*save_coros)
+
+        # Bulk-delete steps omitted from AI response (single round-trip)
+        ids_to_delete = []
+        for step in steps:
+            sid = str(step.id)
+            bare = sid.split(":", 1)[1] if ":" in sid else sid
+            if sid not in returned_ids and bare not in returned_ids:
+                ids_to_delete.append(ensure_record_id(sid))
+        if ids_to_delete:
+            await repo_query("DELETE lesson_step WHERE id IN $ids", {"ids": ids_to_delete})
+            logger.info("Bulk deleted {} omitted lesson steps", len(ids_to_delete))
+
+        logger.info(
+            f"Refined lesson plan for {notebook_id}: {len(revised_steps)} steps returned, "
+            f"{len(ids_to_delete)} deleted"
+        )
         return {"status": "completed"}
 
     except json.JSONDecodeError as e:

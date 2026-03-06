@@ -113,6 +113,9 @@ class PodcastEpisode(ObjectModel):
     command: Optional[Union[str, RecordID]] = Field(
         default=None, description="Link to surreal-commands job"
     )
+    language: Optional[str] = Field(
+        default=None, description="Output language code (e.g., 'en', 'fr')"
+    )
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 

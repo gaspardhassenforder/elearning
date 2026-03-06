@@ -12,10 +12,12 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { sendLearnerChatMessage, parseLearnerChatStream, LearnerChatMessage, ToolCall, ObjectiveCheckedData, SSEErrorData } from '../api/learner-chat'
+import { apiClient } from '../api/client'
 import { useToast } from './use-toast'
 import { learnerToast } from '../utils/learner-toast'
 import { useLearnerStore } from '../stores/learner-store'
 import { learningObjectivesKeys } from './use-learning-objectives'
+import { QUERY_KEYS } from '../api/query-client'
 import { useTranslation } from './use-translation'
 import { getVideoType } from '../utils/source-type'
 
@@ -29,6 +31,7 @@ interface UseLearnerChatResult {
   clearMessages: () => Promise<void>
   editLastMessage: (newContent: string) => Promise<void>
   lastObjectiveChecked: ObjectiveCheckedData | null  // Story 4.4: Last checked objective for inline confirmation
+  injectSurfaceQuiz: (quizData: Record<string, unknown>) => void
 }
 
 /**
@@ -154,6 +157,13 @@ export function useLearnerChat(
                   jobId: toolCall.result.job_id,
                   artifactType: toolCall.result.artifact_type,
                   notebookId,
+                })
+              }
+
+              // Invalidate lesson step progress when teacher marks a step complete
+              if (toolCall.toolName === 'complete_lesson_step' && toolCall.result?.step_id) {
+                queryClient.invalidateQueries({
+                  queryKey: QUERY_KEYS.lessonStepsProgress(notebookId),
                 })
               }
             }
@@ -304,9 +314,15 @@ export function useLearnerChat(
     greetingRequestedRef.current = false  // Allow greeting to fire again after reset
     try {
       const { resetLearnerChat } = await import('../api/learner-chat')
-      await resetLearnerChat(notebookId)
-      // Invalidate history cache so next load sees empty state
+      await Promise.all([
+        resetLearnerChat(notebookId),
+        apiClient.delete(`/notebooks/${notebookId}/lesson-steps/progress`).catch((err) => {
+          console.error('Failed to reset lesson progress:', err)
+        }),
+      ])
+      // Invalidate history and lesson progress caches
       queryClient.invalidateQueries({ queryKey: ['learner-chat-history', notebookId] })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.lessonStepsProgress(notebookId) })
     } catch (err) {
       console.error('Failed to reset chat:', err)
     }
@@ -421,6 +437,21 @@ export function useLearnerChat(
     requestGreeting()
   }, [notebookId, isLoadingHistory, isHistoryFetching, hasExistingHistory])
 
+  const injectSurfaceQuiz = useCallback((quizData: Record<string, unknown>) => {
+    const syntheticMessage: LearnerChatMessage = {
+      role: 'assistant',
+      content: '',
+      timestamp: new Date().toISOString(),
+      toolCalls: [{
+        id: `synthetic-quiz-${quizData.quiz_id}`,
+        toolName: 'surface_quiz',
+        args: { quiz_id: quizData.quiz_id },
+        result: quizData,
+      }],
+    }
+    setMessages((prev) => [...prev, syntheticMessage])
+  }, [])
+
   return {
     messages,
     isLoading,
@@ -431,6 +462,7 @@ export function useLearnerChat(
     clearMessages,
     editLastMessage,
     lastObjectiveChecked,  // Story 4.4: Expose for inline confirmation
+    injectSurfaceQuiz,
   }
 }
 

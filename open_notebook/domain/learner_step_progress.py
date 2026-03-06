@@ -64,7 +64,7 @@ class LearnerStepProgress(ObjectModel):
                         "UPDATE $id SET completed_at = $completed_at",
                         {
                             "id": existing.id,
-                            "completed_at": datetime.now().isoformat(),
+                            "completed_at": datetime.now(),
                         },
                     )
                     if result:
@@ -77,7 +77,7 @@ class LearnerStepProgress(ObjectModel):
             data = {
                 "user_id": ensure_record_id(user_id),
                 "step_id": ensure_record_id(step_id),
-                "completed_at": datetime.now().isoformat(),
+                "completed_at": datetime.now(),
             }
             result = await repo_create(cls.table_name, data)
             logger.info(
@@ -149,6 +149,44 @@ class LearnerStepProgress(ObjectModel):
             logger.error(
                 f"Error fetching completed step IDs for user {user_id} in notebook {notebook_id}: {str(e)}"
             )
+            raise DatabaseOperationError(e)
+
+    @classmethod
+    async def reset_progress(cls, user_id: str, notebook_id: str) -> int:
+        """Delete all progress records for a learner in a notebook.
+
+        Args:
+            user_id: User record ID
+            notebook_id: Notebook record ID
+
+        Returns:
+            Number of deleted records
+        """
+        if not user_id.startswith("user:"):
+            user_id = f"user:{user_id}"
+        if not notebook_id.startswith("notebook:"):
+            notebook_id = f"notebook:{notebook_id}"
+
+        try:
+            result = await repo_query(
+                """
+                DELETE learner_step_progress
+                WHERE user_id = $user_id
+                  AND step_id IN (
+                    SELECT VALUE id FROM lesson_step WHERE notebook_id = $notebook_id
+                  )
+                RETURN BEFORE
+                """,
+                {
+                    "user_id": ensure_record_id(user_id),
+                    "notebook_id": ensure_record_id(notebook_id),
+                },
+            )
+            deleted = len(result) if result else 0
+            logger.info(f"Reset {deleted} progress records for user {user_id} in notebook {notebook_id}")
+            return deleted
+        except Exception as e:
+            logger.error(f"Error resetting progress for user {user_id} in notebook {notebook_id}: {str(e)}")
             raise DatabaseOperationError(e)
 
     @classmethod

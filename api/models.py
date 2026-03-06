@@ -682,6 +682,9 @@ class BatchGenerationRequest(BaseModel):
     podcast_language: Optional[str] = Field(
         "en", description="Podcast language ('en' or 'fr')"
     )
+    podcast_style: Optional[str] = Field(
+        "tech_discussion", description="Podcast style/episode profile name (e.g., 'tech_discussion', 'solo_expert', 'business_analysis')"
+    )
 
 
 class ArtifactGenerationResult(BaseModel):
@@ -1127,3 +1130,5 @@ class PodcastTriggerRequest(BaseModel):
     title: Optional[str] = Field(None, description="Override episode title")
     ai_instructions: Optional[str] = Field(None, description="Override topic/instructions")
     source_ids: List[str] = Field(default_factory=list, description="Source IDs to use; empty = all sources")
+    episode_profile_name: Optional[str] = Field(None, description="Episode profile name; uses first available if None")
+    language: Optional[str] = Field("en", description="Output language code (e.g., 'en', 'fr')")

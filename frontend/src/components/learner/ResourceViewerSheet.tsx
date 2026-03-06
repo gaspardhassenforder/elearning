@@ -134,7 +134,7 @@ function SourceViewer({
           />
         </div>
       ) : (
-        <ScrollArea className="flex-1 px-6 py-4">
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <LoadingSpinner />
@@ -156,7 +156,7 @@ function SourceViewer({
               {tSources?.noContent || 'No content available'}
             </p>
           )}
-        </ScrollArea>
+        </div>
       )}
     </>
   )
@@ -182,9 +182,7 @@ function TextContentWithHighlight({
   if (!searchText) {
     return (
       <div className="prose prose-sm dark:prose-invert max-w-none">
-        <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
-          {content}
-        </pre>
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
       </div>
     )
   }
@@ -195,12 +193,10 @@ function TextContentWithHighlight({
   const matchIndex = lowerContent.indexOf(lowerSearch)
 
   if (matchIndex === -1) {
-    // No match found - render plain
+    // No match found - render as markdown
     return (
       <div className="prose prose-sm dark:prose-invert max-w-none">
-        <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
-          {content}
-        </pre>
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
       </div>
     )
   }
@@ -211,13 +207,11 @@ function TextContentWithHighlight({
 
   return (
     <div className="prose prose-sm dark:prose-invert max-w-none">
-      <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
-        {before}
-        <mark ref={highlightRef} className="bg-yellow-200 dark:bg-yellow-800 rounded px-0.5">
-          {match}
-        </mark>
-        {after}
-      </pre>
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{before}</ReactMarkdown>
+      <mark ref={highlightRef} className="bg-yellow-200 dark:bg-yellow-800 rounded px-0.5">
+        {match}
+      </mark>
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{after}</ReactMarkdown>
     </div>
   )
 }

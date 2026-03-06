@@ -10,10 +10,12 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Sparkles, Check, AlertCircle, Loader2, FileText, Mic, BookOpen, RotateCw, ChevronDown, ChevronUp, Languages } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Sparkles, Check, AlertCircle, Loader2, FileText, Mic, BookOpen, RotateCw, ChevronDown, ChevronUp, Languages, Palette, Info } from 'lucide-react';
 import { useGenerateAllArtifacts, useArtifacts } from '@/lib/hooks/use-artifacts';
 import { useModuleCreationStore } from '@/lib/stores/module-creation-store';
 import { useTranslation } from '@/lib/hooks/use-translation';
+import { podcastsApi } from '@/lib/api/podcasts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -69,6 +71,7 @@ export function ArtifactGenerationPanel({ moduleId, onComplete }: ArtifactGenera
   const [selectedQuizSourceIds, setSelectedQuizSourceIds] = useState<string[]>([]);
   const [selectedPodcastSourceIds, setSelectedPodcastSourceIds] = useState<string[]>([]);
   const [podcastLanguage, setPodcastLanguage] = useState('en');
+  const [podcastStyle, setPodcastStyle] = useState('tech_discussion');
   const [showQuizSourceSelector, setShowQuizSourceSelector] = useState(false);
   const [showPodcastSourceSelector, setShowPodcastSourceSelector] = useState(false);
 
@@ -164,6 +167,7 @@ export function ArtifactGenerationPanel({ moduleId, onComplete }: ArtifactGenera
       quiz_source_ids: selectedQuizSourceIds.length > 0 ? selectedQuizSourceIds : undefined,
       podcast_source_ids: selectedPodcastSourceIds.length > 0 ? selectedPodcastSourceIds : undefined,
       podcast_language: podcastLanguage,
+      podcast_style: podcastStyle,
     });
   };
 
@@ -196,6 +200,7 @@ export function ArtifactGenerationPanel({ moduleId, onComplete }: ArtifactGenera
       quiz_source_ids: selectedQuizSourceIds.length > 0 ? selectedQuizSourceIds : undefined,
       podcast_source_ids: selectedPodcastSourceIds.length > 0 ? selectedPodcastSourceIds : undefined,
       podcast_language: podcastLanguage,
+      podcast_style: podcastStyle,
     });
   };
 
@@ -292,6 +297,21 @@ export function ArtifactGenerationPanel({ moduleId, onComplete }: ArtifactGenera
                         <SelectContent>
                           <SelectItem value="en">{t.artifacts?.podcastLanguageEn || 'English'}</SelectItem>
                           <SelectItem value="fr">{t.artifacts?.podcastLanguageFr || 'Français'}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {/* Style selector */}
+                    <div className="flex items-center gap-2">
+                      <Palette className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">{t.artifacts?.podcastStyle || 'Style'}:</span>
+                      <Select value={podcastStyle} onValueChange={setPodcastStyle}>
+                        <SelectTrigger className="h-7 w-44 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="tech_discussion">{t.artifacts?.podcastStyleTech || 'Technical Discussion'}</SelectItem>
+                          <SelectItem value="solo_expert">{t.artifacts?.podcastStyleSolo || 'Solo Expert'}</SelectItem>
+                          <SelectItem value="business_analysis">{t.artifacts?.podcastStyleBusiness || 'Business Analysis'}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -414,6 +434,50 @@ export function ArtifactGenerationPanel({ moduleId, onComplete }: ArtifactGenera
   );
 }
 
+/** Shows profile/language details for a completed podcast episode. */
+function PodcastEpisodeDetails({ episodeId }: { episodeId: string }) {
+  const { data: episode, isLoading } = useQuery({
+    queryKey: ['podcastEpisode', episodeId],
+    queryFn: () => podcastsApi.getEpisode(episodeId),
+    enabled: !episodeId.startsWith('command:'),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+        <Loader2 className="h-3 w-3 animate-spin" />
+        <span>Loading details...</span>
+      </div>
+    );
+  }
+
+  if (!episode) return null;
+
+  const langLabel: Record<string, string> = { en: 'English', fr: 'Français' };
+
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 text-xs text-muted-foreground">
+      <span className="flex items-center gap-1">
+        <Info className="h-3 w-3" />
+        <span className="font-medium">Profile:</span> {episode.episode_profile?.name ?? '—'}
+        {episode.episode_profile?.description && (
+          <span className="text-muted-foreground/70">— {episode.episode_profile.description}</span>
+        )}
+      </span>
+      <span className="flex items-center gap-1">
+        <span className="font-medium">Speakers:</span> {episode.speaker_profile?.name ?? '—'}
+      </span>
+      {episode.language && (
+        <span className="flex items-center gap-1">
+          <span className="font-medium">Language:</span>{' '}
+          {langLabel[episode.language] ?? episode.language}
+        </span>
+      )}
+    </div>
+  );
+}
+
 interface ArtifactStatusItemProps {
   artifact: ArtifactStatus;
   isEditMode?: boolean;
@@ -446,6 +510,9 @@ function ArtifactStatusItem({ artifact, isEditMode, onRegenerate }: ArtifactStat
             <div className="text-sm text-red-600 dark:text-red-400 mt-1">
               {artifact.error}
             </div>
+          )}
+          {artifact.type === 'podcast' && artifact.status === 'completed' && artifact.id && (
+            <PodcastEpisodeDetails episodeId={artifact.id} />
           )}
         </div>
       </div>
