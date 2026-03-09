@@ -2,6 +2,7 @@ import contextvars
 import os
 import re
 import time
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Any, Optional
 
@@ -908,20 +909,46 @@ async def generate_podcast_command(
             if input_data.execution_context
             else None
         )
+
+        # Build LangSmith parent trace context if tracing is enabled
+        tracing_enabled = (
+            os.getenv("LANGSMITH_TRACING", "").lower() == "true"
+            or os.getenv("LANGCHAIN_TRACING_V2", "").lower() == "true"
+        )
+        if tracing_enabled:
+            try:
+                from langsmith import trace as ls_trace
+                ctx = ls_trace(
+                    name=f"podcast: {input_data.episode_name}",
+                    run_type="chain",
+                    metadata={
+                        "episode_profile": input_data.episode_profile,
+                        "speaker_profile": input_data.speaker_profile,
+                        "notebook_ids": input_data.notebook_ids,
+                        "content_length": len(input_data.content),
+                        "language": input_data.language,
+                    },
+                )
+            except ImportError:
+                ctx = nullcontext()
+        else:
+            ctx = nullcontext()
+
         _active_command_id.set(cmd_id)
 
         if cmd_id:
             await _update_command_progress(cmd_id, 0, 0, "starting")
 
         try:
-            result = await create_podcast(
-                content=input_data.content,
-                briefing=briefing,
-                episode_name=input_data.episode_name,
-                output_dir=str(output_dir),
-                speaker_config=speaker_profile.name,
-                episode_profile=episode_profile.name,
-            )
+            with ctx:
+                result = await create_podcast(
+                    content=input_data.content,
+                    briefing=briefing,
+                    episode_name=input_data.episode_name,
+                    output_dir=str(output_dir),
+                    speaker_config=speaker_profile.name,
+                    episode_profile=episode_profile.name,
+                )
         finally:
             _active_command_id.set(None)
 
