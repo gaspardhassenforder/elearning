@@ -58,6 +58,44 @@ from api.routers import (
 from api.routers import commands as commands_router
 from open_notebook.database.async_migrate import AsyncMigrationManager
 
+# Patch content-core YouTube processor to use transcripts-api engine
+# pytubefix is blocked on GCP/datacenter IPs; youtube-transcript-api is not
+try:
+    import content_core.processors.youtube as _yt_module
+    _original_extract = _yt_module.extract_youtube_transcript
+
+    async def _patched_extract_youtube_transcript(state):
+        from youtube_transcript_api import YouTubeTranscriptApi
+        from youtube_transcript_api.formatters import TextFormatter
+        from content_core.config import CONFIG
+
+        video_id = await _yt_module._extract_youtube_id(state.url)
+        title = await _yt_module.get_video_title(video_id)
+        languages = CONFIG.get("youtube_transcripts", {}).get("preferred_languages", ["en", "es", "pt"])
+
+        try:
+            api = YouTubeTranscriptApi()
+            transcript_list = api.list(video_id)
+            transcript = transcript_list.find_transcript(languages)
+            fetched = transcript.fetch()
+            formatter = TextFormatter()
+            formatted_content = formatter.format_transcript(fetched)
+            transcript_raw = fetched
+        except Exception as e:
+            logger.warning(f"youtube-transcript-api failed for {video_id}, falling back to pytubefix: {e}")
+            formatted_content, transcript_raw = _yt_module.extract_transcript_pytubefix(state.url, languages)
+
+        return {
+            "content": formatted_content,
+            "title": title,
+            "metadata": {"video_id": video_id, "transcript": transcript_raw},
+        }
+
+    _yt_module.extract_youtube_transcript = _patched_extract_youtube_transcript
+    logger.info("YouTube transcript engine patched to use youtube-transcript-api")
+except Exception as e:
+    logger.warning(f"Failed to patch YouTube transcript engine: {e}")
+
 # Import commands to register them in the API process
 try:
     logger.info("Commands imported in API process")
