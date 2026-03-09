@@ -128,15 +128,18 @@ async def list_podcast_episodes():
                 continue
 
             # Get job status if available
-            job_status = None
-            if episode.command:
+            # If the episode already has an audio file, it's completed regardless of
+            # command status (handles cases where the command record was cleaned up or
+            # returns None after the podcast finished generating).
+            if episode.audio_file:
+                job_status = "completed"
+            elif episode.command:
                 try:
                     job_status = await episode.get_job_status()
                 except Exception:
                     job_status = "unknown"
             else:
-                # No command but has audio file = completed import
-                job_status = "completed"
+                job_status = "unknown"
 
             audio_url = None
             if episode.audio_file:
@@ -176,15 +179,17 @@ async def get_podcast_episode(episode_id: str):
         episode = await PodcastService.get_episode(episode_id)
 
         # Get job status if available
-        job_status = None
-        if episode.command:
+        # If the episode already has an audio file, it's completed regardless of
+        # command status (handles cases where the command record was cleaned up).
+        if episode.audio_file:
+            job_status = "completed"
+        elif episode.command:
             try:
                 job_status = await episode.get_job_status()
             except Exception:
                 job_status = "unknown"
         else:
-            # No command but has audio file = completed import
-            job_status = "completed" if episode.audio_file else "unknown"
+            job_status = "unknown"
 
         audio_url = None
         if episode.audio_file:
