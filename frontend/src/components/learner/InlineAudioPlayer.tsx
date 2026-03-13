@@ -14,14 +14,14 @@
  * - Loading state for generating podcasts
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { Play, Pause, Headphones, CheckCircle2 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { cn } from '@/lib/utils'
-import ReactMarkdown from 'react-markdown'
+import type { TranscriptEntry } from '@/lib/types/podcasts'
 
 interface InlineAudioPlayerProps {
   podcastId: string
@@ -65,9 +65,11 @@ export function InlineAudioPlayer({
   const [canPlay, setCanPlay] = useState(false)
   const blobUrlRef = useRef<string | null>(null)
   const fallbackAttemptedRef = useRef(false)
-  const [transcript, setTranscript] = useState<string | null>(null)
+  const [transcriptEntries, setTranscriptEntries] = useState<TranscriptEntry[] | null>(null)
   const [transcriptLoading, setTranscriptLoading] = useState(false)
   const [transcriptUnavailable, setTranscriptUnavailable] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(-1)
+  const entryRefs = useRef<(HTMLDivElement | null)[]>([])
 
   const isReady = status === 'completed'
 
@@ -224,7 +226,7 @@ export function InlineAudioPlayer({
 
   // Auto-fetch transcript on mount when URL is available
   useEffect(() => {
-    if (!effectiveTranscriptUrl || transcript) return
+    if (!effectiveTranscriptUrl || transcriptEntries) return
 
     let cancelled = false
     setTranscriptLoading(true)
@@ -246,17 +248,12 @@ export function InlineAudioPlayer({
         if (cancelled) return
 
         const raw = data.transcript
-        if (typeof raw === 'string') {
-          setTranscript(raw)
-        } else if (raw && typeof raw === 'object' && Array.isArray(raw.transcript)) {
-          const formatted = raw.transcript
-            .map((entry: { speaker?: string; dialogue?: string }) =>
-              entry.speaker ? `**${entry.speaker}:** ${entry.dialogue || ''}` : entry.dialogue || ''
-            )
-            .join('\n\n')
-          setTranscript(formatted)
+        if (Array.isArray(raw.transcript)) {
+          setTranscriptEntries(raw.transcript as TranscriptEntry[])
+        } else if (Array.isArray(raw)) {
+          setTranscriptEntries(raw as TranscriptEntry[])
         } else {
-          setTranscript(JSON.stringify(raw, null, 2))
+          setTranscriptEntries([{ dialogue: JSON.stringify(raw, null, 2) }])
         }
       } catch (err) {
         console.error('[InlineAudioPlayer] Failed to fetch transcript:', err)
@@ -267,7 +264,68 @@ export function InlineAudioPlayer({
 
     fetchTranscript()
     return () => { cancelled = true }
-  }, [effectiveTranscriptUrl, transcript])
+  }, [effectiveTranscriptUrl, transcriptEntries])
+
+  const hasTimestamps = (transcriptEntries?.length ?? 0) > 0 && transcriptEntries?.[0]?.start_time !== undefined
+
+  const entryCharOffsets = useMemo(() => {
+    if (!transcriptEntries) return []
+    let cumulative = 0
+    return transcriptEntries.map(entry => {
+      const start = cumulative
+      cumulative += entry.dialogue?.length ?? 0
+      return start
+    })
+  }, [transcriptEntries])
+
+  const totalChars = useMemo(
+    () => (transcriptEntries ?? []).reduce((sum, e) => sum + (e.dialogue?.length ?? 0), 0),
+    [transcriptEntries]
+  )
+
+  // Track active transcript entry
+  useEffect(() => {
+    if (!transcriptEntries || transcriptEntries.length === 0) return
+    let idx = 0
+    if (hasTimestamps) {
+      for (let i = 0; i < transcriptEntries.length; i++) {
+        if ((transcriptEntries[i].start_time ?? 0) <= currentTime) idx = i
+        else break
+      }
+    } else if (duration > 0 && totalChars > 0) {
+      const charOffset = (currentTime / duration) * totalChars
+      for (let i = 0; i < entryCharOffsets.length; i++) {
+        if (entryCharOffsets[i] <= charOffset) idx = i
+        else break
+      }
+    }
+    setActiveIndex(prev => prev === idx ? prev : idx)
+  }, [currentTime, duration, transcriptEntries, hasTimestamps, entryCharOffsets, totalChars])
+
+  useEffect(() => {
+    entryRefs.current = []
+  }, [transcriptEntries])
+
+  // Auto-scroll active entry into view
+  useEffect(() => {
+    if (activeIndex >= 0 && entryRefs.current[activeIndex]) {
+      entryRefs.current[activeIndex]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  }, [activeIndex])
+
+  const seekToEntry = (index: number) => {
+    const audio = audioRef.current
+    if (!audio || !transcriptEntries) return
+    let targetTime: number
+    if (hasTimestamps && transcriptEntries[index].start_time !== undefined) {
+      targetTime = transcriptEntries[index].start_time!
+    } else if (duration > 0 && totalChars > 0) {
+      targetTime = (entryCharOffsets[index] / totalChars) * duration
+    } else return
+    audio.currentTime = targetTime
+    void audio.play()
+    setIsPlaying(true)
+  }
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -409,13 +467,38 @@ export function InlineAudioPlayer({
             </p>
             <div className="h-48 rounded-md border bg-muted/50 overflow-hidden">
               <ScrollArea className="h-full">
-                <div className="p-3">
+                <div className="p-3 space-y-2">
                   {transcriptLoading ? (
                     <p className="text-xs text-muted-foreground animate-pulse">{t.common.loading}</p>
-                  ) : transcript ? (
-                    <div className="text-xs leading-relaxed prose prose-sm dark:prose-invert max-w-none">
-                      <ReactMarkdown>{transcript}</ReactMarkdown>
-                    </div>
+                  ) : transcriptEntries && transcriptEntries.length > 0 ? (
+                    transcriptEntries.map((entry, index) => {
+                      const isActive = index === activeIndex
+                      const spokenFraction = isActive && hasTimestamps &&
+                        entry.start_time !== undefined && entry.end_time !== undefined &&
+                        entry.end_time > entry.start_time
+                          ? Math.min(1, (currentTime - entry.start_time) / (entry.end_time - entry.start_time))
+                          : isActive ? 1 : 0
+                      const splitAt = Math.floor(spokenFraction * (entry.dialogue?.length ?? 0))
+                      return (
+                        <div
+                          key={index}
+                          ref={el => { entryRefs.current[index] = el }}
+                          onClick={() => seekToEntry(index)}
+                          className={cn(
+                            'text-xs p-1.5 rounded cursor-pointer transition-colors',
+                            isActive
+                              ? 'bg-accent text-accent-foreground'
+                              : 'hover:bg-muted-foreground/10'
+                          )}
+                        >
+                          {entry.speaker && (
+                            <span className="font-semibold">{entry.speaker}: </span>
+                          )}
+                          <span className="text-primary font-medium">{(entry.dialogue ?? '').slice(0, splitAt)}</span>
+                          <span>{(entry.dialogue ?? '').slice(splitAt)}</span>
+                        </div>
+                      )
+                    })
                   ) : transcriptUnavailable ? (
                     <p className="text-xs text-muted-foreground italic">
                       {t.podcasts?.noTranscript || 'Transcript not yet available. It may still be generating.'}

@@ -1,3 +1,10 @@
+export type TranscriptEntry = {
+  speaker?: string
+  dialogue?: string
+  start_time?: number
+  end_time?: number
+}
+
 export type EpisodeStatus =
   | 'running'
   | 'processing'

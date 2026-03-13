@@ -26,6 +26,31 @@ except ImportError as e:
 THINK_PATTERN = re.compile(r"<think>(.*?)</think>", re.DOTALL | re.IGNORECASE)
 
 
+def _compute_segment_timings(output_dir: Path, transcript_entries: list) -> list:
+    """Compute start/end_time for each transcript entry using saved audio clip files."""
+    clips_dir = output_dir / "clips"
+    timed = []
+    cumulative = 0.0
+    for i, entry in enumerate(transcript_entries):
+        clip_path = clips_dir / f"{i:04d}.mp3"
+        duration = 0.0
+        if clip_path.exists():
+            try:
+                from moviepy import AudioFileClip
+                clip = AudioFileClip(str(clip_path))
+                duration = float(clip.duration or 0.0)
+                clip.close()
+            except Exception as e:
+                logger.warning(f"Could not read clip {clip_path}: {e}")
+        timed.append({
+            **entry,
+            "start_time": cumulative,
+            "end_time": cumulative + duration,
+        })
+        cumulative += duration
+    return timed
+
+
 def _extract_text_from_content(content: Any) -> str:
     """
     Extract text content from various LLM response formats.
@@ -955,9 +980,12 @@ async def generate_podcast_command(
         episode.audio_file = (
             str(result.get("final_output_file_path")) if result else None
         )
-        episode.transcript = {
-            "transcript": full_model_dump(result["transcript"]) if result else None
-        }
+        if result:
+            raw_transcript = [full_model_dump(t) for t in result["transcript"]]
+            timed_transcript = _compute_segment_timings(output_dir, raw_transcript) if output_dir.exists() else raw_transcript
+            episode.transcript = {"transcript": timed_transcript}
+        else:
+            episode.transcript = {"transcript": None}
         episode.outline = full_model_dump(result["outline"]) if result else None
         await episode.save()
 

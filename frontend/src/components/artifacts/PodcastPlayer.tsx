@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -12,6 +12,8 @@ import { QUERY_KEYS } from '@/lib/api/query-client'
 import { resolvePodcastAssetUrl } from '@/lib/api/podcasts'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { cn } from '@/lib/utils'
+import type { TranscriptEntry } from '@/lib/types/podcasts'
 interface PodcastPlayerProps {
   podcastId: string
   notebookId: string
@@ -27,11 +29,6 @@ type OutlineSegment = {
 
 type OutlineData = {
   segments?: OutlineSegment[]
-}
-
-type TranscriptEntry = {
-  speaker?: string
-  dialogue?: string
 }
 
 type TranscriptData = {
@@ -62,6 +59,11 @@ export function PodcastPlayer({ podcastId, notebookId, open, onOpenChange }: Pod
   const { t } = useTranslation()
   const [audioSrc, setAudioSrc] = useState<string | undefined>()
   const [audioError, setAudioError] = useState<string | null>(null)
+  const audioRef = useRef<HTMLAudioElement>(null)
+  const entryRefs = useRef<(HTMLDivElement | null)[]>([])
+  const [currentTime, setCurrentTime] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const [activeIndex, setActiveIndex] = useState(-1)
 
   // Fetch podcast episode - note: we need to get it from the episodes list
   // For now, we'll fetch all episodes and find the one matching podcastId
@@ -77,6 +79,63 @@ export function PodcastPlayer({ podcastId, notebookId, open, onOpenChange }: Pod
 
   const outlineSegments = useMemo(() => extractOutlineSegments(episode?.outline), [episode?.outline])
   const transcriptEntries = useMemo(() => extractTranscriptEntries(episode?.transcript), [episode?.transcript])
+
+  const hasTimestamps = transcriptEntries.length > 0 && transcriptEntries[0]?.start_time !== undefined
+
+  const entryCharOffsets = useMemo(() => {
+    let cumulative = 0
+    return transcriptEntries.map(entry => {
+      const start = cumulative
+      cumulative += entry.dialogue?.length ?? 0
+      return start
+    })
+  }, [transcriptEntries])
+
+  const totalChars = useMemo(
+    () => transcriptEntries.reduce((sum, e) => sum + (e.dialogue?.length ?? 0), 0),
+    [transcriptEntries]
+  )
+
+  useEffect(() => {
+    if (transcriptEntries.length === 0) return
+    let idx = 0
+    if (hasTimestamps) {
+      for (let i = 0; i < transcriptEntries.length; i++) {
+        if ((transcriptEntries[i].start_time ?? 0) <= currentTime) idx = i
+        else break
+      }
+    } else if (duration > 0 && totalChars > 0) {
+      const charOffset = (currentTime / duration) * totalChars
+      for (let i = 0; i < entryCharOffsets.length; i++) {
+        if (entryCharOffsets[i] <= charOffset) idx = i
+        else break
+      }
+    }
+    setActiveIndex(prev => prev === idx ? prev : idx)
+  }, [currentTime, duration, transcriptEntries, hasTimestamps, entryCharOffsets, totalChars])
+
+  useEffect(() => {
+    entryRefs.current = []
+  }, [transcriptEntries])
+
+  useEffect(() => {
+    if (activeIndex >= 0 && entryRefs.current[activeIndex]) {
+      entryRefs.current[activeIndex]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  }, [activeIndex])
+
+  const seekToEntry = (index: number) => {
+    const audio = audioRef.current
+    if (!audio) return
+    let targetTime: number
+    if (hasTimestamps && transcriptEntries[index].start_time !== undefined) {
+      targetTime = transcriptEntries[index].start_time!
+    } else if (duration > 0 && totalChars > 0) {
+      targetTime = (entryCharOffsets[index] / totalChars) * duration
+    } else return
+    audio.currentTime = targetTime
+    audio.play().catch(err => console.error('[PodcastPlayer] Play failed:', err))
+  }
 
   useEffect(() => {
     if (!episode) return
@@ -196,7 +255,15 @@ export function PodcastPlayer({ podcastId, notebookId, open, onOpenChange }: Pod
         <div className="space-y-4 overflow-hidden flex flex-col flex-1 min-h-0">
           {audioSrc ? (
             <div className="space-y-2">
-              <audio controls preload="none" src={audioSrc} className="w-full" />
+              <audio
+                ref={audioRef}
+                controls
+                preload="none"
+                src={audioSrc}
+                className="w-full"
+                onTimeUpdate={() => setCurrentTime(audioRef.current?.currentTime ?? 0)}
+                onLoadedMetadata={() => setDuration(audioRef.current?.duration ?? 0)}
+              />
               <Button
                 variant="outline"
                 size="sm"
@@ -254,16 +321,36 @@ export function PodcastPlayer({ podcastId, notebookId, open, onOpenChange }: Pod
               <TabsContent value="transcript" className="flex-1 overflow-y-auto mt-4">
                 <ScrollArea className="h-full">
                   <div className="space-y-4 pr-4">
-                    {transcriptEntries.map((entry, index) => (
-                      <div key={index} className="space-y-1">
-                        {entry.speaker && (
-                          <p className="font-semibold text-sm">{entry.speaker}</p>
-                        )}
-                        {entry.dialogue && (
-                          <p className="text-sm text-muted-foreground">{entry.dialogue}</p>
-                        )}
-                      </div>
-                    ))}
+                    {transcriptEntries.map((entry, index) => {
+                      const isActive = index === activeIndex
+                      const spokenFraction = isActive && hasTimestamps &&
+                        entry.start_time !== undefined && entry.end_time !== undefined &&
+                        entry.end_time > entry.start_time
+                          ? Math.min(1, (currentTime - entry.start_time) / (entry.end_time - entry.start_time))
+                          : isActive ? 1 : 0
+                      const splitAt = Math.floor(spokenFraction * (entry.dialogue?.length ?? 0))
+                      return (
+                        <div
+                          key={index}
+                          ref={el => { entryRefs.current[index] = el }}
+                          onClick={() => seekToEntry(index)}
+                          className={cn(
+                            "space-y-1 p-2 rounded-md cursor-pointer transition-colors",
+                            isActive ? "bg-accent text-accent-foreground" : "hover:bg-muted"
+                          )}
+                        >
+                          {entry.speaker && (
+                            <p className="font-semibold text-sm">{entry.speaker}</p>
+                          )}
+                          {entry.dialogue && (
+                            <p className="text-sm">
+                              <span className="text-primary font-medium">{entry.dialogue.slice(0, splitAt)}</span>
+                              <span>{entry.dialogue.slice(splitAt)}</span>
+                            </p>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 </ScrollArea>
               </TabsContent>
