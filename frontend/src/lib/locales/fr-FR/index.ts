@@ -1228,8 +1228,10 @@ export const frFR = {
     noModulesDescription: "Contactez votre administrateur pour accéder aux modules d'apprentissage.",
     sources: "{count} sources",
     notes: "{count} notes",
+    steps: "{completed}/{total} étapes",
     startLearning: "Commencer l'apprentissage",
     continueLearning: "Continuer l'apprentissage",
+    reviewLesson: "Revoir la leçon",
     loading: "Chargement des modules...",
     loadError: "Échec du chargement des modules",
     // Admin view (Story 3.1)

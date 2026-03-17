@@ -10,20 +10,26 @@ import { Trophy } from 'lucide-react'
 
 const RANK_EMOJIS: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' }
 
-export function Leaderboard() {
+interface LeaderboardProps {
+  hideTitle?: boolean
+}
+
+export function Leaderboard({ hideTitle }: LeaderboardProps) {
   const { user } = useAuthStore()
   const { t } = useTranslation()
   const { data: entries, isLoading } = useLeaderboard()
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Trophy className="h-5 w-5 text-amber-500" />
-          {t.gamification.leaderboard}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+    <Card className={hideTitle ? 'border-0 shadow-none' : undefined}>
+      {!hideTitle && (
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Trophy className="h-5 w-5 text-amber-500" />
+            {t.gamification.leaderboard}
+          </CardTitle>
+        </CardHeader>
+      )}
+      <CardContent className={hideTitle ? 'px-0 pt-0' : undefined}>
         {isLoading && (
           <div className="space-y-2">
             {[1, 2, 3].map(i => (

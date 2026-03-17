@@ -363,6 +363,8 @@ export interface LearnerModule {
   is_locked: boolean
   source_count: number
   assigned_at: string
+  step_count: number
+  completed_steps: number
 }
 
 // Learning Objectives types (Story 3.3: Learning Objectives Configuration)

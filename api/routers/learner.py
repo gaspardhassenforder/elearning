@@ -50,7 +50,7 @@ async def get_learner_modules(
         Company scoping is AUTOMATICALLY enforced by get_current_learner().
     """
     logger.info(f"Fetching modules for learner {learner.user.id} (company {learner.company_id})")
-    modules = await assignment_service.get_learner_modules(learner.company_id)
+    modules = await assignment_service.get_learner_modules(learner.company_id, user_id=learner.user.id)
     # Service already returns List[LearnerModuleResponse], no reconstruction needed
     return modules
 

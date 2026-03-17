@@ -2,7 +2,6 @@
 
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { useLearnerModules } from '@/lib/hooks/use-learner-modules'
-import { useLeaderboard } from '@/lib/hooks/use-leaderboard'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { useRouter } from 'next/navigation'
 import {
@@ -15,9 +14,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
-import { BookOpen, GraduationCap, FileText, ArrowRight, Lock } from 'lucide-react'
+import { BookOpen, GraduationCap, CheckSquare, ArrowRight, Lock } from 'lucide-react'
 import { LearnerModule } from '@/lib/types/api'
-import { Leaderboard } from '@/components/learner/Leaderboard'
 
 /**
  * Module Selection Page (Learner Home)
@@ -31,8 +29,6 @@ export default function ModulesPage() {
   const { t } = useTranslation()
   const router = useRouter()
   const { data: modules, isLoading, error } = useLearnerModules()
-  const { data: leaderboard } = useLeaderboard()
-  const myPoints = leaderboard?.find(e => e.username === user?.username)?.points ?? 0
 
   const handleOpenModule = (notebookId: string, isLocked: boolean) => {
     // Prevent navigation if module is locked
@@ -43,18 +39,13 @@ export default function ModulesPage() {
   return (
     <div className="container mx-auto p-6 max-w-6xl">
       {/* Header */}
-      <div className="mb-8 flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {t.modules.welcome.replace('{name}', user?.username || 'Learner')}
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            {t.modules.subtitle}
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="text-sm text-muted-foreground">{t.gamification.yourPoints.replace('{points}', String(myPoints))}</p>
-        </div>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold tracking-tight">
+          {t.modules.welcome.replace('{name}', user?.username || 'Learner')}
+        </h1>
+        <p className="text-muted-foreground mt-2">
+          {t.modules.subtitle}
+        </p>
       </div>
 
       {/* Loading State */}
@@ -119,10 +110,6 @@ export default function ModulesPage() {
         </div>
       )}
 
-      {/* Leaderboard */}
-      <div className="mt-10 max-w-sm">
-        <Leaderboard />
-      </div>
     </div>
   )
 }
@@ -142,10 +129,20 @@ interface ModuleCardProps {
 function ModuleCard({ module, onOpen }: ModuleCardProps) {
   const { t } = useTranslation()
   const isLocked = module.is_locked
+  const isCompleted = module.step_count > 0 && module.completed_steps >= module.step_count
+  const isStarted = module.completed_steps > 0
+
+  const buttonLabel = isLocked
+    ? t.assignments.locked
+    : isCompleted
+      ? t.modules.reviewLesson
+      : isStarted
+        ? t.modules.continueLearning
+        : t.modules.startLearning
 
   return (
     <Card
-      className={`group transition-all ${
+      className={`group transition-all flex flex-col ${
         isLocked
           ? 'opacity-60 cursor-not-allowed'
           : 'hover:shadow-md cursor-pointer'
@@ -172,11 +169,17 @@ function ModuleCard({ module, onOpen }: ModuleCardProps) {
           </CardDescription>
         )}
       </CardHeader>
-      <CardContent>
-        <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
+      <CardContent className="flex flex-col flex-1">
+        <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4 mt-auto">
           <div className="flex items-center gap-1">
-            <FileText className="h-4 w-4" />
-            <span>{t.modules.sources.replace('{count}', String(module.source_count))}</span>
+            {isCompleted && <CheckSquare className="h-4 w-4 text-green-500" />}
+            <span>
+              {module.step_count > 0
+                ? t.modules.steps
+                    .replace('{completed}', String(module.completed_steps))
+                    .replace('{total}', String(module.step_count))
+                : t.modules.sources.replace('{count}', String(module.source_count))}
+            </span>
           </div>
         </div>
         <Button
@@ -184,7 +187,7 @@ function ModuleCard({ module, onOpen }: ModuleCardProps) {
           variant="default"
           disabled={isLocked}
         >
-          {isLocked ? t.assignments.locked : t.modules.startLearning}
+          {buttonLabel}
           {!isLocked && <ArrowRight className="ml-2 h-4 w-4" />}
         </Button>
       </CardContent>

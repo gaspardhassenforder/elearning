@@ -1228,8 +1228,10 @@ export const enUS = {
     noModulesDescription: "Contact your administrator to get access to learning modules.",
     sources: "{count} sources",
     notes: "{count} notes",
+    steps: "{completed}/{total} steps",
     startLearning: "Start Learning",
     continueLearning: "Continue Learning",
+    reviewLesson: "Review Lesson",
     loading: "Loading modules...",
     loadError: "Failed to load modules",
     // Admin view (Story 3.1)

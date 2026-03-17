@@ -65,6 +65,8 @@ class LearnerModuleResponse(BaseModel):
     is_locked: bool
     source_count: int
     assigned_at: str
+    step_count: int = 0
+    completed_steps: int = 0
     # DO NOT include assigned_by — learners don't see admin info
 
 

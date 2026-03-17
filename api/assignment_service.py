@@ -243,7 +243,7 @@ async def toggle_module_lock(
     return assignment, warning
 
 
-async def get_learner_modules(company_id: str) -> List[LearnerModuleResponse]:
+async def get_learner_modules(company_id: str, user_id: Optional[str] = None) -> List[LearnerModuleResponse]:
     """Get modules visible to learners (assigned, unlocked, published).
 
     Enforces visibility rules:
@@ -276,14 +276,30 @@ async def get_learner_modules(company_id: str) -> List[LearnerModuleResponse]:
             logger.info(f"Skipping unpublished module {entry.get('notebook_id')} for learner visibility")
             continue
 
+        notebook_id = entry.get("notebook_id")
+
+        # Fetch step progress if user_id provided
+        step_count = 0
+        completed_steps = 0
+        if user_id:
+            try:
+                from api.lesson_plan_service import get_learner_step_progress
+                progress = await get_learner_step_progress(notebook_id, user_id)
+                step_count = progress.get("total_steps", 0)
+                completed_steps = progress.get("completed_count", 0)
+            except Exception as e:
+                logger.warning(f"Failed to fetch step progress for notebook {notebook_id}: {e}")
+
         modules.append(
             LearnerModuleResponse(
-                id=entry.get("notebook_id"),
+                id=notebook_id,
                 name=notebook_data.get("name", "Untitled Module"),
                 description=notebook_data.get("description"),
                 is_locked=entry.get("is_locked", False),
                 source_count=notebook_data.get("source_count", 0),
                 assigned_at=str(entry.get("assigned_at") or datetime.now(timezone.utc).isoformat()),
+                step_count=step_count,
+                completed_steps=completed_steps,
             )
         )
 
