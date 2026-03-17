@@ -283,7 +283,6 @@ function ArtifactViewer({
                   options: q.options,
                 }))}
                 totalQuestions={preview.question_count || preview.questions?.length || 0}
-                quizUrl=""
               />
             )}
 
