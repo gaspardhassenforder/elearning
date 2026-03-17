@@ -6,7 +6,7 @@ and learner endpoints for tracking step completion progress.
 
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
 from loguru import logger
 
 from api import lesson_plan_service
@@ -21,6 +21,7 @@ from api.models import (
     LessonPlanRefineRequest,
     LearnerStepProgressResponse,
     PodcastTriggerRequest,
+    CompleteLessonStepRequest,
 )
 from open_notebook.domain.lesson_step import LessonStep
 from open_notebook.domain.learner_step_progress import LearnerStepProgress
@@ -312,12 +313,14 @@ async def refine_lesson_plan_endpoint(
 )
 async def complete_lesson_step(
     step_id: str,
+    body: CompleteLessonStepRequest = Body(default_factory=CompleteLessonStepRequest),
     learner: LearnerContext = Depends(get_current_learner),
 ):
     """Mark a lesson step as complete for the authenticated learner.
 
     Args:
         step_id: Lesson step record ID
+        body: Optional score_percentage for proportional point calculation
         learner: Authenticated learner context
 
     Returns:
@@ -333,6 +336,7 @@ async def complete_lesson_step(
             user_id=learner.user.id,
             step_id=step_id,
             notebook_id=step.notebook_id,
+            score_percentage=body.score_percentage,
         )
         logger.info(f"Learner {learner.user.id} completed lesson step {step_id}")
         return result

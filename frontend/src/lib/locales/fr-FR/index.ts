@@ -1643,7 +1643,6 @@ export const frFR = {
       noQuestions: "Aucune question disponible",
       submitAnswer: "Soumettre la réponse",
       submitting: "Envoi en cours...",
-      viewFullQuiz: "Voir le quiz complet",
       question: "question",
       questions: "questions",
       submissionError: "Impossible de soumettre la réponse. Veuillez réessayer.",
@@ -1656,6 +1655,11 @@ export const frFR = {
       score: "Score : {score}/{total}",
       results: "Résultats",
       tryAgain: "Réessayer",
+      completeLesson: "Terminer la leçon",
+      completing: "En cours...",
+      lessonComplete: "Leçon terminée !",
+      allLessonsComplete: "Module terminé !",
+      pointsPreview: "~{points} pts",
     },
     // Story 4.6: Lecteur de podcast
     podcast: {
@@ -1692,5 +1696,13 @@ export const frFR = {
       greeting: "Bonjour ! Je peux vous aider à trouver le bon module pour apprendre.",
       greetingPrompt: "Essayez de demander : 'Où puis-je apprendre l'IA ?'",
     },
+  },
+  gamification: {
+    leaderboard: "Classement",
+    yourPoints: "Vos points : {points}",
+    you: "Vous",
+    rank: "Rang",
+    points: "pts",
+    noEntries: "Aucun apprenant pour l'instant",
   },
 }

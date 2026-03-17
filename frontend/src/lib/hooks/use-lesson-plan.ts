@@ -14,6 +14,7 @@ import {
   deleteAllLessonSteps,
   reorderLessonSteps,
   getLessonStepsProgress,
+  completeLessonStep,
   refineLessonPlan,
   triggerPodcastGeneration,
   type LessonStepResponse,
@@ -168,6 +169,29 @@ export function useLessonStepsProgress(notebookId: string) {
     enabled: !!notebookId,
     staleTime: 30 * 1000, // 30 seconds — refresh after step completion
     refetchOnWindowFocus: true,
+  })
+}
+
+/**
+ * Mutation hook: Mark a lesson step as complete (learner only)
+ */
+export function useCompleteLessonStep(notebookId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ stepId, scorePercentage }: { stepId: string; scorePercentage?: number }) =>
+      completeLessonStep(stepId, scorePercentage),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.lessonStepsProgress(notebookId),
+      })
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.leaderboard,
+      })
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to complete step: ${error.message}`)
+    },
   })
 }
 

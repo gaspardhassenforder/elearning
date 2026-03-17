@@ -355,7 +355,9 @@ async def get_learner_step_progress(
         return {"completed_step_ids": [], "total_steps": 0, "completed_count": 0}
 
 
-async def complete_step_with_objectives(user_id: str, step_id: str, notebook_id: str) -> dict:
+async def complete_step_with_objectives(
+    user_id: str, step_id: str, notebook_id: str, score_percentage: Optional[float] = None
+) -> dict:
     """Mark a lesson step complete and auto-complete objectives if all required steps are done.
 
     Shared logic used by both the HTTP endpoint and the chat tool.
@@ -368,7 +370,25 @@ async def complete_step_with_objectives(user_id: str, step_id: str, notebook_id:
     Returns:
         Dict with message and all_objectives_completed flag
     """
+    # Idempotency check: detect first-time completion before marking complete
+    uid = user_id if user_id.startswith("user:") else f"user:{user_id}"
+    sid = step_id if step_id.startswith("lesson_step:") else f"lesson_step:{step_id}"
+
+    existing = await LearnerStepProgress._get_by_user_and_step(uid, sid)
+    already_completed = existing is not None and existing.completed_at is not None
+
     await LearnerStepProgress.mark_complete(user_id=user_id, step_id=step_id)
+
+    import math
+    points_awarded = 0
+    if not already_completed:
+        step_points = math.ceil(50 * score_percentage / 100) if score_percentage is not None else 50
+        points_awarded += step_points
+        if step_points > 0:
+            await repo_query(
+                "UPDATE $uid SET points = (points ?? 0) + $pts",
+                {"uid": ensure_record_id(uid), "pts": step_points},
+            )
 
     all_objectives_completed = False
     try:
@@ -384,6 +404,12 @@ async def complete_step_with_objectives(user_id: str, step_id: str, notebook_id:
         completed_ids = await LearnerStepProgress.get_completed_step_ids(user_id, notebook_id)
 
         if required and all(str(s.id) in completed_ids for s in required):
+            if not already_completed:
+                points_awarded += 50
+                await repo_query(
+                    "UPDATE $uid SET points = (points ?? 0) + 50",
+                    {"uid": ensure_record_id(uid)},
+                )
             objectives = await LearningObjective.get_for_notebook(notebook_id)
             await asyncio.gather(*[
                 LearnerObjectiveProgress.create(
@@ -404,7 +430,7 @@ async def complete_step_with_objectives(user_id: str, step_id: str, notebook_id:
             "Auto-objective-completion failed for notebook {}: {}", notebook_id, str(e)
         )
 
-    return {"message": "Step marked complete", "all_objectives_completed": all_objectives_completed}
+    return {"message": "Step marked complete", "all_objectives_completed": all_objectives_completed, "points_awarded": points_awarded}
 
 
 async def trigger_podcast_for_step(

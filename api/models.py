@@ -1106,6 +1106,13 @@ class LessonPlanRefineRequest(BaseModel):
     prompt: str = Field(..., description="Natural language instruction for refining the lesson plan")
 
 
+class CompleteLessonStepRequest(BaseModel):
+    """Request body for completing a lesson step."""
+    score_percentage: Optional[float] = Field(
+        None, ge=0, le=100, description="Quiz score percentage (0–100) for proportional points"
+    )
+
+
 class LessonPlanGenerationResponse(BaseModel):
     """Response from lesson plan generation."""
 
@@ -1132,3 +1139,9 @@ class PodcastTriggerRequest(BaseModel):
     source_ids: List[str] = Field(default_factory=list, description="Source IDs to use; empty = all sources")
     episode_profile_name: Optional[str] = Field(None, description="Episode profile name; uses first available if None")
     language: Optional[str] = Field("en", description="Output language code (e.g., 'en', 'fr')")
+
+
+class LeaderboardEntry(BaseModel):
+    rank: int
+    username: str
+    points: int

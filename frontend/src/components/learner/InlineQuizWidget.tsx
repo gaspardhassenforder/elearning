@@ -14,9 +14,9 @@
  * - "View Full Quiz" link for complete quiz experience
  */
 
-import { useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useCallback, useMemo } from 'react'
 import { CheckCircle2, XCircle, FileQuestion, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useCompleteLessonStep, useLessonSteps } from '@/lib/hooks/use-lesson-plan'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
@@ -51,7 +51,8 @@ interface InlineQuizWidgetProps {
   description?: string
   questions: QuizQuestion[]
   totalQuestions: number
-  quizUrl?: string
+  stepId?: string
+  notebookId?: string
 }
 
 export function InlineQuizWidget({
@@ -60,15 +61,26 @@ export function InlineQuizWidget({
   description,
   questions,
   totalQuestions,
-  quizUrl,
+  stepId,
+  notebookId,
 }: InlineQuizWidgetProps) {
   const { t } = useTranslation()
-  const router = useRouter()
+  // If stepId wasn't in the tool result (stale cache or pre-lesson-plan surfacing),
+  // fall back to the quiz-type lesson step for this notebook.
+  const { data: lessonSteps } = useLessonSteps(notebookId ?? '')
+  const effectiveStepId = useMemo(() => {
+    if (stepId) return stepId
+    if (!notebookId || !lessonSteps) return undefined
+    return lessonSteps.find((s) => s.step_type === 'quiz')?.id
+  }, [stepId, notebookId, lessonSteps])
+  const completeStep = useCompleteLessonStep(notebookId ?? '')
   const [currentIndex, setCurrentIndex] = useState(0)
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({})
   const [quizResults, setQuizResults] = useState<QuizResults | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [completionResult, setCompletionResult] = useState<{ points: number; allDone: boolean } | null>(null)
+  const [isCompleting, setIsCompleting] = useState(false)
 
   if (!questions.length) {
     return (
@@ -123,17 +135,31 @@ export function InlineQuizWidget({
     }
   }
 
-  const handleViewFullQuiz = (e: React.MouseEvent) => {
-    e.preventDefault()
-    if (quizUrl) router.push(quizUrl)
-  }
-
   const handleRetake = useCallback(() => {
     setQuizResults(null)
     setSelectedAnswers({})
     setCurrentIndex(0)
     setSubmitError(null)
   }, [])
+
+  const handleCompleteLesson = async () => {
+    if (!effectiveStepId || !notebookId || isCompleting || completionResult) return
+    setIsCompleting(true)
+    completeStep.mutate(
+      { stepId: effectiveStepId, scorePercentage: quizResults?.percentage },
+      {
+        onSuccess: (data) => {
+          setCompletionResult({ points: data.points_awarded, allDone: data.all_objectives_completed })
+          setIsCompleting(false)
+        },
+        onError: () => {
+          setIsCompleting(false)
+        },
+      }
+    )
+  }
+
+  const previewPoints = quizResults ? Math.ceil(50 * quizResults.percentage / 100) : 0
 
   // Results view
   if (quizResults) {
@@ -151,6 +177,16 @@ export function InlineQuizWidget({
                 {t.learner.quiz.score
                   .replace('{score}', String(quizResults.score))
                   .replace('{total}', String(quizResults.total))}
+                {effectiveStepId && !completionResult && (
+                  <span className="ml-2 text-xs text-primary font-semibold">
+                    {t.learner.quiz.pointsPreview.replace('{points}', String(previewPoints))}
+                  </span>
+                )}
+                {completionResult && (
+                  <span className="ml-2 text-xs text-green-600 font-semibold">
+                    +{completionResult.points} pts
+                  </span>
+                )}
               </p>
             </div>
 
@@ -192,7 +228,7 @@ export function InlineQuizWidget({
               ))}
             </div>
 
-            {/* Actions: Retake + View Full Quiz */}
+            {/* Actions: Retake + Complete Lesson */}
             <div className="flex items-center gap-3 pt-2">
               <Button
                 variant="outline"
@@ -201,13 +237,21 @@ export function InlineQuizWidget({
               >
                 {t.learner.quiz.tryAgain}
               </Button>
-              {quizUrl && (
-                <button
-                  onClick={handleViewFullQuiz}
-                  className="text-xs text-primary hover:underline font-medium"
+              {effectiveStepId && !completionResult && (
+                <Button
+                  size="sm"
+                  onClick={handleCompleteLesson}
+                  disabled={isCompleting}
+                  className="bg-primary hover:bg-primary/90"
                 >
-                  {t.learner.quiz.viewFullQuiz} →
-                </button>
+                  {isCompleting ? t.learner.quiz.completing : t.learner.quiz.completeLesson}
+                </Button>
+              )}
+              {completionResult && (
+                <span className="text-xs text-green-600 font-semibold flex items-center gap-1">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  {completionResult.allDone ? t.learner.quiz.allLessonsComplete : t.learner.quiz.lessonComplete}
+                </span>
               )}
             </div>
           </div>

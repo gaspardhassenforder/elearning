@@ -1643,7 +1643,6 @@ export const enUS = {
       noQuestions: "No questions available",
       submitAnswer: "Submit Answer",
       submitting: "Submitting...",
-      viewFullQuiz: "View Full Quiz",
       question: "question",
       questions: "questions",
       submissionError: "Unable to submit answer. Please try again.",
@@ -1656,6 +1655,11 @@ export const enUS = {
       score: "Score: {score}/{total}",
       results: "Results",
       tryAgain: "Try Again",
+      completeLesson: "Complete Lesson",
+      completing: "Completing...",
+      lessonComplete: "Lesson complete!",
+      allLessonsComplete: "Module complete!",
+      pointsPreview: "~{points} pts",
     },
     // Story 4.6: Podcast Player
     podcast: {
@@ -1692,6 +1696,14 @@ export const enUS = {
       greeting: "Hi! I can help you find the right module to learn from.",
       greetingPrompt: "Try asking: 'Where can I learn about AI?'",
     },
+  },
+  gamification: {
+    leaderboard: "Leaderboard",
+    yourPoints: "Your points: {points}",
+    you: "You",
+    rank: "Rank",
+    points: "pts",
+    noEntries: "No learners yet",
   },
 }
 

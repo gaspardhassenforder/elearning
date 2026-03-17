@@ -1,0 +1,1 @@
+DEFINE FIELD points ON user TYPE int DEFAULT 0;

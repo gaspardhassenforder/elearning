@@ -114,11 +114,24 @@ export async function reorderLessonSteps(
   })
 }
 
+export interface CompleteLessonStepResponse {
+  message: string
+  all_objectives_completed: boolean
+  points_awarded: number
+}
+
 /**
  * Mark a lesson step as complete (learner only)
  */
-export async function completeLessonStep(stepId: string): Promise<void> {
-  await apiClient.post(`/lesson-steps/${stepId}/complete`)
+export async function completeLessonStep(
+  stepId: string,
+  scorePercentage?: number
+): Promise<CompleteLessonStepResponse> {
+  const response = await apiClient.post<CompleteLessonStepResponse>(
+    `/lesson-steps/${stepId}/complete`,
+    { score_percentage: scorePercentage ?? null }
+  )
+  return response.data
 }
 
 /**
