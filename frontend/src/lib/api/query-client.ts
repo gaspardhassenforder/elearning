@@ -55,4 +55,5 @@ export const QUERY_KEYS = {
   lessonSteps: (notebookId: string) => ['lesson-steps', notebookId] as const,
   // Learner step progress
   lessonStepsProgress: (notebookId: string) => ['lesson-steps-progress', notebookId] as const,
+  leaderboard: ['leaderboard'] as const,
 }

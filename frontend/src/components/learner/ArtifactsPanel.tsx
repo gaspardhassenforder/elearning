@@ -15,7 +15,7 @@
  * - Empty state when no artifacts exist
  */
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { GraduationCap, AlertCircle } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
@@ -24,6 +24,7 @@ import { EmptyState } from '@/components/common/EmptyState'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { useNotebookArtifacts } from '@/lib/hooks/use-artifacts'
 import { useLearnerDeleteArtifact } from '@/lib/hooks/use-learner-artifacts'
+import { useLessonSteps } from '@/lib/hooks/use-lesson-plan'
 import { ArtifactCard } from './ArtifactCard'
 
 interface ArtifactsPanelProps {
@@ -40,6 +41,13 @@ export function ArtifactsPanel({ notebookId }: ArtifactsPanelProps) {
   const { data: artifacts, isLoading, error, refetch } = useNotebookArtifacts(notebookId)
 
   const deleteMutation = useLearnerDeleteArtifact(notebookId)
+
+  // Fetch lesson steps to find the quiz-type step ID for auto-completion.
+  // Quiz steps don't have artifact_id set, so we match by step_type instead.
+  const { data: steps } = useLessonSteps(notebookId)
+  const quizStepId = useMemo(() => {
+    return steps?.find((step) => step.step_type === 'quiz')?.id
+  }, [steps])
 
   // Toggle expand handler (accordion behavior)
   const handleToggleExpand = (artifactId: string) => {
@@ -103,6 +111,8 @@ export function ArtifactsPanel({ notebookId }: ArtifactsPanelProps) {
             isExpanded={expandedArtifactId === artifact.id}
             onToggleExpand={() => handleToggleExpand(artifact.id)}
             onDelete={(id) => deleteMutation.mutate(id)}
+            stepId={artifact.artifact_type === 'quiz' ? quizStepId : undefined}
+            notebookId={notebookId}
           />
         ))}
       </div>

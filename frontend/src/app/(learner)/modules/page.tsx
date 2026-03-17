@@ -2,6 +2,7 @@
 
 import { useAuthStore } from '@/lib/stores/auth-store'
 import { useLearnerModules } from '@/lib/hooks/use-learner-modules'
+import { useLeaderboard } from '@/lib/hooks/use-leaderboard'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { useRouter } from 'next/navigation'
 import {
@@ -16,6 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { BookOpen, GraduationCap, FileText, ArrowRight, Lock } from 'lucide-react'
 import { LearnerModule } from '@/lib/types/api'
+import { Leaderboard } from '@/components/learner/Leaderboard'
 
 /**
  * Module Selection Page (Learner Home)
@@ -29,6 +31,8 @@ export default function ModulesPage() {
   const { t } = useTranslation()
   const router = useRouter()
   const { data: modules, isLoading, error } = useLearnerModules()
+  const { data: leaderboard } = useLeaderboard()
+  const myPoints = leaderboard?.find(e => e.username === user?.username)?.points ?? 0
 
   const handleOpenModule = (notebookId: string, isLocked: boolean) => {
     // Prevent navigation if module is locked
@@ -39,13 +43,18 @@ export default function ModulesPage() {
   return (
     <div className="container mx-auto p-6 max-w-6xl">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">
-          {t.modules.welcome.replace('{name}', user?.username || 'Learner')}
-        </h1>
-        <p className="text-muted-foreground mt-2">
-          {t.modules.subtitle}
-        </p>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {t.modules.welcome.replace('{name}', user?.username || 'Learner')}
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            {t.modules.subtitle}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-sm text-muted-foreground">{t.gamification.yourPoints.replace('{points}', String(myPoints))}</p>
+        </div>
       </div>
 
       {/* Loading State */}
@@ -109,6 +118,11 @@ export default function ModulesPage() {
           ))}
         </div>
       )}
+
+      {/* Leaderboard */}
+      <div className="mt-10 max-w-sm">
+        <Leaderboard />
+      </div>
     </div>
   )
 }

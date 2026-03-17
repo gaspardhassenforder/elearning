@@ -17,6 +17,7 @@ class User(ObjectModel):
     company_id: Optional[str] = None
     profile: Optional[dict] = None
     onboarding_completed: bool = False
+    points: int = 0
 
     def _prepare_save_data(self) -> Dict[str, Any]:
         data = super()._prepare_save_data()

@@ -479,6 +479,7 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
                         onEdit={isEditableMsg ? editLastMessage : undefined}
                         sourceTitleMap={sourceTitleMap}
                         onConfirm={sendMessage}
+                        notebookId={notebookId}
                       />
                     )
                   })

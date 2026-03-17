@@ -486,11 +486,13 @@ async def surface_quiz(quiz_id: str, config: RunnableConfig) -> dict:
                 "recoverable": True,
             }
 
-        # Extract user_id from config for company scoping validation
+        # Extract user_id and notebook_id from config
         user_id = None
+        notebook_id_cfg = None
         if config:
             configurable = config.get("configurable", {})
             user_id = configurable.get("user_id")
+            notebook_id_cfg = configurable.get("notebook_id")
 
         if user_id:
             # Validate company scoping: quiz.notebook_id must belong to learner's company
@@ -528,6 +530,18 @@ async def surface_quiz(quiz_id: str, config: RunnableConfig) -> dict:
                 # Intentionally exclude correct_answer
             })
 
+        # Look up associated lesson step so the frontend can auto-complete it on quiz submission.
+        # Quiz lesson steps do not have artifact_id set (only podcast steps do), so we simply
+        # find the quiz-type step for this notebook.
+        step_id = None
+        if notebook_id_cfg:
+            step_result = await repo_query(
+                "SELECT VALUE type::string(id) FROM lesson_step WHERE notebook_id = $notebook_id AND step_type = 'quiz' LIMIT 1",
+                {"notebook_id": ensure_record_id(notebook_id_cfg)},
+            )
+            if step_result:
+                step_id = step_result[0]
+
         # Return structured data for frontend rendering
         result = {
             "artifact_type": "quiz",
@@ -536,7 +550,7 @@ async def surface_quiz(quiz_id: str, config: RunnableConfig) -> dict:
             "description": quiz.description,
             "questions": questions_preview,  # All questions for inline quiz
             "total_questions": len(quiz.questions),
-            "quiz_url": f"/quizzes/{quiz_id}",  # Frontend route
+            "step_id": step_id,  # Lesson step to auto-complete after quiz submission (or None)
         }
 
         logger.info(f"Successfully surfaced quiz: {quiz.title} ({len(quiz.questions)} questions)")

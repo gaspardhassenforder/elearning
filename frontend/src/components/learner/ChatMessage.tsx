@@ -41,6 +41,7 @@ interface ChatMessageProps {
   onEdit?: (newContent: string) => void
   sourceTitleMap?: Map<string, string>
   onConfirm?: (message: string) => void
+  notebookId?: string
 }
 
 function QuizErrorFallback() {
@@ -59,7 +60,7 @@ function PodcastErrorFallback() {
   )
 }
 
-export function ChatMessage({ message, index, isLastAssistant, isStreaming, t, isEditable, onEdit, sourceTitleMap, onConfirm }: ChatMessageProps) {
+export function ChatMessage({ message, index, isLastAssistant, isStreaming, t, isEditable, onEdit, sourceTitleMap, onConfirm, notebookId }: ChatMessageProps) {
   const [detailsExpanded, setDetailsExpanded] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editContent, setEditContent] = useState('')
@@ -370,7 +371,8 @@ export function ChatMessage({ message, index, isLastAssistant, isStreaming, t, i
                     description={tc.result!.description as string}
                     questions={(tc.result!.questions || []) as Array<{ text: string; options: string[] }>}
                     totalQuestions={(tc.result!.total_questions || 0) as number}
-                    quizUrl={tc.result!.quiz_url as string}
+                    stepId={tc.result!.step_id as string | undefined}
+                    notebookId={notebookId}
                   />
                 </ErrorBoundary>
               ))}

@@ -46,9 +46,11 @@ interface ArtifactCardProps {
   isExpanded: boolean
   onToggleExpand: () => void
   onDelete?: (artifactId: string) => void
+  stepId?: string
+  notebookId?: string
 }
 
-export function ArtifactCard({ artifact, isExpanded, onToggleExpand, onDelete }: ArtifactCardProps) {
+export function ArtifactCard({ artifact, isExpanded, onToggleExpand, onDelete, stepId, notebookId }: ArtifactCardProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const { t } = useTranslation()
 
@@ -174,7 +176,8 @@ export function ArtifactCard({ artifact, isExpanded, onToggleExpand, onDelete }:
         title={quiz.title}
         questions={questions}
         totalQuestions={quiz.question_count}
-        // Note: No quizUrl for learner panel - quiz is viewed inline only
+        stepId={stepId}
+        notebookId={notebookId}
       />
     )
   }
