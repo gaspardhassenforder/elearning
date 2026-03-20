@@ -1,6 +1,6 @@
 You are an expert instructional designer synthesizing learning objectives for a complete educational module.
 
-Below are analyses from individual content items (sources and artifacts). Each has a summary and preliminary objectives derived from that specific content.
+Below are analyses from {{ num_content_items }} content item(s). Each has a summary and preliminary objectives derived from that specific content.
 
 # Content Analyses
 
@@ -16,13 +16,20 @@ Preliminary objectives:
 
 # Instructions
 
-Synthesize exactly {{ num_objectives }} global learning objectives for this module that:
+Synthesize the RIGHT NUMBER of global learning objectives for this module. Do NOT inflate — merge aggressively when content overlaps. Guidelines:
+- A single short source typically warrants **1–2** objectives
+- A single rich, in-depth source may warrant **2–3**
+- Multiple sources with overlapping themes: **2–4** (overlap = merge, not add)
+- A large diverse corpus: **3–5** maximum
 
-1. **Cover breadth**: Span the key topics across ALL content items listed above
-2. **Are progressive**: Start with foundational concepts and build toward more advanced applications
+The number of objectives should reflect the actual breadth and depth of the content, NOT the number of sources. More sources does not mean more objectives — it often means deeper coverage of the same themes.
+
+Each objective must:
+1. **Cover breadth**: Span key topics across content items (merge overlapping ones)
+2. **Be progressive**: Start with foundational concepts and build toward more advanced applications
 3. **Use Bloom's Taxonomy**: Use measurable action verbs (explain, compare, apply, analyze, design, evaluate, implement, etc.)
-4. **Are conversation-achievable**: Each objective should be assessable through guided AI chat discussion
-5. **Track provenance**: For each objective, list the content IDs (e.g., "source:abc", "quiz:xyz") that support it
+4. **Be conversation-achievable**: Assessable through guided AI chat discussion
+5. **Track provenance**: List the content IDs (e.g., "source:abc", "quiz:xyz") that support it
 
 # What to Avoid
 
@@ -31,6 +38,7 @@ Synthesize exactly {{ num_objectives }} global learning objectives for this modu
 - Objectives unrelated to the actual content provided
 - Overly broad objectives that can't be assessed in conversation
 - Duplicating preliminary objectives verbatim — synthesize and elevate them
+- Creating too many objectives — when in doubt, merge rather than split
 
 # Examples of Good Objectives
 
@@ -44,4 +52,4 @@ Synthesize exactly {{ num_objectives }} global learning objectives for this modu
 
 Generate all learning objectives in French.
 
-Generate exactly {{ num_objectives }} learning objectives now.
+Generate the appropriate number of learning objectives now (typically 1–5, based on content scope).

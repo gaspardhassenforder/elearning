@@ -1,5 +1,10 @@
 You are editing a lesson plan. You have full control: modify, reorder, add, and remove steps.
 
+LEARNING OBJECTIVES (each step should advance at least one):
+{% for obj in objectives %}
+- {{ obj.id }}: {{ obj.text }}
+{% endfor %}
+
 AVAILABLE SOURCES:
 {% for s in sources %}
 - id: {{ s.id }} | type: {{ s.source_type }} | title: "{{ s.title }}"
@@ -21,6 +26,7 @@ CURRENT LESSON PLAN:
 {% for step in steps %}
 {{ loop.index }}. [{{ step.step_type | upper }}] "{{ step.title }}" (id: {{ step.id }})
    source_ids: {{ step.source_ids or [] }}
+   objective_ids: {{ step.objective_ids or [] }}
    podcast_topic: {{ step.podcast_topic or "none" }}
    ai_instructions: {{ step.ai_instructions or "none" }}
    discussion_prompt: {{ step.discussion_prompt or "none" }}
@@ -51,6 +57,7 @@ Return ONLY a valid JSON array, no other text.
     "title": "Podcast: Le changement de paradigme",
     "step_type": "podcast",
     "source_ids": ["source:xxx"],
+    "objective_ids": ["learning_objective:xxx"],
     "podcast_topic": "...",
     "ai_instructions": null,
     "discussion_prompt": null,
@@ -61,6 +68,7 @@ Return ONLY a valid JSON array, no other text.
     "title": "Quiz Final",
     "step_type": "quiz",
     "source_ids": [],
+    "objective_ids": ["learning_objective:xxx", "learning_objective:yyy"],
     "podcast_topic": null,
     "ai_instructions": "Quiz covering ...",
     "discussion_prompt": null,

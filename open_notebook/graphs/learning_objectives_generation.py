@@ -70,7 +70,6 @@ class ObjectiveGenerationState(TypedDict):
     """State for learning objectives generation workflow."""
 
     notebook_id: str
-    num_objectives: Optional[int]
     content_analyses: list[dict]
     generated_objectives: list[dict]
     objective_ids: list[str]
@@ -358,12 +357,10 @@ async def aggregate_objectives(state: ObjectiveGenerationState) -> dict:
             parser=parser,
         )
 
-        num_objectives = state.get("num_objectives", 4)
-
         prompt = prompter.render(
             data={
                 "analyses": state["content_analyses"],
-                "num_objectives": num_objectives,
+                "num_content_items": len(state["content_analyses"]),
             }
         )
 

@@ -93,7 +93,6 @@ async def generate_objectives(notebook_id: str) -> Dict:
         result = await objectives_generation_graph.ainvoke(
             {
                 "notebook_id": notebook_id,
-                "num_objectives": 4,  # Default to 4 objectives
                 "status": "pending",
                 "content_analyses": [],
                 "generated_objectives": [],

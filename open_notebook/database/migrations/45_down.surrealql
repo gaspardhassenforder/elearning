@@ -1,0 +1,2 @@
+-- Remove objective_ids field from lesson_step
+REMOVE FIELD IF EXISTS objective_ids ON TABLE lesson_step;

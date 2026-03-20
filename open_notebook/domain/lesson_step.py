@@ -39,7 +39,7 @@ class LessonStep(ObjectModel):
     nullable_fields: ClassVar[set[str]] = {
         "source_id", "discussion_prompt", "ai_instructions",
         "artifact_id", "command_id",
-        "podcast_topic", "source_ids",
+        "podcast_topic", "source_ids", "objective_ids",
     }
 
     notebook_id: str
@@ -47,6 +47,7 @@ class LessonStep(ObjectModel):
     step_type: Literal["watch", "read", "quiz", "discuss", "podcast"]
     source_id: Optional[str] = None
     source_ids: Optional[list[str]] = None   # Sources to use for this podcast (plural)
+    objective_ids: Optional[list[str]] = None  # Learning objectives this step advances
     podcast_topic: Optional[str] = None      # Topic/briefing for podcast generator
     discussion_prompt: Optional[str] = None
     ai_instructions: Optional[str] = None   # AI-teacher-facing guidance for this step

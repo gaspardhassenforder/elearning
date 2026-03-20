@@ -72,10 +72,17 @@ async def _fetch_sources_with_insights(notebook_id: str) -> list[dict]:
     return await asyncio.gather(*[_enrich(s) for s in sources])
 
 
-async def _generate_outline(sources_with_insights: list[dict]) -> list[dict]:
-    """Phase 1: LLM groups sources into thematic podcast episodes."""
+async def _generate_outline(
+    sources_with_insights: list[dict],
+    objectives: list[dict],
+) -> list[dict]:
+    """Phase 1: LLM designs episodes guided by learning objectives."""
     prompt = Prompter(prompt_template="lesson_plan/outline").render(
-        data={"sources": sources_with_insights}
+        data={
+            "sources": sources_with_insights,
+            "objectives": objectives,
+            "num_sources": len(sources_with_insights),
+        }
     )
     model = await provision_langchain_model(
         prompt, model_id=None, default_type="chat", max_tokens=8000
@@ -91,19 +98,22 @@ async def _generate_outline(sources_with_insights: list[dict]) -> list[dict]:
         """Collapse multi-line LLM strings to a single line to avoid JSON escaping issues."""
         return " ".join(str(v or "").split())
 
-    valid_ids = {s["id"] for s in sources_with_insights}
+    valid_source_ids = {s["id"] for s in sources_with_insights}
+    valid_objective_ids = {o["id"] for o in objectives}
     sanitized = []
     for ep in outline:
         if not isinstance(ep, dict):
             continue
-        valid_ep_ids = [sid for sid in ep.get("source_ids", []) if sid in valid_ids]
-        if not valid_ep_ids:
+        valid_ep_source_ids = [sid for sid in ep.get("source_ids", []) if sid in valid_source_ids]
+        if not valid_ep_source_ids:
             logger.warning("Episode '{}' has no valid source IDs — skipping", ep.get("episode_title", "?"))
             continue
+        valid_ep_objective_ids = [oid for oid in ep.get("objective_ids", []) if oid in valid_objective_ids]
 
         sanitized.append({
             "episode_title": _clean_str(ep.get("episode_title", "Untitled Episode")),
-            "source_ids": valid_ep_ids,
+            "source_ids": valid_ep_source_ids,
+            "objective_ids": valid_ep_objective_ids,
             "podcast_topic": _clean_str(ep.get("podcast_topic", "")),
             "key_concepts": ep.get("key_concepts", []),
             "ai_summary": _clean_str(ep.get("ai_summary", "")),
@@ -183,7 +193,19 @@ async def generate_lesson_plan(notebook_id: str) -> Dict:
                 no_insight_count, len(sources_with_insights),
             )
 
-        outline = await _generate_outline(sources_with_insights)
+        # Fetch learning objectives — lesson plan is designed around them
+        objectives_models = await LearningObjective.get_for_notebook(notebook_id, ordered=True)
+        if not objectives_models:
+            return {
+                "status": "failed",
+                "error": "No learning objectives found. Please generate learning objectives before creating a lesson plan.",
+            }
+        objectives_data = [
+            {"id": str(obj.id), "text": obj.text}
+            for obj in objectives_models
+        ]
+
+        outline = await _generate_outline(sources_with_insights, objectives_data)
 
         # Phase 2: generate ai_instructions per episode in parallel (one LLM call each)
         # source_ids and podcast_topic are set from outline in Python — never from LLM output
@@ -206,6 +228,7 @@ async def generate_lesson_plan(notebook_id: str) -> Dict:
                 step_type="podcast",
                 source_id=None,
                 source_ids=ep["source_ids"] if ep["source_ids"] else None,
+                objective_ids=ep["objective_ids"] if ep.get("objective_ids") else None,
                 podcast_topic=ep["podcast_topic"] if ep["podcast_topic"] else None,
                 ai_instructions=ai_instructions,
                 discussion_prompt=None,
@@ -217,15 +240,17 @@ async def generate_lesson_plan(notebook_id: str) -> Dict:
             if step.id:
                 step_ids.append(str(step.id))
 
-        # Add quiz step at the end covering all key concepts
+        # Add quiz step at the end covering all objectives
         all_concepts = ", ".join(c for ep in outline for c in ep["key_concepts"])
-        quiz_count = len(outline) * 2
+        all_objective_ids = [o["id"] for o in objectives_data]
+        quiz_count = max(len(outline) * 2, 4)  # at least 4 questions
         quiz_step = LessonStep(
             notebook_id=notebook_id,
             title="Module Knowledge Check",
             step_type="quiz",
             source_id=None,
             source_ids=None,
+            objective_ids=all_objective_ids,  # Quiz covers all objectives
             podcast_topic=None,
             ai_instructions=f"Generate a {quiz_count}-question quiz covering: {all_concepts}. Test understanding and application, not just recall.",
             discussion_prompt=None,
@@ -296,6 +321,7 @@ async def list_steps_with_source_titles(notebook_id: str) -> List[dict]:
                 "source_id": s.source_id,
                 "source_title": source_title_map.get(s.source_id, "") if s.source_id else None,
                 "source_ids": s.source_ids,
+                "objective_ids": s.objective_ids,
                 "podcast_topic": s.podcast_topic,
                 "discussion_prompt": s.discussion_prompt,
                 "ai_instructions": s.ai_instructions,
@@ -537,7 +563,6 @@ async def trigger_podcast_for_step(
         episode_name=step.title,
         notebook_id=step.notebook_id,
         briefing_suffix=briefing,
-        created_by="admin",
         content=content if content else None,
         language=language or "en",
     )
@@ -606,12 +631,21 @@ async def refine_lesson_plan(notebook_id: str, refinement_prompt: str) -> dict:
             artifact_id_to_ref[tracker_id] = ref
             podcasts_data.append({"ref": ref, "title": row.get("title") or "Untitled"})
 
+        # Fetch learning objectives for the refine prompt
+        objectives_models = await LearningObjective.get_for_notebook(notebook_id, ordered=True)
+        objectives_data = [
+            {"id": str(obj.id), "text": obj.text}
+            for obj in objectives_models
+        ]
+        valid_objective_ids = {o["id"] for o in objectives_data}
+
         steps_data = [
             {
                 "id": str(s.id),
                 "title": s.title,
                 "step_type": s.step_type,
                 "source_ids": s.source_ids or [],
+                "objective_ids": s.objective_ids or [],
                 "podcast_topic": s.podcast_topic,
                 "discussion_prompt": s.discussion_prompt,
                 "ai_instructions": s.ai_instructions,
@@ -623,7 +657,13 @@ async def refine_lesson_plan(notebook_id: str, refinement_prompt: str) -> dict:
         ]
 
         prompt = Prompter(prompt_template="lesson_plan/refine").render(
-            data={"steps": steps_data, "sources": sources_data, "podcasts": podcasts_data, "refinement_prompt": refinement_prompt}
+            data={
+                "steps": steps_data,
+                "sources": sources_data,
+                "objectives": objectives_data,
+                "podcasts": podcasts_data,
+                "refinement_prompt": refinement_prompt,
+            }
         )
 
         model = await provision_langchain_model(prompt, None, "chat", max_tokens=8192)
@@ -658,6 +698,10 @@ async def refine_lesson_plan(notebook_id: str, refinement_prompt: str) -> dict:
             raw_source_ids = step_data.get("source_ids") or []
             filtered_source_ids = [sid for sid in raw_source_ids if sid in valid_source_ids]
 
+            # Filter objective_ids to only valid objectives
+            raw_objective_ids = step_data.get("objective_ids") or []
+            filtered_objective_ids = [oid for oid in raw_objective_ids if oid in valid_objective_ids]
+
             # Resolve podcast_ref (integer) → artifact tracker id; ignore invalid/missing refs
             podcast_ref = step_data.get("podcast_ref")
             try:
@@ -675,6 +719,7 @@ async def refine_lesson_plan(notebook_id: str, refinement_prompt: str) -> dict:
                 step.ai_instructions = step_data.get("ai_instructions") or step.ai_instructions
                 # Respect intentional empty list (clear); fall back only when AI hallucinated IDs
                 step.source_ids = [] if not raw_source_ids else (filtered_source_ids or step.source_ids)
+                step.objective_ids = [] if not raw_objective_ids else (filtered_objective_ids or step.objective_ids)
                 step.podcast_topic = step_data.get("podcast_topic") or step.podcast_topic
                 if artifact_id is not None:
                     step.artifact_id = artifact_id
@@ -692,6 +737,7 @@ async def refine_lesson_plan(notebook_id: str, refinement_prompt: str) -> dict:
                     step_type=step_type,
                     source_id=None,
                     source_ids=filtered_source_ids or None,
+                    objective_ids=filtered_objective_ids or None,
                     podcast_topic=step_data.get("podcast_topic") or None,
                     ai_instructions=step_data.get("ai_instructions") or None,
                     discussion_prompt=step_data.get("discussion_prompt") or None,

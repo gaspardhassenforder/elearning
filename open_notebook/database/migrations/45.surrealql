@@ -1,0 +1,2 @@
+-- Add objective_ids field to lesson_step for linking steps to learning objectives
+DEFINE FIELD IF NOT EXISTS objective_ids ON TABLE lesson_step TYPE option<array<string>>;
