@@ -1471,6 +1471,11 @@ export const frFR = {
         summarize: "Peux-tu résumer les concepts clés ?",
         focusFirst: "Par quoi devrais-je commencer ?",
       },
+      // Suggestions fixes — toujours affichées après chaque message IA
+      fixedSuggestions: {
+        nextLesson: "Super, passons à la prochaine leçon",
+        haveQuestion: "J'ai une question...",
+      },
       // Réponses rapides dynamiques — affichées après chaque message IA
       quickReplies: {
         // Étape vidéo

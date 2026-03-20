@@ -31,7 +31,6 @@ import { learnerToast } from '@/lib/utils/learner-toast'
 import { useVoiceInput } from '@/lib/hooks/use-voice-input'
 import { useNotebookSources } from '@/lib/hooks/use-sources'
 import { useLessonSteps, useLessonStepsProgress } from '@/lib/hooks/use-lesson-plan'
-import type { LessonStepResponse } from '@/lib/api/lesson-plan'
 import type { LearnerChatMessage } from '@/lib/api/learner-chat'
 
 const CHAT_CACHE_MAX = 50
@@ -105,7 +104,6 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
   const {
     isLoading,
     isStreaming,
-    quickRepliesReady,
     error,
     sendMessage,
     messages,
@@ -117,13 +115,6 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
   // Lesson step progress
   const { data: stepProgress } = useLessonStepsProgress(notebookId)
   const { data: lessonSteps } = useLessonSteps(notebookId)
-
-  // Derive the current (first incomplete required) lesson step
-  const currentStep = useMemo<LessonStepResponse | null>(() => {
-    if (!lessonSteps || !stepProgress) return null
-    const completedIds = new Set(stepProgress.completed_step_ids)
-    return lessonSteps.find((s) => s.required && !completedIds.has(s.id)) ?? null
-  }, [lessonSteps, stepProgress])
 
   // Build source title map for reference display (source:id -> title)
   const { sources: notebookSources } = useNotebookSources(notebookId)
@@ -138,28 +129,6 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
     }
     return map
   }, [notebookSources])
-
-  // Compute contextual quick replies for the current lesson step
-  const quickReplies = useMemo<string[]>(() => {
-    const chat = t.learner?.chat as Record<string, unknown>
-    const qrKeys = chat?.quickReplies as Record<string, string> | undefined
-    if (!qrKeys) return []
-    if (!currentStep) {
-      return [qrKeys.tellMeMore, qrKeys.whatsNext, qrKeys.haveQuestion]
-    }
-    switch (currentStep.step_type) {
-      case 'watch':
-        return [qrKeys.watchedVideo, qrKeys.needMoreContext, qrKeys.haveQuestion]
-      case 'read':
-        return [qrKeys.readIt, qrKeys.canYouSummarize, qrKeys.haveQuestion]
-      case 'discuss':
-        return [qrKeys.understood, qrKeys.explainDifferently, qrKeys.showExample]
-      case 'quiz':
-        return [qrKeys.completedQuiz, qrKeys.haveQuestion]
-      default:
-        return [qrKeys.tellMeMore, qrKeys.whatsNext, qrKeys.haveQuestion]
-    }
-  }, [currentStep, t])
 
   // Voice input
   const {
@@ -513,37 +482,43 @@ export function ChatPanel({ notebookId }: ChatPanelProps) {
                     onStop={stopListening}
                   />
                 )}
-                {/* Dynamic quick replies — shown after each AI message (or before first user message) */}
-                {!isStreaming && quickRepliesReady && (allMessages.length === 0 || allMessages[allMessages.length - 1]?.role === 'assistant') && (() => {
-                  let replies: string[]
-                  if (!hasUserMessage) {
-                    replies = [
-                      t.learner.chat.suggestions.whatAbout as string,
-                      t.learner.chat.suggestions.summarize as string,
-                      t.learner.chat.suggestions.focusFirst as string,
-                    ]
-                  } else {
-                    // LLM-generated replies if available, fall back to step-based
-                    const lastMsg = allMessages[allMessages.length - 1] as { quickReplies?: string[] }
-                    replies = lastMsg?.quickReplies?.length ? lastMsg.quickReplies : quickReplies
-                  }
-                  const filtered = replies.filter(Boolean)
-                  if (!filtered.length) return null
-                  return (
-                    <div className="flex flex-wrap justify-center gap-2 mb-3">
-                      {filtered.map((reply: string) => (
-                        <button
-                          key={reply}
-                          type="button"
-                          onClick={() => sendMessage(reply)}
-                          className="text-sm px-3 py-1.5 rounded-full border bg-background hover:bg-accent hover:text-accent-foreground transition-colors text-muted-foreground"
-                        >
-                          {reply}
-                        </button>
-                      ))}
-                    </div>
-                  )
-                })()}
+                {/* Fixed quick suggestions — always shown after each AI message */}
+                {!isStreaming && (allMessages.length === 0 || allMessages[allMessages.length - 1]?.role === 'assistant') && (
+                  <div className="flex flex-wrap justify-center gap-2 mb-3">
+                    {/* Button 1: Podcast listened — same action as InlineAudioPlayer button */}
+                    <button
+                      type="button"
+                      onClick={() => sendMessage(t.learner.podcast.listenedMessage as string)}
+                      className="text-sm px-3 py-1.5 rounded-full border bg-background hover:bg-accent hover:text-accent-foreground transition-colors text-muted-foreground"
+                    >
+                      {t.learner.podcast.listenedButton as string}
+                    </button>
+                    {/* Button 2: Next lesson */}
+                    <button
+                      type="button"
+                      onClick={() => sendMessage(t.learner.chat.fixedSuggestions.nextLesson as string)}
+                      className="text-sm px-3 py-1.5 rounded-full border bg-background hover:bg-accent hover:text-accent-foreground transition-colors text-muted-foreground"
+                    >
+                      {t.learner.chat.fixedSuggestions.nextLesson as string}
+                    </button>
+                    {/* Button 3: Have a question — pre-fills textarea, does NOT send */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const textarea = inputRef.current
+                        if (textarea) {
+                          textarea.value = t.learner.chat.fixedSuggestions.haveQuestion as string
+                          textarea.style.height = 'auto'
+                          textarea.style.height = `${Math.min(textarea.scrollHeight, 150)}px`
+                          textarea.focus()
+                        }
+                      }}
+                      className="text-sm px-3 py-1.5 rounded-full border bg-background hover:bg-accent hover:text-accent-foreground transition-colors text-muted-foreground"
+                    >
+                      {t.learner.chat.fixedSuggestions.haveQuestion as string}
+                    </button>
+                  </div>
+                )}
                 <form
                   onSubmit={handleSubmit}
                   className="relative flex items-end gap-2 rounded-2xl border bg-background px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 transition-all"

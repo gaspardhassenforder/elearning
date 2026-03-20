@@ -22,7 +22,6 @@ from api.auth import LearnerContext, get_current_learner
 from api.learner_chat_service import (
     extract_learner_profile,
     build_intro_message,
-    generate_quick_replies,
     get_learner_objectives_with_status,
     get_lesson_steps_with_status,
     init_thread_context,
@@ -126,12 +125,6 @@ class SSEObjectiveCheckedEvent(BaseModel):
     total_completed: int
     total_objectives: int
     all_complete: bool
-
-
-class SSEQuickRepliesEvent(BaseModel):
-    """SSE event with LLM-generated contextual quick-reply suggestions."""
-
-    replies: list[str]
 
 
 # ============================================================================
@@ -647,9 +640,6 @@ async def stream_learner_chat(
                 "generate_artifact": "Generating content...",
             }
 
-            # Collect AI response text for quick_replies generation
-            collected_ai_text: list[str] = []
-
             # Heartbeat: track time of last SSE event to prevent proxy timeouts
             last_event_time = time.monotonic()
 
@@ -689,7 +679,6 @@ async def stream_learner_chat(
                     if chunk and hasattr(chunk, "content") and chunk.content:
                         text_content = extract_text_from_response(chunk.content)
                         if text_content:
-                            collected_ai_text.append(text_content)
                             text_event = SSETextEvent(delta=text_content)
                             yield f"event: text\ndata: {text_event.model_dump_json()}\n\n"
                             last_event_time = time.monotonic()
@@ -764,27 +753,6 @@ async def stream_learner_chat(
                 metadata={"thread_id": thread_id, "notebook_id": notebook_id},
             )
             yield f"event: message_complete\ndata: {message_complete_event.model_dump_json()}\n\n"
-
-            # Generate quick replies in background and emit when ready
-            ai_response_text = "".join(collected_ai_text)
-            quick_replies_task = asyncio.create_task(
-                generate_quick_replies(
-                    user_message=request.message if request.message.strip() else ai_response_text,
-                    ai_response=ai_response_text,
-                    language=request.language,
-                )
-            )
-            # Wait briefly for quick replies (up to 15s)
-            try:
-                replies = await asyncio.wait_for(quick_replies_task, timeout=15.0)
-                if replies:
-                    quick_replies_event = SSEQuickRepliesEvent(replies=replies)
-                    yield f"event: quick_replies\ndata: {quick_replies_event.model_dump_json()}\n\n"
-            except asyncio.TimeoutError:
-                quick_replies_task.cancel()
-                logger.warning("Quick replies timed out for thread {}", thread_id)
-            except Exception as e:
-                logger.warning("Quick replies failed for thread {}: {}", thread_id, str(e))
 
         except Exception as e:
             # Stream error event to frontend

@@ -1471,6 +1471,11 @@ export const enUS = {
         summarize: "Can you summarize the key concepts?",
         focusFirst: "What should I focus on first?",
       },
+      // Fixed suggestions — always shown after each AI message
+      fixedSuggestions: {
+        nextLesson: "Great, let's move to the next lesson",
+        haveQuestion: "I have a question...",
+      },
       // Dynamic quick replies — shown after each AI message
       quickReplies: {
         // Watch step

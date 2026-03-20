@@ -25,7 +25,6 @@ interface UseLearnerChatResult {
   messages: LearnerChatMessage[]
   isLoading: boolean
   isStreaming: boolean
-  quickRepliesReady: boolean
   error: Error | null
   sendMessage: (content: string) => Promise<void>
   clearMessages: () => Promise<void>
@@ -51,13 +50,6 @@ export function useLearnerChat(
   const queryClient = useQueryClient()
   const [messages, setMessages] = useState<LearnerChatMessage[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
-  // true by default so pre-first-message suggestions render immediately
-  const [quickRepliesReady, setQuickRepliesReady] = useState(true)
-  const quickRepliesTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Clear timeout on unmount to prevent state update on unmounted component
-  useEffect(() => () => {
-    if (quickRepliesTimeoutRef.current) clearTimeout(quickRepliesTimeoutRef.current)
-  }, [])
   // Story 4.4: Track last checked objective for inline confirmation
   const [lastObjectiveChecked, setLastObjectiveChecked] = useState<ObjectiveCheckedData | null>(null)
 
@@ -196,22 +188,6 @@ export function useLearnerChat(
             window.dispatchEvent(new CustomEvent('objective_checked', {
               detail: objectiveData
             }))
-          } else if (event.type === 'quick_replies' && event.replies?.length) {
-            // LLM replies arrived — clear timeout and mark ready
-            if (quickRepliesTimeoutRef.current) {
-              clearTimeout(quickRepliesTimeoutRef.current)
-              quickRepliesTimeoutRef.current = null
-            }
-            setQuickRepliesReady(true)
-            // Attach LLM-generated quick reply suggestions to the last assistant message
-            setMessages((prev) => {
-              const updated = [...prev]
-              const lastMessage = updated[updated.length - 1]
-              if (lastMessage && lastMessage.role === 'assistant') {
-                lastMessage.quickReplies = event.replies
-              }
-              return updated
-            })
           } else if (event.type === 'error' && event.errorData) {
             // Story 7.1: Handle SSE error events - attach to current assistant message
             setMessages((prev) => {
@@ -224,12 +200,7 @@ export function useLearnerChat(
             })
           } else if (event.type === 'message_complete') {
             // Message streaming complete: stop loading state so user can read and type next.
-            // quick_replies and objective_checked may still arrive later and update the UI.
             setIsStreaming(false)
-            // Wait for LLM quick replies; fall back to step-based after 5s
-            setQuickRepliesReady(false)
-            if (quickRepliesTimeoutRef.current) clearTimeout(quickRepliesTimeoutRef.current)
-            quickRepliesTimeoutRef.current = setTimeout(() => setQuickRepliesReady(true), 5000)
             // Story 4.3: Trigger reactive scroll
             const completedToolCalls = Array.from(toolCallsMap.values())
 
@@ -375,7 +346,6 @@ export function useLearnerChat(
     const requestGreeting = async () => {
       try {
         setIsStreaming(true)
-        setQuickRepliesReady(false)  // Wait for LLM quick replies on greeting
         const response = await sendLearnerChatMessage(notebookId, { message: '', language })
 
         let greetingContent = ''
@@ -420,16 +390,6 @@ export function useLearnerChat(
               }
               return updated
             })
-          } else if (event.type === 'quick_replies' && event.replies?.length) {
-            setQuickRepliesReady(true)
-            setMessages((prev) => {
-              const updated = [...prev]
-              const lastMessage = updated[updated.length - 1]
-              if (lastMessage && lastMessage.role === 'assistant') {
-                lastMessage.quickReplies = event.replies
-              }
-              return updated
-            })
           }
         }
       } catch (err) {
@@ -437,7 +397,6 @@ export function useLearnerChat(
         setMessages([])
       } finally {
         setIsStreaming(false)
-        setQuickRepliesReady(true)  // Fallback: show step-based replies if quick_replies never arrived
       }
     }
 
@@ -463,7 +422,6 @@ export function useLearnerChat(
     messages,
     isLoading,
     isStreaming,
-    quickRepliesReady,
     error: error as Error | null,
     sendMessage,
     clearMessages,

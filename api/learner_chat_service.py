@@ -7,8 +7,6 @@ Story: 4.2 - Two-Layer Prompt System & Proactive AI Teacher
 """
 
 import asyncio
-import json as _json
-import re as _re
 from typing import Optional, Tuple
 
 from fastapi import HTTPException
@@ -22,16 +20,6 @@ from open_notebook.domain.learning_objective import LearningObjective
 from open_notebook.domain.learner_objective_progress import LearnerObjectiveProgress
 from open_notebook.domain.lesson_step import LessonStep
 from open_notebook.graphs.prompt import assemble_system_prompt
-
-# Maps UI language codes to display names used in LLM prompts.
-# Shared across build_intro_message, generate_quick_replies, and any future language-aware calls.
-_LANGUAGE_DISPLAY_NAMES: dict[str, str] = {
-    "fr-FR": "French (Français)",
-    "pt-BR": "Brazilian Portuguese (Português)",
-    "zh-CN": "Simplified Chinese (简体中文)",
-    "zh-TW": "Traditional Chinese (繁體中文)",
-}
-
 
 def build_intro_message(learner_profile: dict, language: str = "en-US") -> str:
     """Build hidden intro message for first-visit greeting.
@@ -293,70 +281,6 @@ async def get_lesson_steps_with_status(
     except Exception as e:
         logger.error("Error loading lesson steps with status: {}", str(e))
         return [], None
-
-
-async def generate_quick_replies(
-    user_message: str,
-    ai_response: str,
-    language: str = "en-US",
-) -> list[str]:
-    """Generate 3 contextual quick-reply suggestions using a cheap Gemini model.
-
-    Runs after each AI response to produce clickable buttons that guide the
-    learner toward useful next actions without revealing answers.
-
-    Args:
-        user_message: The learner's last message
-        ai_response: The AI tutor's full response (truncated for cost)
-        language: UI language code (e.g., 'en-US', 'fr-FR')
-
-    Returns:
-        List of 3 short reply strings, or [] on failure
-    """
-    from esperanto import AIFactory
-    from langchain_core.messages import HumanMessage
-
-    # Truncate to keep the call cheap
-    response_preview = ai_response[:600] if len(ai_response) > 600 else ai_response
-    user_preview = user_message[:200] if len(user_message) > 200 else user_message
-
-    prompt = (
-        "You generate 3 short reply suggestions for a learner in an educational chat.\n\n"
-        f'The learner said: "{user_preview}"\n'
-        f'The AI tutor responded: "{response_preview}"\n\n'
-        "Generate exactly 3 short follow-up options the learner might want to send:\n"
-        "- Maximum 8 words each\n"
-        "- Do NOT suggest anything that reveals answers or does the thinking for them\n"
-        "- Vary them: one showing readiness/progress, one requesting help/clarification, "
-        "one going deeper or asking a genuine question\n"
-        "- Keep them natural and concise\n\n"
-        'Respond ONLY with a JSON array of 3 strings, no other text:\n["option 1", "option 2", "option 3"]'
-    )
-
-    # Language instruction (same pattern as assemble_system_prompt)
-    if language and language != "en-US":
-        language_name = _LANGUAGE_DISPLAY_NAMES.get(language, language)
-        prompt += f"\n\nIMPORTANT: Generate the 3 suggestions in {language_name}. Do not use English."
-
-    try:
-        model = AIFactory.create_language(
-            model_name="gemini-2.0-flash-lite",
-            provider="google",
-        )
-        lc_model = model.to_langchain()
-        response = await lc_model.ainvoke([HumanMessage(content=prompt)])
-        text = response.content if hasattr(response, "content") else str(response)
-        # Strip extended-thinking tags if present
-        text = _re.sub(r"<think>.*?</think>", "", text, flags=_re.DOTALL).strip()
-        match = _re.search(r"\[.*?\]", text, _re.DOTALL)
-        if match:
-            replies = _json.loads(match.group())
-            if isinstance(replies, list) and len(replies) >= 3:
-                return [str(r).strip() for r in replies[:3]]
-    except Exception as e:
-        logger.warning("Quick replies generation failed: {}", str(e))
-
-    return []
 
 
 async def build_source_context_for_learner(notebook_id: str) -> Optional[str]:
