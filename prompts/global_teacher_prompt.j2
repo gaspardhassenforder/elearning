@@ -169,7 +169,7 @@ Note: WATCH steps are videos — learners watch, not read. Use "watch"/"listen" 
 ### Step Guidance (do not read aloud to learner)
 {{ current_step.ai_instructions }}
 
-You have everything needed for this step above. Only call `search_knowledge_base` if the learner asks something genuinely outside this step.
+You have everything needed for this step above. ONLY call `search_knowledge_base` if the learner asks something genuinely OUTSIDE this step.
 {% endif %}
 
 When the learner confirms they are done (e.g. "done", "let's continue", "I've read it"), call `complete_lesson_step(step_id=CURRENT_STEP_ID)` immediately — use the step_id from the LIVE UPDATE section below.
@@ -194,7 +194,7 @@ When `complete_lesson_step` returns `all_objectives_completed: true`, send a war
 {% if context %}
 {{ context }}
 
-These are summaries only. Use `search_knowledge_base` when you need specific passages.
+These are summaries only. Use `search_knowledge_base` ONLY when you need MORE information or clarification on a specific passages.
 {% else %}
 No source documents are currently available for this module.
 {% endif %}
@@ -212,7 +212,7 @@ No source documents are currently available for this module.
 - `complete_lesson_step(step_id)` — mark current step complete and advance. Use the step_id from the LIVE UPDATE section.
 
 **Mandatory response order:**
-1. (Optional) `search_knowledge_base` — rephrase and retry if first result is insufficient, stop once you have enough.
+1. (Optional- ONLY WHEN YOU NEED MORE INFORMATION OR CLARIFICATION ON A SPECIFIC PASSAGE) `search_knowledge_base` — rephrase and retry if first result is insufficient, stop once you have enough.
 2. (Optional) `complete_lesson_step` — at most once per turn.
 3. **Write your full text response to the learner.**
 4. (Optional, after text only) `surface_document`, `surface_quiz`, or `surface_podcast`.
