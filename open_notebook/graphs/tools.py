@@ -419,10 +419,18 @@ async def _resolve_artifact_id(
     if not content_id.startswith("artifact:"):
         return content_id, None, None
 
+    from open_notebook.database.repository import ensure_record_id, repo_query
     from open_notebook.domain.artifact import Artifact
 
-    artifact = await Artifact.get(content_id)
-    if not artifact or artifact.artifact_type != expected_type:
+    rows = await repo_query("SELECT * FROM $id", {"id": ensure_record_id(content_id)})
+    if not rows:
+        return None, None, {
+            "error": f"I couldn't find that {expected_type}",
+            "error_type": "not_found",
+            "recoverable": True,
+        }
+    artifact = Artifact(**rows[0])
+    if artifact.artifact_type != expected_type:
         return None, None, {
             "error": f"I couldn't find that {expected_type}",
             "error_type": "not_found",
@@ -989,74 +997,46 @@ async def generate_artifact(
             message = f"Podcast generation started. You'll be notified when it's ready."
 
         elif artifact_type == "quiz":
-            import asyncio
-            from api.quiz_job_tracker import create_quiz_job, complete_quiz_job, fail_quiz_job
             from api.quiz_service import generate_quiz
+            from open_notebook.database.repository import ensure_record_id, repo_query
+            from open_notebook.domain.lesson_step import LessonStep
 
-            logger.info(f"Submitting quiz generation job (async): topic={topic}, notebook={notebook_id}")
+            logger.info(f"Generating quiz synchronously: topic={topic}, notebook={notebook_id}")
 
-            # Create a trackable job before launching background task
-            quiz_job_id = create_quiz_job()
+            result = await generate_quiz(
+                notebook_id=notebook_id,
+                topic=topic,
+                num_questions=num_questions,
+            )
+            if "quiz_id" not in result:
+                return {
+                    "error": "I had trouble generating that quiz",
+                    "error_type": "service_error",
+                    "recoverable": False,
+                }
+            quiz_id = result["quiz_id"]
 
-            # Capture variables for the background task
-            _notebook_id = notebook_id
-            _topic = topic
-            _num_questions = num_questions
-            _quiz_job_id = quiz_job_id
+            # The workflow already created the artifact tracker — look it up instead of duplicating it
+            tracker_rows = await repo_query(
+                "SELECT VALUE type::string(id) FROM artifact WHERE artifact_id = $qid AND artifact_type = 'quiz' LIMIT 1",
+                {"qid": ensure_record_id(quiz_id)},
+            )
+            artifact_tracker_id = tracker_rows[0] if tracker_rows else quiz_id
 
-            async def _run_quiz_generation():
-                try:
-                    result = await generate_quiz(
-                        notebook_id=_notebook_id,
-                        topic=_topic,
-                        num_questions=_num_questions,
-                    )
-                    if "quiz_id" in result:
-                        quiz_id = result["quiz_id"]
-                        await Artifact.create_for_artifact(
-                            notebook_id=_notebook_id,
-                            artifact_type="quiz",
-                            artifact_id=quiz_id,
-                            title=f"Quiz: {_topic}",
-                        )
-                        # Build surface data so frontend can render quiz inline
-                        surface_data = {
-                            "artifact_type": "quiz",
-                            "quiz_id": quiz_id,
-                            "title": f"Quiz: {_topic}",
-                            "description": None,
-                            "questions": [],
-                            "total_questions": 0,
-                            "quiz_url": f"/quizzes/{quiz_id}",
-                        }
-                        try:
-                            from open_notebook.domain.quiz import Quiz
-                            quiz = await Quiz.get(quiz_id)
-                            if quiz:
-                                surface_data["title"] = quiz.title
-                                surface_data["description"] = quiz.description
-                                surface_data["total_questions"] = len(quiz.questions)
-                                surface_data["questions"] = [
-                                    {"text": q.question, "options": q.options}
-                                    for q in quiz.questions
-                                ]
-                        except Exception as load_err:
-                            logger.warning("Could not load quiz for surface data: {}", str(load_err))
-                        complete_quiz_job(_quiz_job_id, quiz_id, surface_data)
-                        logger.info(f"Background quiz generation complete: {quiz_id}")
-                    else:
-                        error_msg = result.get("error", "Unknown error")
-                        fail_quiz_job(_quiz_job_id, error_msg)
-                        logger.error(f"Background quiz generation failed: {error_msg}")
-                except Exception as e:
-                    fail_quiz_job(_quiz_job_id, str(e))
-                    logger.error("Background quiz generation error: {}", str(e), exc_info=True)
+            # Persist artifact_id on the lesson step so next visit uses the live reference
+            step_rows = await repo_query(
+                "SELECT VALUE type::string(id) FROM lesson_step WHERE notebook_id = $nb AND step_type = 'quiz' LIMIT 1",
+                {"nb": ensure_record_id(notebook_id)},
+            )
+            if step_rows:
+                step = await LessonStep.get(step_rows[0])
+                if step:
+                    step.artifact_id = artifact_tracker_id
+                    await step.save()
 
-            asyncio.create_task(_run_quiz_generation())
-
-            job_id = quiz_job_id
-            artifact_ids = []
-            message = f"Quiz '{topic}' generation started. It will appear in your artifacts panel shortly."
+            job_id = artifact_tracker_id
+            artifact_ids = [artifact_tracker_id]
+            message = f"Quiz '{topic}' has been generated."
 
         elif artifact_type == "transformation":
             # Import here to avoid circular dependencies

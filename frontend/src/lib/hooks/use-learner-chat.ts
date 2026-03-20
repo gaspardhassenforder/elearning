@@ -150,7 +150,8 @@ export function useLearnerChat(
               if (
                 toolCall.toolName === 'generate_artifact' &&
                 toolCall.result?.job_id &&
-                toolCall.result?.artifact_type
+                toolCall.result?.artifact_type &&
+                toolCall.result?.artifact_type !== 'quiz'
               ) {
                 // Store active job in learner store to trigger AsyncStatusBar
                 setActiveJob({

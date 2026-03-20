@@ -112,7 +112,7 @@ async def call_model_async(state: ThreadState, config: RunnableConfig) -> dict:
     content = ai_message.content
     if isinstance(content, list):
         text_parts = [item.get('text', '') for item in content if isinstance(item, dict) and 'text' in item]
-        content = '\n'.join(text_parts) if text_parts else str(content)
+        content = '\n'.join(text_parts) if text_parts else ''
     elif not isinstance(content, str):
         content = str(content)
 
@@ -205,10 +205,10 @@ def call_model_with_messages(state: ThreadState, config: RunnableConfig) -> dict
                     text_parts.append(item['text'])
                 elif 'type' in item and item.get('type') == 'text':
                     text_parts.append(item.get('text', ''))
-        content = '\n'.join(text_parts) if text_parts else str(content)
+        content = '\n'.join(text_parts) if text_parts else ''
     elif not isinstance(content, str):
         content = str(content)
-    
+
     # Clean thinking content from AI response (e.g., <think>...</think> tags)
     cleaned_content = clean_thinking_content(content)
     cleaned_message = ai_message.model_copy(update={"content": cleaned_content})
@@ -281,10 +281,11 @@ _SURFACE_ONLY_TOOLS = frozenset({"surface_document", "surface_quiz", "surface_po
 def after_tools(state: ThreadState) -> str:
     """Route after tool execution.
 
-    Surface-only tools display content and are terminal — skip the next LLM turn.
+    Surface-only tools display content and are terminal — skip the next LLM turn,
+    BUT only if the triggering AIMessage already included text. If the AI called a
+    surface tool with no accompanying text, route back to agent so it can write a
+    response (fixes race condition where learner sees podcast widget with no message).
     Retrieval/generation tools produce information the LLM must reason about.
-    If the last AIMessage used ONLY surface tools → END.
-    If any retrieval or generation tool was called → back to agent.
     """
     messages = state.get("messages", [])
     for msg in reversed(messages):
@@ -293,7 +294,19 @@ def after_tools(state: ThreadState) -> str:
         if isinstance(msg, AIMessage) and getattr(msg, "tool_calls", None):
             called = {tc["name"] for tc in msg.tool_calls}
             if called.issubset(_SURFACE_ONLY_TOOLS):
-                return "__end__"
+                # Only end if the AI already wrote text alongside the surface call.
+                # If no text, route back to agent to generate a response.
+                content = msg.content
+                if isinstance(content, str):
+                    has_text = bool(content.strip())
+                elif isinstance(content, list):
+                    has_text = any(
+                        isinstance(part, dict) and part.get("text", "").strip()
+                        for part in content
+                    )
+                else:
+                    has_text = False
+                return "__end__" if has_text else "agent"
             return "agent"
         break
     return "agent"

@@ -274,7 +274,7 @@ async def assemble_system_prompt(
         final_prompt = global_rendered
 
     # Append language instruction if specified
-    if language and language != "en-US":
+    if language:
         language_map = {
             "fr-FR": "French (Français)",
             "pt-BR": "Brazilian Portuguese (Português)",

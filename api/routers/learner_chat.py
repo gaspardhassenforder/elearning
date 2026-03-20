@@ -77,7 +77,7 @@ class LearnerChatRequest(BaseModel):
 
     message: str = Field(default="", description="Learner's message content (empty triggers first-visit greeting)")
     language: str = Field(
-        default="en-US",
+        default="fr-FR",
         description="UI language code (e.g., 'en-US', 'fr-FR') for AI response language"
     )
 
