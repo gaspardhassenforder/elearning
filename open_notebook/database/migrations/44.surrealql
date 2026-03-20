@@ -1,0 +1,3 @@
+-- Fix artifact categorization: admin-created artifacts should have created_by = NONE
+-- so they appear under "Module Artifacts" instead of "My Artifacts" in the learner sidebar.
+UPDATE artifact SET created_by = NONE WHERE created_by = "admin";

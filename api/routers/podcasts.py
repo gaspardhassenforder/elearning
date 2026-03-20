@@ -333,7 +333,7 @@ async def get_podcast(podcast_id: str, user: User = Depends(get_current_user)):
                 "audio_file_path": episode.audio_file,
                 "transcript": episode.transcript,
                 "is_overview": False,
-                "created_by": "admin",
+                "created_by": None,
                 "status": "completed" if episode.audio_file else "pending",
                 "duration_minutes": 7,
                 "is_ready": bool(episode.audio_file),

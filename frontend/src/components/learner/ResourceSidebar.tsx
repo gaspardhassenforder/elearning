@@ -15,12 +15,14 @@ import {
   TrendingUp,
   ChevronDown,
   ChevronRight,
+  Trash2,
 } from 'lucide-react'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { useTranslation } from '@/lib/hooks/use-translation'
 import { useNotebookSources } from '@/lib/hooks/use-sources'
 import { useNotebookArtifacts } from '@/lib/hooks/use-artifacts'
 import { useLearnerStore } from '@/lib/stores/learner-store'
+import { useLearnerDeleteArtifact } from '@/lib/hooks/use-learner-artifacts'
 import { LessonPlanProgress } from './LessonPlanProgress'
 
 interface ResourceSidebarProps {
@@ -63,6 +65,7 @@ export function ResourceSidebar({ notebookId }: ResourceSidebarProps) {
 
   const { sources, isLoading: sourcesLoading } = useNotebookSources(notebookId)
   const { data: artifacts, isLoading: artifactsLoading } = useNotebookArtifacts(notebookId)
+  const deleteArtifact = useLearnerDeleteArtifact(notebookId)
 
   // Split artifacts into module (admin-created) vs. learner-created
   const { moduleArtifacts, myArtifacts } = useMemo(() => {
@@ -177,20 +180,36 @@ export function ResourceSidebar({ notebookId }: ResourceSidebarProps) {
                   ) : (
                     <div className="space-y-0.5">
                       {myArtifacts.map((artifact) => (
-                        <button
+                        <div
                           key={artifact.id}
-                          onClick={() => openViewerSheet({ type: 'artifact', id: artifact.id })}
-                          className={`w-full text-left flex items-center gap-2 py-2 px-3 rounded-lg text-sm transition-colors hover:bg-accent/50 ${
+                          className={`group flex items-center rounded-lg text-sm transition-colors hover:bg-accent/50 ${
                             viewerSheet?.type === 'artifact' && viewerSheet?.id === artifact.id
                               ? 'bg-accent border-l-2 border-primary'
                               : ''
                           }`}
                         >
-                          <span className="flex-shrink-0 text-sm">
-                            {getArtifactIcon(artifact.artifact_type)}
-                          </span>
-                          <span className="truncate">{artifact.title}</span>
-                        </button>
+                          <button
+                            onClick={() => openViewerSheet({ type: 'artifact', id: artifact.id })}
+                            className="flex-1 min-w-0 text-left flex items-center gap-2 py-2 px-3"
+                          >
+                            <span className="flex-shrink-0 text-sm">
+                              {getArtifactIcon(artifact.artifact_type)}
+                            </span>
+                            <span className="truncate">{artifact.title}</span>
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (window.confirm(t.learner?.artifacts?.confirmDelete || 'Delete this artifact?')) {
+                                deleteArtifact.mutate(artifact.id)
+                              }
+                            }}
+                            className="flex-shrink-0 p-1.5 mr-1 rounded opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                            title={t.common?.delete || 'Delete'}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       ))}
                     </div>
                   )}

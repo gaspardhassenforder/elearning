@@ -150,15 +150,21 @@ export function useLearnerChat(
               if (
                 toolCall.toolName === 'generate_artifact' &&
                 toolCall.result?.job_id &&
-                toolCall.result?.artifact_type &&
-                toolCall.result?.artifact_type !== 'quiz'
+                toolCall.result?.artifact_type
               ) {
-                // Store active job in learner store to trigger AsyncStatusBar
-                setActiveJob({
-                  jobId: toolCall.result.job_id,
-                  artifactType: toolCall.result.artifact_type,
-                  notebookId,
-                })
+                if (toolCall.result.artifact_type === 'quiz') {
+                  // Quiz is generated synchronously — just refresh the sidebar
+                  queryClient.invalidateQueries({
+                    queryKey: QUERY_KEYS.learnerArtifacts(notebookId),
+                  })
+                } else {
+                  // Store active job in learner store to trigger AsyncStatusBar
+                  setActiveJob({
+                    jobId: toolCall.result.job_id,
+                    artifactType: toolCall.result.artifact_type,
+                    notebookId,
+                  })
+                }
               }
 
               // Invalidate lesson step progress when teacher marks a step complete

@@ -864,7 +864,9 @@ async def complete_lesson_step(step_id: str, config: RunnableConfig) -> dict:
         step_id: The record ID of the lesson step (e.g., "lesson_step:abc123")
 
     Returns:
-        dict with step_id, step_title, and a confirmation message
+        dict with step_id, step_title, confirmation message, and next_step
+        (full details of the next step including discussion_prompt and ai_instructions,
+        or None if all steps are completed)
     """
     from open_notebook.domain.learner_step_progress import LearnerStepProgress
 
@@ -888,6 +890,16 @@ async def complete_lesson_step(step_id: str, config: RunnableConfig) -> dict:
         step_id,
     )
 
+    # Find the next step after the completed one
+    next_step = None
+    found_current = False
+    for s in lesson_steps:
+        if found_current:
+            next_step = s
+            break
+        if s.get("id") == step_id:
+            found_current = True
+
     try:
         # Delegate step completion + objective auto-completion to service
         notebook_id = configurable.get("notebook_id")
@@ -901,12 +913,30 @@ async def complete_lesson_step(step_id: str, config: RunnableConfig) -> dict:
 
         logger.info(f"Marked step {step_id} complete for user {user_id}")
 
-        return {
+        response = {
             "step_id": step_id,
             "step_title": step_title,
             "message": "Step marked complete",
             "all_objectives_completed": all_objectives_completed,
         }
+
+        if next_step:
+            response["next_step"] = {
+                "id": next_step.get("id"),
+                "title": next_step.get("title"),
+                "step_type": next_step.get("step_type"),
+                "source_id": next_step.get("source_id"),
+                "discussion_prompt": next_step.get("discussion_prompt"),
+                "ai_instructions": next_step.get("ai_instructions"),
+                "artifact_id": next_step.get("artifact_id"),
+                "order": next_step.get("order"),
+                "required": next_step.get("required"),
+            }
+        else:
+            response["next_step"] = None
+            response["message"] = "All lesson steps completed!"
+
+        return response
 
     except Exception as e:
         logger.error("Error in complete_lesson_step for step {}: {}", step_id, str(e), exc_info=True)
@@ -992,6 +1022,7 @@ async def generate_artifact(
                 speaker_profile_name=speaker_profile,
                 episode_name=f"Podcast: {topic}",
                 notebook_id=notebook_id,
+                created_by=user_id,
             )
 
             message = f"Podcast generation started. You'll be notified when it's ready."
@@ -1007,6 +1038,7 @@ async def generate_artifact(
                 notebook_id=notebook_id,
                 topic=topic,
                 num_questions=num_questions,
+                created_by=user_id,
             )
             if "quiz_id" not in result:
                 return {

@@ -1,0 +1,3 @@
+-- Rollback: restore created_by = "admin" for artifacts that had it
+-- Note: This is lossy — we cannot distinguish which NONE artifacts were originally "admin".
+-- No-op rollback.
