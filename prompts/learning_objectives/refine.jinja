@@ -9,10 +9,15 @@ INSTRUCTION: {{ refinement_prompt }}
 
 Apply the instruction to improve, rewrite, add, remove, or reorder the objectives.
 Keep objectives measurable and action-verb based (e.g., "Explain", "Apply", "Analyze").
-Preserve the original id field for each objective you keep or modify.
 
-Return ONLY a valid JSON array with ALL objectives (including unmodified ones), no other text.
-Each item must include its original "id" field so updates can be matched.
+RULES:
+- To KEEP or MODIFY an existing objective: preserve its original "id" field exactly as given
+- To ADD a new objective: set "id" to null
+- To REMOVE an objective: simply omit it from the output array
+- Keep all objectives you don't explicitly want to remove
+- Return ONLY the JSON array, nothing else
+
+Return ONLY a valid JSON array with ALL objectives (kept, modified, and new), no other text.
 
 Example output format:
 [
@@ -21,12 +26,7 @@ Example output format:
     "text": "Explain the core concepts of machine learning and their real-world applications"
   },
   {
-    "id": "learning_objective:def456",
-    "text": "Apply supervised learning techniques to classify structured datasets"
+    "id": null,
+    "text": "Design a supervised learning pipeline for a real-world classification problem"
   }
 ]
-
-IMPORTANT:
-- Keep all objectives you don't explicitly want to remove
-- Return ONLY the JSON array, nothing else
-- Preserve the "id" field exactly as given

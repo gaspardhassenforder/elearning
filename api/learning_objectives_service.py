@@ -4,6 +4,7 @@ Story 3.3: Learning Objectives Configuration
 Business logic for managing learning objectives and auto-generation workflow.
 """
 
+import asyncio
 import json
 from typing import Dict, List, Optional
 
@@ -12,6 +13,7 @@ from fastapi import HTTPException
 from loguru import logger
 
 from open_notebook.ai.provision import provision_langchain_model
+from open_notebook.database.repository import ensure_record_id, repo_query
 from open_notebook.domain.learning_objective import LearningObjective
 from open_notebook.domain.notebook import Notebook
 from open_notebook.graphs.learning_objectives_generation import objectives_generation_graph
@@ -277,19 +279,54 @@ async def refine_objectives(notebook_id: str, refinement_prompt: str) -> dict:
 
         # Build lookup by ID (full or bare)
         existing_by_id = build_dual_key_lookup(objectives)
+        returned_ids: set[str] = set()
+        save_coros = []
+        created_count = 0
+        updated_count = 0
 
         for i, obj_data in enumerate(revised_objectives):
             obj_id = obj_data.get("id")
-            if not obj_id or obj_id not in existing_by_id:
-                continue
-            obj = existing_by_id[obj_id]
-            new_text = obj_data.get("text", "").strip()
-            if new_text:
-                obj.text = new_text
-            obj.order = i
-            await obj.save()
+            new_text = (obj_data.get("text") or "").strip()
 
-        logger.info(f"Refined {len(revised_objectives)} objectives for notebook {notebook_id}")
+            if obj_id and obj_id in existing_by_id:
+                # UPDATE existing objective
+                returned_ids.add(obj_id)
+                obj = existing_by_id[obj_id]
+                if new_text:
+                    obj.text = new_text
+                obj.order = i
+                save_coros.append(obj.save())
+                updated_count += 1
+            elif new_text:
+                # CREATE new objective (id is null/missing/unknown)
+                new_obj = LearningObjective(
+                    notebook_id=notebook_id,
+                    text=new_text,
+                    order=i,
+                    auto_generated=False,
+                )
+                save_coros.append(new_obj.save())
+                created_count += 1
+
+        # Persist all updates and creates in parallel
+        await asyncio.gather(*save_coros)
+
+        # Bulk-delete objectives omitted from AI response (single round-trip)
+        ids_to_delete = []
+        for obj in objectives:
+            sid = str(obj.id)
+            bare = sid.split(":", 1)[1] if ":" in sid else sid
+            if sid not in returned_ids and bare not in returned_ids:
+                ids_to_delete.append(ensure_record_id(sid))
+        if ids_to_delete:
+            await repo_query(
+                "DELETE learning_objective WHERE id IN $ids", {"ids": ids_to_delete}
+            )
+
+        logger.info(
+            f"Refined objectives for {notebook_id}: "
+            f"{updated_count} updated, {created_count} created, {len(ids_to_delete)} deleted"
+        )
         return {"status": "completed"}
 
     except json.JSONDecodeError as e:
