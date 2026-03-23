@@ -235,6 +235,18 @@ export function ChatMessage({ message, index, isLastAssistant, isStreaming, t, i
     return map
   }, [message.toolCalls])
 
+  // Failed tool calls whose error should be shown (skip if a later call of the same tool succeeded)
+  const unresolvedErrors = useMemo(() => {
+    if (!message.toolCalls) return []
+    return message.toolCalls.filter((tc, i) => {
+      if (!tc.result?.error) return false;
+      const laterSuccess = message.toolCalls!
+        .slice(i + 1)
+        .some((later) => later.toolName === tc.toolName && later.result && !later.result.error);
+      return !laterSuccess;
+    })
+  }, [message.toolCalls])
+
   // Convert references to compact numbered format
   const processedContent = convertReferencesToCompactMarkdown(
     message.content,
@@ -419,16 +431,14 @@ export function ChatMessage({ message, index, isLastAssistant, isStreaming, t, i
               ))}
 
             {/* Error messages for failed tool calls */}
-            {message.toolCalls
-              .filter((tc) => tc.result?.error)
-              .map((tc, tcIndex) => (
-                <ChatErrorMessage
-                  key={`error-${index}-${tcIndex}`}
-                  message={tc.result!.error as string}
-                  recoverable={(tc.result!.recoverable ?? false) as boolean}
-                  className="text-xs"
-                />
-              ))}
+            {unresolvedErrors.map((tc, tcIndex) => (
+              <ChatErrorMessage
+                key={`error-${index}-${tcIndex}`}
+                message={tc.result!.error as string}
+                recoverable={(tc.result!.recoverable ?? false) as boolean}
+                className="text-xs"
+              />
+            ))}
           </div>
         )}
 
