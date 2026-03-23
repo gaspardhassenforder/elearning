@@ -668,6 +668,33 @@ async def vector_search_for_notebook(
         embed = await _get_cached_embedding(keyword)
         notebook_id_clean = ensure_record_id(notebook_id)
 
+        logger.debug(
+            "vector_search_for_notebook: notebook_id={}, query_embed_dim={}, keyword='{}'",
+            notebook_id_clean, len(embed), keyword,
+        )
+
+        # Diagnostic: check if any embeddings exist for this notebook
+        diag = await repo_query(
+            """
+            SELECT
+                count() AS total,
+                array::distinct(embedding_dimension) AS dims
+            FROM source_embedding
+            WHERE notebook_ids CONTAINS $notebook_id
+                OR ((notebook_ids = none OR array::len(notebook_ids) = 0)
+                    AND source IN (SELECT VALUE in FROM reference WHERE out = $notebook_id))
+            GROUP ALL
+            """,
+            {"notebook_id": notebook_id_clean},
+        )
+        logger.info(
+            "vector_search_for_notebook diagnostics for {}: embeddings={}, stored_dims={}, query_dim={}",
+            notebook_id_clean,
+            diag[0]["total"] if diag else 0,
+            diag[0]["dims"] if diag else [],
+            len(embed),
+        )
+
         # Build base params
         params = {
             "notebook_id": notebook_id_clean,

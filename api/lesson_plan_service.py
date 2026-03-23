@@ -155,7 +155,7 @@ async def _generate_step_instructions(ep: dict, sources_with_insights: list[dict
         }
     )
     model = await provision_langchain_model(
-        prompt, model_id=None, default_type="chat", max_tokens=600
+        prompt, model_id=None, default_type="chat", max_tokens=2000
     )
     response = await model.ainvoke(prompt)
     return clean_thinking_content(extract_text_from_response(response.content)).strip()
@@ -252,7 +252,7 @@ async def generate_lesson_plan(notebook_id: str) -> Dict:
             source_ids=None,
             objective_ids=all_objective_ids,  # Quiz covers all objectives
             podcast_topic=None,
-            ai_instructions=f"Generate a {quiz_count}-question quiz covering: {all_concepts}. Test understanding and application, not just recall.",
+            ai_instructions=f"ALWAYS generate a NEW quiz by calling generate_artifact(artifact_type='quiz'). Do NOT surface an existing quiz — every learner gets a fresh {quiz_count}-question quiz. Covering: {all_concepts}. Test understanding and application, not just recall.",
             discussion_prompt=None,
             order=len(outline),
             required=True,

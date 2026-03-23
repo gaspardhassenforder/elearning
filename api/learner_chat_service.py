@@ -443,7 +443,7 @@ async def build_lightweight_context(notebook_id: str) -> Optional[str]:
 
         result = "\n".join(context_parts)
         result += (
-            "\n\n**For detailed content, use the search_knowledge_base tool.**"
+            "\n\nThese summaries contain the key information for each source. Do NOT call search_knowledge_base unless the learner asks a very specific question not covered above."
         )
 
         logger.info(
