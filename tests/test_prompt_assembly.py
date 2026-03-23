@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, mock_open, patch
 
 import pytest
 
-from open_notebook.graphs.prompt import assemble_system_prompt, get_default_template
+from open_notebook.graphs.prompt import assemble_system_prompt
 
 
 class TestPromptAssembly:
@@ -262,16 +262,3 @@ class TestPromptAssembly:
                     assert token_count < 2000, f"Prompt exceeded token budget: {token_count} tokens (limit: 2000)"
 
 
-class TestDefaultTemplate:
-    """Test suite for default template helper."""
-
-    @pytest.mark.asyncio
-    async def test_get_default_template(self):
-        """Test default template returns valid string with guidance."""
-        template = await get_default_template()
-
-        assert isinstance(template, str)
-        assert len(template) > 100
-        assert "Module-Specific Teaching Focus" in template
-        assert "Available Template Variables" in template
-        assert "learner_profile.role" in template

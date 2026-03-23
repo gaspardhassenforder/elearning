@@ -57,97 +57,6 @@ from jinja2 import Template
 from loguru import logger
 
 from open_notebook.domain.module_prompt import ModulePrompt
-from open_notebook.database.repository import repo_query
-
-
-async def _load_available_artifacts(notebook_id: str) -> str:
-    """Load available artifacts (quizzes and podcasts) for a notebook.
-
-    Story 4.6: Artifacts surfacing in chat.
-    Loads all completed quizzes and ready podcasts for the notebook,
-    formats them as a list for injection into the global teacher prompt.
-
-    Args:
-        notebook_id: Notebook/module record ID
-
-    Returns:
-        Formatted string listing available artifacts with IDs,
-        or empty string if no artifacts found.
-    """
-    logger.info(f"Loading available artifacts for notebook {notebook_id}")
-
-    artifacts_text_parts = []
-
-    try:
-        # Load quizzes for this notebook
-        quiz_query = """
-            SELECT id, title, questions_json, created
-            FROM quiz
-            WHERE notebook_id = $notebook_id
-            ORDER BY created DESC
-        """
-        quiz_results = await repo_query(quiz_query, {"notebook_id": notebook_id})
-
-        if quiz_results:
-            artifacts_text_parts.append("**Quizzes:**")
-            for quiz_row in quiz_results:
-                quiz_id = quiz_row.get("id")
-                title = quiz_row.get("title", "Untitled Quiz")
-                # Count questions from JSON
-                import json
-                questions_json = quiz_row.get("questions_json", "[]")
-                try:
-                    questions = json.loads(questions_json) if questions_json else []
-                    question_count = len(questions)
-                except (json.JSONDecodeError, TypeError):
-                    question_count = 0
-
-                artifacts_text_parts.append(
-                    f"  - Quiz: \"{title}\" (ID: {quiz_id}) - {question_count} questions"
-                )
-
-        # Load completed podcasts for this notebook
-        podcast_query = """
-            SELECT id, title, length, speaker_format, status, created
-            FROM podcast
-            WHERE notebook_id = $notebook_id
-              AND status = 'completed'
-            ORDER BY created DESC
-        """
-        podcast_results = await repo_query(podcast_query, {"notebook_id": notebook_id})
-
-        if podcast_results:
-            if artifacts_text_parts:
-                artifacts_text_parts.append("")  # Blank line between sections
-            artifacts_text_parts.append("**Podcasts:**")
-            for podcast_row in podcast_results:
-                podcast_id = podcast_row.get("id")
-                title = podcast_row.get("title", "Untitled Podcast")
-                length = podcast_row.get("length", "medium")
-                speaker_format = podcast_row.get("speaker_format", "multi")
-
-                # Map length to duration
-                duration_map = {"short": 3, "medium": 7, "long": 15}
-                duration = duration_map.get(length, 7)
-
-                artifacts_text_parts.append(
-                    f"  - Podcast: \"{title}\" (ID: {podcast_id}) - {duration} minutes, {speaker_format}-speaker"
-                )
-
-        if artifacts_text_parts:
-            logger.info(
-                f"Found {len([p for p in artifacts_text_parts if 'Quiz:' in p])} quizzes and "
-                f"{len([p for p in artifacts_text_parts if 'Podcast:' in p])} podcasts for notebook {notebook_id}"
-            )
-            return "\n".join(artifacts_text_parts)
-        else:
-            logger.debug(f"No artifacts found for notebook {notebook_id}")
-            return ""
-
-    except Exception as e:
-        logger.error("Error loading artifacts for notebook {}: {}", notebook_id, str(e))
-        # Return empty string on error - don't break prompt assembly
-        return ""
 
 
 async def assemble_system_prompt(
@@ -221,16 +130,12 @@ async def assemble_system_prompt(
     # Story 4.5: Extract ai_familiarity for adaptive teaching
     ai_familiarity = learner_profile.get("ai_familiarity", "intermediate") if learner_profile else "intermediate"
 
-    # Story 4.6: Load available artifacts (quizzes and podcasts) for surfacing in chat
-    artifacts_list = await _load_available_artifacts(notebook_id)
-
     global_context = {
         "learner_profile": learner_profile,
         "objectives": objectives_with_status,
         "current_focus_objective": current_focus_objective,  # Story 4.2: Focus objective for AI
         "context": context,
         "ai_familiarity": ai_familiarity,  # Story 4.5: For adaptive teaching strategy
-        "artifacts_list": artifacts_list,  # Story 4.6: Available quizzes and podcasts
         "lesson_steps": lesson_steps or [],  # Structured lesson plan with statuses
         "current_step": current_step,  # Active lesson step (first incomplete required step)
     }
@@ -292,52 +197,3 @@ async def assemble_system_prompt(
         logger.info(f"Added language instruction for {language_name}")
 
     return final_prompt
-
-
-async def get_default_template() -> str:
-    """Get default per-module prompt template for pre-population.
-
-    Returns a starter template that admins can customize. Demonstrates
-    available Jinja2 variables and provides guidance on customization.
-
-    Returns:
-        Default template string with explanatory comments
-    """
-    return """# Module-Specific Teaching Focus
-
-Focus this module on [TOPIC/INDUSTRY - e.g., "AI applications in logistics"].
-The learners are [ROLE/AUDIENCE - e.g., "supply chain managers"].
-
-## Teaching Approach
-[Describe desired teaching style - e.g., "Keep explanations concrete with real-world examples"]
-
-## Emphasis Areas
-- [Area 1 - e.g., "Warehouse automation"]
-- [Area 2 - e.g., "Predictive shipping optimization"]
-- [Area 3 - e.g., "Inventory forecasting"]
-
-## Specific Examples to Reference
-{% if context %}
-When appropriate, reference these real-world applications:
-- [Example 1 - e.g., "Amazon's fulfillment center automation"]
-- [Example 2 - e.g., "DHL's predictive shipping"]
-{% endif %}
-
-## Tone & Language
-[Describe desired tone - e.g., "Professional but approachable, avoid overly technical jargon"]
-
----
-
-**Available Template Variables:**
-- `learner_profile.role` - Learner's job role
-- `learner_profile.ai_familiarity` - AI experience level
-- `objectives` - List of learning objectives with status
-- `context` - Available source documents
-
-**Example Usage:**
-```
-{% if learner_profile.ai_familiarity == "beginner" %}
-Avoid technical AI terminology unless explaining it.
-{% endif %}
-```
-"""

@@ -28,43 +28,6 @@ interface ModulePromptEditorProps {
   onBack?: () => void
 }
 
-const DEFAULT_TEMPLATE = `# Module-Specific Teaching Focus
-
-Focus this module on [TOPIC/INDUSTRY - e.g., "AI applications in logistics"].
-The learners are [ROLE/AUDIENCE - e.g., "supply chain managers"].
-
-## Teaching Approach
-[Describe desired teaching style - e.g., "Keep explanations concrete with real-world examples"]
-
-## Emphasis Areas
-- [Area 1 - e.g., "Warehouse automation"]
-- [Area 2 - e.g., "Predictive shipping optimization"]
-- [Area 3 - e.g., "Inventory forecasting"]
-
-## Specific Examples to Reference
-When appropriate, reference these real-world applications:
-- [Example 1 - e.g., "Amazon's fulfillment center automation"]
-- [Example 2 - e.g., "DHL's predictive shipping"]
-
-## Tone & Language
-[Describe desired tone - e.g., "Professional but approachable, avoid overly technical jargon"]
-
----
-
-**Available Template Variables:**
-- \`learner_profile.role\` - Learner's job role
-- \`learner_profile.ai_familiarity\` - AI experience level
-- \`objectives\` - List of learning objectives with status
-- \`context\` - Available source documents
-
-**Example Usage:**
-\`\`\`
-{% if learner_profile.ai_familiarity == "beginner" %}
-Avoid technical AI terminology unless explaining it.
-{% endif %}
-\`\`\`
-`
-
 export function ModulePromptEditor({ moduleId, onNext, onBack }: ModulePromptEditorProps) {
   const { t } = useTranslation()
 
@@ -82,8 +45,8 @@ export function ModulePromptEditor({ moduleId, onNext, onBack }: ModulePromptEdi
       // Existing prompt - load it
       setPromptText(promptData.system_prompt || '')
     } else if (!isLoading && !promptData) {
-      // No existing prompt - pre-populate with default template
-      setPromptText(DEFAULT_TEMPLATE)
+      // No existing prompt - leave empty (placeholder guides the admin)
+      setPromptText('')
     }
   }, [promptData, isLoading])
 

@@ -1426,7 +1426,7 @@ export const enUS = {
     loading: "Loading prompt...",
     errorLoading: "Failed to load prompt",
     errorSaving: "Failed to save prompt",
-    placeholder: "Enter custom teaching instructions for this module...",
+    placeholder: "e.g., Focus on practical logistics applications.\nUse a professional but approachable tone.\nAvoid overly technical jargon.",
     charactersLabel: "Characters",
     unsavedChanges: "Unsaved changes",
     infoTitle: "Two-Layer Prompt System",
@@ -1434,10 +1434,10 @@ export const enUS = {
     infoGlobal: "Global Layer: Core pedagogical principles (Socratic method, proactive teaching) - always active",
     infoModule: "Module Layer: Optional customization for topic, industry, tone, and examples - configured here",
     infoOptional: "This per-module prompt is optional. Leave empty to use only the global teaching principles.",
-    helpTitle: "How to Customize:",
-    helpVariables: "Use template variables like {{ learner_profile.role }} to personalize teaching",
-    helpJinja: "Supports Jinja2 syntax for conditional logic ({% if %} statements)",
-    helpEmpty: "Leave empty to rely on global prompt only (no module-specific customization)",
+    helpTitle: "How to write custom instructions:",
+    helpVariables: "Describe the teaching tone, emphasis areas, or things to avoid",
+    helpJinja: "The AI already knows your sources, objectives, and lesson plan — focus on style and approach",
+    helpEmpty: "Leave empty to use the global prompt only",
   },
   learner: {
     // Story 4.1: Learner Chat Interface & SSE Streaming

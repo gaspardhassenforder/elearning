@@ -1426,7 +1426,7 @@ export const frFR = {
     loading: "Chargement de l'invite...",
     errorLoading: "Échec du chargement de l'invite",
     errorSaving: "Échec de l'enregistrement de l'invite",
-    placeholder: "Saisissez des instructions d'enseignement personnalisées pour ce module...",
+    placeholder: "ex. Concentrez-vous sur les applications logistiques pratiques.\nUtilisez un ton professionnel mais accessible.\nÉvitez le jargon trop technique.",
     charactersLabel: "Caractères",
     unsavedChanges: "Modifications non enregistrées",
     infoTitle: "Système d'invite à deux couches",
@@ -1434,10 +1434,10 @@ export const frFR = {
     infoGlobal: "Couche globale : Principes pédagogiques fondamentaux (méthode socratique, enseignement proactif) - toujours actifs",
     infoModule: "Couche module : Personnalisation optionnelle pour le sujet, l'industrie, le ton et les exemples - configuré ici",
     infoOptional: "Cette invite par module est facultative. Laissez vide pour utiliser uniquement les principes d'enseignement globaux.",
-    helpTitle: "Comment personnaliser :",
-    helpVariables: "Utilisez des variables de modèle comme {{ learner_profile.role }} pour personnaliser l'enseignement",
-    helpJinja: "Prend en charge la syntaxe Jinja2 pour la logique conditionnelle (instructions {% if %})",
-    helpEmpty: "Laissez vide pour s'appuyer uniquement sur l'invite globale (aucune personnalisation spécifique au module)",
+    helpTitle: "Comment rédiger des instructions personnalisées :",
+    helpVariables: "Décrivez le ton d'enseignement, les domaines à privilégier ou les choses à éviter",
+    helpJinja: "L'IA connaît déjà vos sources, objectifs et plan de cours — concentrez-vous sur le style et l'approche",
+    helpEmpty: "Laissez vide pour utiliser uniquement l'invite globale",
   },
   learner: {
     // Story 4.1: Interface de chat apprenant et streaming SSE
