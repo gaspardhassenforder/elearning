@@ -665,6 +665,7 @@ async def stream_learner_chat(
                         "user_id": learner.user.id,
                         "notebook_id": notebook_id,
                         "company_id": learner.company_id,
+                        "lesson_steps": lesson_steps,
                     },
                     "callbacks": callbacks,
                 },

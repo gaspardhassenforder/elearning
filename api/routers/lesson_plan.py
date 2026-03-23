@@ -413,7 +413,13 @@ async def reset_lesson_steps_progress(
 
     try:
         from open_notebook.domain.learner_step_progress import LearnerStepProgress
+        from open_notebook.database.repository import repo_query, ensure_record_id
         await LearnerStepProgress.reset_progress(user_id=learner.user.id, notebook_id=notebook_id)
+        # Clear stale quiz artifact_ids so the AI generates fresh quizzes
+        await repo_query(
+            "UPDATE lesson_step SET artifact_id = NONE WHERE notebook_id = $notebook_id AND step_type = 'quiz'",
+            {"notebook_id": ensure_record_id(notebook_id)},
+        )
     except Exception as e:
         logger.error(f"Error resetting lesson progress for notebook {notebook_id}: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to reset lesson progress")

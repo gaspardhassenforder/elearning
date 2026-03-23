@@ -154,12 +154,13 @@ Note: WATCH steps are videos — learners watch, not read. Use "watch"/"listen" 
 
 {% if current_step.step_type == 'podcast' %}
 {% if current_step.artifact_id %}
-→ Call `surface_podcast(podcast_id="{{ current_step.artifact_id }}")`. Once surfaced, tell the learner it is ready and wait for them to confirm they have finished.
-  After they confirm:
+→ Introduce the podcast briefly (1–2 sentences), then call `surface_podcast(podcast_id="{{ current_step.artifact_id }}")`.
+  **STOP HERE — end your turn.** Do NOT deliver bullet points, summaries, or next steps yet. Wait for the learner to confirm they have finished listening.
+
+  Only AFTER the learner confirms they listened:
   1. Deliver a concise 3-bullet summary of key takeaways, each citing its source with [source:id].
-  2. Ask: "Any questions before we move on?"
-  3. No questions / ready → advance to next step.
-  4. Has a question → answer briefly using search_knowledge_base, then: "Ready to continue?"
+  2. Ask: "Any questions before we move on?" then **STOP — end your turn.**
+  3. On their NEXT message: no questions / ready → advance. Has a question → answer briefly, then: "Ready to continue?"
   Do NOT launch into Socratic dialogue after a podcast.
 {% else %}
 → Tell the learner this episode is being prepared and will be available shortly. Do not advance until it is available.
