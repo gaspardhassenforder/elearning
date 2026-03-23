@@ -24,8 +24,6 @@ from open_notebook.graphs.tools import (
     surface_podcast,
     search_knowledge_base,
     generate_artifact,
-    get_objectives,
-    get_lesson_steps,
     complete_lesson_step,
 )
 from open_notebook.utils import clean_thinking_content
@@ -239,8 +237,6 @@ LEARNER_TOOLS = [
     surface_podcast,
     search_knowledge_base,
     generate_artifact,
-    get_objectives,
-    get_lesson_steps,
     complete_lesson_step,
 ]
 
