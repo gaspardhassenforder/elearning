@@ -1,7 +1,10 @@
 import { useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { podcastsApi, EpisodeProfileInput, SpeakerProfileInput } from '@/lib/api/podcasts'
+import {
+  podcastsApi,
+  UnifiedPodcastProfilePayload,
+} from '@/lib/api/podcasts'
 import { QUERY_KEYS } from '@/lib/api/query-client'
 import { useToast } from '@/lib/hooks/use-toast'
 import { useTranslation } from '@/lib/hooks/use-translation'
@@ -116,63 +119,6 @@ export function useEpisodeProfiles() {
   }
 }
 
-export function useCreateEpisodeProfile() {
-  const queryClient = useQueryClient()
-  const { toast } = useToast()
-  const { t } = useTranslation()
-
-  return useMutation({
-    mutationFn: (payload: EpisodeProfileInput) =>
-      podcastsApi.createEpisodeProfile(payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.episodeProfiles })
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.podcastEpisodes })
-      toast({
-        title: t.podcasts.profileCreated,
-        description: t.podcasts.profileCreatedDesc,
-      })
-    },
-    onError: (error: unknown) => {
-      toast({
-        title: t.podcasts.failedToCreateProfile,
-        description: getApiErrorKey(error, t.common.error),
-        variant: 'destructive',
-      })
-    },
-  })
-}
-
-export function useUpdateEpisodeProfile() {
-  const queryClient = useQueryClient()
-  const { toast } = useToast()
-  const { t } = useTranslation()
-
-  return useMutation({
-    mutationFn: ({
-      profileId,
-      payload,
-    }: {
-      profileId: string
-      payload: EpisodeProfileInput
-    }) => podcastsApi.updateEpisodeProfile(profileId, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.episodeProfiles })
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.podcastEpisodes })
-      toast({
-        title: t.podcasts.profileUpdated,
-        description: t.podcasts.profileUpdatedDesc,
-      })
-    },
-    onError: (error: unknown) => {
-      toast({
-        title: t.podcasts.failedToUpdateProfile,
-        description: getApiErrorKey(error, t.common.error),
-        variant: 'destructive',
-      })
-    },
-  })
-}
-
 export function useDeleteEpisodeProfile() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
@@ -182,6 +128,7 @@ export function useDeleteEpisodeProfile() {
     mutationFn: (profileId: string) => podcastsApi.deleteEpisodeProfile(profileId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.episodeProfiles })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.speakerProfiles })
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.podcastEpisodes })
       toast({
         title: t.podcasts.profileDeleted,
@@ -208,7 +155,7 @@ export function useDuplicateEpisodeProfile() {
       podcastsApi.duplicateEpisodeProfile(profileId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.episodeProfiles })
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.podcastEpisodes })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.speakerProfiles })
       toast({
         title: t.podcasts.profileDuplicated,
         description: t.podcasts.profileDuplicatedDesc,
@@ -217,6 +164,63 @@ export function useDuplicateEpisodeProfile() {
     onError: (error: unknown) => {
       toast({
         title: t.podcasts.failedToDuplicateProfile,
+        description: getApiErrorKey(error, t.common.error),
+        variant: 'destructive',
+      })
+    },
+  })
+}
+
+export function useCreateUnifiedPodcastProfile() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  const { t } = useTranslation()
+
+  return useMutation({
+    mutationFn: (payload: UnifiedPodcastProfilePayload) =>
+      podcastsApi.createUnifiedEpisodeProfile(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.episodeProfiles })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.speakerProfiles })
+      toast({
+        title: t.podcasts.profileCreated,
+        description: t.podcasts.profileCreatedDesc,
+      })
+    },
+    onError: (error: unknown) => {
+      toast({
+        title: t.podcasts.failedToCreateProfile,
+        description: getApiErrorKey(error, t.common.error),
+        variant: 'destructive',
+      })
+    },
+  })
+}
+
+export function useUpdateUnifiedPodcastProfile() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  const { t } = useTranslation()
+
+  return useMutation({
+    mutationFn: ({
+      profileId,
+      payload,
+    }: {
+      profileId: string
+      payload: UnifiedPodcastProfilePayload
+    }) => podcastsApi.updateUnifiedEpisodeProfile(profileId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.episodeProfiles })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.speakerProfiles })
+      toast({
+        title: t.podcasts.profileUpdated,
+        description: t.podcasts.profileUpdatedDesc,
+      })
+    },
+    onError: (error: unknown) => {
+      toast({
+        title: t.podcasts.failedToUpdateProfile,
         description: getApiErrorKey(error, t.common.error),
         variant: 'destructive',
       })
@@ -244,116 +248,6 @@ export function useSpeakerProfiles(episodeProfiles?: EpisodeProfile[]) {
   }
 }
 
-export function useCreateSpeakerProfile() {
-  const queryClient = useQueryClient()
-  const { toast } = useToast()
-  const { t } = useTranslation()
-
-  return useMutation({
-    mutationFn: (payload: SpeakerProfileInput) =>
-      podcastsApi.createSpeakerProfile(payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.speakerProfiles })
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.episodeProfiles })
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.podcastEpisodes })
-      toast({
-        title: t.podcasts.speakerCreated,
-        description: t.podcasts.speakerCreatedDesc,
-      })
-    },
-    onError: (error: unknown) => {
-      toast({
-        title: t.podcasts.failedToCreateSpeaker,
-        description: getApiErrorKey(error, t.common.error),
-        variant: 'destructive',
-      })
-    },
-  })
-}
-
-export function useUpdateSpeakerProfile() {
-  const queryClient = useQueryClient()
-  const { toast } = useToast()
-  const { t } = useTranslation()
-
-  return useMutation({
-    mutationFn: ({
-      profileId,
-      payload,
-    }: {
-      profileId: string
-      payload: SpeakerProfileInput
-    }) => podcastsApi.updateSpeakerProfile(profileId, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.speakerProfiles })
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.episodeProfiles })
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.podcastEpisodes })
-      toast({
-        title: t.podcasts.speakerUpdated,
-        description: t.podcasts.speakerUpdatedDesc,
-      })
-    },
-    onError: (error: unknown) => {
-      toast({
-        title: t.podcasts.failedToUpdateSpeaker,
-        description: getApiErrorKey(error, t.common.error),
-        variant: 'destructive',
-      })
-    },
-  })
-}
-
-export function useDeleteSpeakerProfile() {
-  const queryClient = useQueryClient()
-  const { toast } = useToast()
-  const { t } = useTranslation()
-
-  return useMutation({
-    mutationFn: (profileId: string) => podcastsApi.deleteSpeakerProfile(profileId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.speakerProfiles })
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.episodeProfiles })
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.podcastEpisodes })
-      toast({
-        title: t.podcasts.speakerDeleted,
-        description: t.podcasts.speakerDeletedDesc,
-      })
-    },
-    onError: (error: unknown) => {
-      toast({
-        title: t.podcasts.failedToDeleteSpeaker,
-        description: getApiErrorKey(error, t.podcasts.failedToDeleteSpeakerDesc),
-        variant: 'destructive',
-      })
-    },
-  })
-}
-
-export function useDuplicateSpeakerProfile() {
-  const queryClient = useQueryClient()
-  const { toast } = useToast()
-  const { t } = useTranslation()
-
-  return useMutation({
-    mutationFn: (profileId: string) =>
-      podcastsApi.duplicateSpeakerProfile(profileId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.speakerProfiles })
-      toast({
-        title: t.podcasts.speakerDuplicated,
-        description: t.podcasts.speakerDuplicatedDesc,
-      })
-    },
-    onError: (error: unknown) => {
-      toast({
-        title: t.podcasts.failedToDuplicateSpeaker,
-        description: getApiErrorKey(error, t.common.error),
-        variant: 'destructive',
-      })
-    },
-  })
-}
-
 export function useGeneratePodcast() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
@@ -365,17 +259,17 @@ export function useGeneratePodcast() {
     onSuccess: async (response, variables) => {
       // Immediately refetch to show the new episode
       await queryClient.refetchQueries({ queryKey: QUERY_KEYS.podcastEpisodes })
-      
+
       // Invalidate artifacts for ALL notebooks that contributed content
       const notebookIds = variables.notebook_ids ?? []
       if (variables.notebook_id && !notebookIds.includes(variables.notebook_id)) {
         notebookIds.push(variables.notebook_id)
       }
-      
+
       for (const nbId of notebookIds) {
         await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.artifacts(nbId) })
       }
-      
+
       toast({
         title: t.podcasts.generationStarted,
         description: t.podcasts.generationStartedDesc.replace('{name}', response.episode_name),

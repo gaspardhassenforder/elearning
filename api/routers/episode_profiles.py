@@ -1,10 +1,17 @@
-from typing import List
+from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
 from pydantic import BaseModel, Field
 
 from api.auth import get_current_user, require_admin
+from api.podcast_unified_service import (
+    create_unified_podcast_profile,
+    delete_episode_profile_with_managed_speaker,
+    duplicate_episode_profile_with_speaker_clone,
+    update_unified_podcast_profile,
+)
+from open_notebook.exceptions import NotFoundError
 from open_notebook.podcasts.models import EpisodeProfile
 
 router = APIRouter()
@@ -23,27 +30,27 @@ class EpisodeProfileResponse(BaseModel):
     num_segments: int
 
 
+def _to_episode_response(profile: EpisodeProfile) -> EpisodeProfileResponse:
+    return EpisodeProfileResponse(
+        id=str(profile.id),
+        name=profile.name,
+        description=profile.description or "",
+        speaker_config=profile.speaker_config,
+        outline_provider=profile.outline_provider,
+        outline_model=profile.outline_model,
+        transcript_provider=profile.transcript_provider,
+        transcript_model=profile.transcript_model,
+        default_briefing=profile.default_briefing,
+        num_segments=profile.num_segments,
+    )
+
+
 @router.get("/episode-profiles", response_model=List[EpisodeProfileResponse])
 async def list_episode_profiles(_user=Depends(get_current_user)):
     """List all available episode profiles"""
     try:
         profiles = await EpisodeProfile.get_all(order_by="name asc")
-
-        return [
-            EpisodeProfileResponse(
-                id=str(profile.id),
-                name=profile.name,
-                description=profile.description or "",
-                speaker_config=profile.speaker_config,
-                outline_provider=profile.outline_provider,
-                outline_model=profile.outline_model,
-                transcript_provider=profile.transcript_provider,
-                transcript_model=profile.transcript_model,
-                default_briefing=profile.default_briefing,
-                num_segments=profile.num_segments,
-            )
-            for profile in profiles
-        ]
+        return [_to_episode_response(profile) for profile in profiles]
 
     except Exception as e:
         logger.error("Failed to fetch episode profiles: {}", str(e))
@@ -63,18 +70,7 @@ async def get_episode_profile(profile_name: str, _user=Depends(get_current_user)
                 status_code=404, detail=f"Episode profile '{profile_name}' not found"
             )
 
-        return EpisodeProfileResponse(
-            id=str(profile.id),
-            name=profile.name,
-            description=profile.description or "",
-            speaker_config=profile.speaker_config,
-            outline_provider=profile.outline_provider,
-            outline_model=profile.outline_model,
-            transcript_provider=profile.transcript_provider,
-            transcript_model=profile.transcript_model,
-            default_briefing=profile.default_briefing,
-            num_segments=profile.num_segments,
-        )
+        return _to_episode_response(profile)
 
     except HTTPException:
         raise
@@ -85,119 +81,81 @@ async def get_episode_profile(profile_name: str, _user=Depends(get_current_user)
         )
 
 
-class EpisodeProfileCreate(BaseModel):
-    name: str = Field(..., description="Unique profile name")
+class UnifiedPodcastProfilePayload(BaseModel):
+    """Wizard unique : intervenants + format épisode (TTS/LLM imposés côté serveur)."""
+
+    name: str = Field(..., description="Unique episode profile name")
     description: str = Field("", description="Profile description")
-    speaker_config: str = Field(..., description="Reference to speaker profile name")
-    outline_provider: str = Field(..., description="AI provider for outline generation")
-    outline_model: str = Field(..., description="AI model for outline generation")
-    transcript_provider: str = Field(
-        ..., description="AI provider for transcript generation"
+    speakers: List[Dict[str, Any]] = Field(
+        ..., description="Speaker voice configs (name, voice_id, backstory, personality)"
     )
-    transcript_model: str = Field(..., description="AI model for transcript generation")
     default_briefing: str = Field(..., description="Default briefing template")
-    num_segments: int = Field(default=5, description="Number of podcast segments")
+    num_segments: int = Field(default=5, ge=3, le=20, description="Number of podcast segments")
 
 
-@router.post("/episode-profiles", response_model=EpisodeProfileResponse)
-async def create_episode_profile(profile_data: EpisodeProfileCreate, _admin=Depends(require_admin)):
-    """Create a new episode profile"""
+@router.post("/episode-profiles/unified", response_model=EpisodeProfileResponse)
+async def create_unified_episode_profile(
+    payload: UnifiedPodcastProfilePayload, _admin=Depends(require_admin)
+):
+    """Create episode profile + managed speaker profile (single wizard)."""
     try:
-        profile = EpisodeProfile(
-            name=profile_data.name,
-            description=profile_data.description,
-            speaker_config=profile_data.speaker_config,
-            outline_provider=profile_data.outline_provider,
-            outline_model=profile_data.outline_model,
-            transcript_provider=profile_data.transcript_provider,
-            transcript_model=profile_data.transcript_model,
-            default_briefing=profile_data.default_briefing,
-            num_segments=profile_data.num_segments,
+        profile, _ = await create_unified_podcast_profile(
+            name=payload.name,
+            description=payload.description,
+            speakers=payload.speakers,
+            default_briefing=payload.default_briefing,
+            num_segments=payload.num_segments,
         )
-
-        await profile.save()
-
-        return EpisodeProfileResponse(
-            id=str(profile.id),
-            name=profile.name,
-            description=profile.description or "",
-            speaker_config=profile.speaker_config,
-            outline_provider=profile.outline_provider,
-            outline_model=profile.outline_model,
-            transcript_provider=profile.transcript_provider,
-            transcript_model=profile.transcript_model,
-            default_briefing=profile.default_briefing,
-            num_segments=profile.num_segments,
-        )
-
-    except Exception as e:
-        logger.error("Failed to create episode profile: {}", str(e))
-        raise HTTPException(
-            status_code=500, detail="Failed to create episode profile"
-        )
-
-
-@router.put("/episode-profiles/{profile_id}", response_model=EpisodeProfileResponse)
-async def update_episode_profile(profile_id: str, profile_data: EpisodeProfileCreate, _admin=Depends(require_admin)):
-    """Update an existing episode profile"""
-    try:
-        profile = await EpisodeProfile.get(profile_id)
-
-        if not profile:
-            raise HTTPException(
-                status_code=404, detail=f"Episode profile '{profile_id}' not found"
-            )
-
-        # Update fields
-        profile.name = profile_data.name
-        profile.description = profile_data.description
-        profile.speaker_config = profile_data.speaker_config
-        profile.outline_provider = profile_data.outline_provider
-        profile.outline_model = profile_data.outline_model
-        profile.transcript_provider = profile_data.transcript_provider
-        profile.transcript_model = profile_data.transcript_model
-        profile.default_briefing = profile_data.default_briefing
-        profile.num_segments = profile_data.num_segments
-
-        await profile.save()
-
-        return EpisodeProfileResponse(
-            id=str(profile.id),
-            name=profile.name,
-            description=profile.description or "",
-            speaker_config=profile.speaker_config,
-            outline_provider=profile.outline_provider,
-            outline_model=profile.outline_model,
-            transcript_provider=profile.transcript_provider,
-            transcript_model=profile.transcript_model,
-            default_briefing=profile.default_briefing,
-            num_segments=profile.num_segments,
-        )
-
+        return _to_episode_response(profile)
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Failed to update episode profile: {}", str(e))
+        logger.error("Failed to create unified episode profile: {}", str(e))
         raise HTTPException(
-            status_code=500, detail="Failed to update episode profile"
+            status_code=500, detail="Failed to create unified episode profile"
+        )
+
+
+@router.put("/episode-profiles/{profile_id}/unified", response_model=EpisodeProfileResponse)
+async def update_unified_episode_profile(
+    profile_id: str,
+    payload: UnifiedPodcastProfilePayload,
+    _admin=Depends(require_admin),
+):
+    """Update episode + linked speaker (same wizard payload)."""
+    try:
+        profile, _ = await update_unified_podcast_profile(
+            profile_id,
+            name=payload.name,
+            description=payload.description,
+            speakers=payload.speakers,
+            default_briefing=payload.default_briefing,
+            num_segments=payload.num_segments,
+        )
+        return _to_episode_response(profile)
+    except NotFoundError:
+        raise HTTPException(
+            status_code=404, detail=f"Episode profile '{profile_id}' not found"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to update unified episode profile: {}", str(e))
+        raise HTTPException(
+            status_code=500, detail="Failed to update unified episode profile"
         )
 
 
 @router.delete("/episode-profiles/{profile_id}")
 async def delete_episode_profile(profile_id: str, _admin=Depends(require_admin)):
-    """Delete an episode profile"""
+    """Delete an episode profile (et le speaker géré par le wizard si couplé)."""
     try:
-        profile = await EpisodeProfile.get(profile_id)
-
-        if not profile:
-            raise HTTPException(
-                status_code=404, detail=f"Episode profile '{profile_id}' not found"
-            )
-
-        await profile.delete()
-
+        await delete_episode_profile_with_managed_speaker(profile_id)
         return {"message": "Episode profile deleted successfully"}
-
+    except NotFoundError:
+        raise HTTPException(
+            status_code=404, detail=f"Episode profile '{profile_id}' not found"
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -211,43 +169,14 @@ async def delete_episode_profile(profile_id: str, _admin=Depends(require_admin))
     "/episode-profiles/{profile_id}/duplicate", response_model=EpisodeProfileResponse
 )
 async def duplicate_episode_profile(profile_id: str, _admin=Depends(require_admin)):
-    """Duplicate an episode profile"""
+    """Duplicate an episode profile (clone du pack voix lié)."""
     try:
-        original = await EpisodeProfile.get(profile_id)
-
-        if not original:
-            raise HTTPException(
-                status_code=404, detail=f"Episode profile '{profile_id}' not found"
-            )
-
-        # Create duplicate with modified name
-        duplicate = EpisodeProfile(
-            name=f"{original.name} - Copy",
-            description=original.description,
-            speaker_config=original.speaker_config,
-            outline_provider=original.outline_provider,
-            outline_model=original.outline_model,
-            transcript_provider=original.transcript_provider,
-            transcript_model=original.transcript_model,
-            default_briefing=original.default_briefing,
-            num_segments=original.num_segments,
+        duplicate, _ = await duplicate_episode_profile_with_speaker_clone(profile_id)
+        return _to_episode_response(duplicate)
+    except NotFoundError:
+        raise HTTPException(
+            status_code=404, detail=f"Episode profile '{profile_id}' not found"
         )
-
-        await duplicate.save()
-
-        return EpisodeProfileResponse(
-            id=str(duplicate.id),
-            name=duplicate.name,
-            description=duplicate.description or "",
-            speaker_config=duplicate.speaker_config,
-            outline_provider=duplicate.outline_provider,
-            outline_model=duplicate.outline_model,
-            transcript_provider=duplicate.transcript_provider,
-            transcript_model=duplicate.transcript_model,
-            default_briefing=duplicate.default_briefing,
-            num_segments=duplicate.num_segments,
-        )
-
     except HTTPException:
         raise
     except Exception as e:

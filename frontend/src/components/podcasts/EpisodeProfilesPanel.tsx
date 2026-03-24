@@ -1,14 +1,14 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Copy, Edit3, MoreVertical, Trash2, Users } from 'lucide-react'
 
-import { EpisodeProfile, SpeakerProfile } from '@/lib/types/podcasts'
+import { EpisodeProfile } from '@/lib/types/podcasts'
 import {
   useDeleteEpisodeProfile,
   useDuplicateEpisodeProfile,
 } from '@/lib/hooks/use-podcasts'
-import { EpisodeProfileFormDialog } from '@/components/podcasts/forms/EpisodeProfileFormDialog'
+import { UnifiedPodcastProfileFormDialog } from '@/components/podcasts/forms/UnifiedPodcastProfileFormDialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,7 +20,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -40,36 +39,15 @@ import { useTranslation } from '@/lib/hooks/use-translation'
 
 interface EpisodeProfilesPanelProps {
   episodeProfiles: EpisodeProfile[]
-  speakerProfiles: SpeakerProfile[]
-  modelOptions: Record<string, string[]>
 }
 
-function findSpeakerSummary(
-  speakerProfiles: SpeakerProfile[],
-  speakerName: string
-) {
-  return speakerProfiles.find((profile) => profile.name === speakerName)
-}
-
-export function EpisodeProfilesPanel({
-  episodeProfiles,
-  speakerProfiles,
-  modelOptions,
-}: EpisodeProfilesPanelProps) {
+export function EpisodeProfilesPanel({ episodeProfiles }: EpisodeProfilesPanelProps) {
   const { t } = useTranslation()
   const [createOpen, setCreateOpen] = useState(false)
   const [editProfile, setEditProfile] = useState<EpisodeProfile | null>(null)
 
   const deleteProfile = useDeleteEpisodeProfile()
   const duplicateProfile = useDuplicateEpisodeProfile()
-
-  const sortedProfiles = useMemo(
-    () =>
-      [...episodeProfiles].sort((a, b) => a.name.localeCompare(b.name, 'en')),
-    [episodeProfiles]
-  )
-
-  const disableCreate = speakerProfiles.length === 0
 
   return (
     <div className="space-y-6">
@@ -80,29 +58,16 @@ export function EpisodeProfilesPanel({
             {t.podcasts.episodeProfilesDesc}
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)} disabled={disableCreate}>
-          {t.podcasts.createProfile}
-        </Button>
+        <Button onClick={() => setCreateOpen(true)}>{t.podcasts.createProfile}</Button>
       </div>
 
-      {disableCreate ? (
-        <p className="rounded-lg border border-dashed bg-amber-50 p-4 text-sm text-amber-900">
-          {t.podcasts.createSpeakerFirst}
-        </p>
-      ) : null}
-
-      {sortedProfiles.length === 0 ? (
+      {episodeProfiles.length === 0 ? (
         <div className="rounded-lg border border-dashed bg-muted/30 p-10 text-center text-sm text-muted-foreground">
           {t.podcasts.noEpisodeProfiles}
         </div>
       ) : (
         <div className="space-y-4">
-          {sortedProfiles.map((profile) => {
-            const speakerSummary = findSpeakerSummary(
-              speakerProfiles,
-              profile.speaker_config
-            )
-
+          {episodeProfiles.map((profile) => {
             return (
               <Card key={profile.id} className="shadow-sm">
                 <CardHeader className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
@@ -177,23 +142,8 @@ export function EpisodeProfilesPanel({
                 </CardHeader>
 
                 <CardContent className="space-y-4 text-sm">
+                  <p className="text-xs text-muted-foreground">{t.podcasts.unifiedEngineNote}</p>
                   <div className="grid gap-3 md:grid-cols-2">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        {t.podcasts.outlineModel}
-                      </p>
-                      <p className="text-foreground">
-                        {profile.outline_provider} / {profile.outline_model}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        {t.podcasts.transcriptModel}
-                      </p>
-                      <p className="text-foreground">
-                        {profile.transcript_provider} / {profile.transcript_model}
-                      </p>
-                    </div>
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         {t.podcasts.segments}
@@ -206,12 +156,7 @@ export function EpisodeProfilesPanel({
                       </p>
                       <div className="flex items-center gap-2 text-foreground">
                         <Users className="h-4 w-4" />
-                        <span>{profile.speaker_config}</span>
-                        {speakerSummary ? (
-                          <Badge variant="outline" className="text-xs">
-                            {speakerSummary.tts_provider} / {speakerSummary.tts_model}
-                          </Badge>
-                        ) : null}
+                        <span className="break-all">{profile.speaker_config.replace(/::__podcast_voices$/, '')}</span>
                       </div>
                     </div>
                   </div>
@@ -233,15 +178,13 @@ export function EpisodeProfilesPanel({
         </div>
       )}
 
-      <EpisodeProfileFormDialog
+      <UnifiedPodcastProfileFormDialog
         mode="create"
         open={createOpen}
         onOpenChange={setCreateOpen}
-        speakerProfiles={speakerProfiles}
-        modelOptions={modelOptions}
       />
 
-      <EpisodeProfileFormDialog
+      <UnifiedPodcastProfileFormDialog
         mode="edit"
         open={Boolean(editProfile)}
         onOpenChange={(open) => {
@@ -249,8 +192,6 @@ export function EpisodeProfilesPanel({
             setEditProfile(null)
           }
         }}
-        speakerProfiles={speakerProfiles}
-        modelOptions={modelOptions}
         initialData={editProfile ?? undefined}
       />
     </div>

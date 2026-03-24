@@ -986,7 +986,7 @@ export function GeneratePodcastDialog({ open, onOpenChange, notebookId }: Genera
                       <div className="space-y-1">
                         <p className="text-xs text-muted-foreground">
                           {t.podcasts.usesSpeakerProfile}{' '}
-                          <strong>{selectedEpisodeProfile.speaker_config}</strong>
+                          <strong>{selectedEpisodeProfile.speaker_config.replace(/::__podcast_voices$/, '')}</strong>
                         </p>
                         <div className="flex flex-wrap gap-2">
                           <Badge variant="outline" className="text-xs">
